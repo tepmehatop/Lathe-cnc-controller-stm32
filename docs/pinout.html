@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELS STM32F407 — Схема подключения</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --card: #0f3460;
+    --accent: #e94560; --text: #eaeaea; --muted: #888;
+    --green: #4caf50; --blue: #2196f3; --orange: #ff9800;
+    --purple: #9c27b0; --teal: #009688; --red: #f44336;
+    --yellow: #ffeb3b; --pink: #e91e63; --cyan: #00bcd4;
+    --lime: #8bc34a; --brown: #795548;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; }
+  h1 { text-align: center; padding: 20px; color: var(--accent); font-size: 1.6em; }
+  h1 span { color: var(--muted); font-size: 0.7em; display: block; margin-top: 4px; }
+
+  /* TABS */
+  .tabs { display: flex; justify-content: center; gap: 8px; padding: 10px; flex-wrap: wrap; }
+  .tab { padding: 10px 24px; border-radius: 6px; cursor: pointer; border: 2px solid var(--card);
+         background: var(--surface); color: var(--muted); font-size: 0.95em; transition: all .2s; }
+  .tab.active, .tab:hover { border-color: var(--accent); color: var(--text); background: var(--card); }
+  .tab-content { display: none; padding: 20px; }
+  .tab-content.active { display: block; }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 16px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.82em; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+  /* ============ STYLE 1: WIRING BLOCK DIAGRAM ============ */
+  .wiring-wrap { max-width: 1100px; margin: 0 auto; }
+  .wiring-grid { display: grid; grid-template-columns: 1fr 240px 1fr; gap: 20px; align-items: start; }
+  .wiring-col { display: flex; flex-direction: column; gap: 12px; }
+  .wiring-center { display: flex; flex-direction: column; align-items: center; }
+
+  .stm-box { background: var(--card); border: 3px solid var(--accent);
+             border-radius: 12px; padding: 20px 16px; text-align: center; width: 100%; }
+  .stm-box h2 { color: var(--accent); font-size: 1.1em; margin-bottom: 4px; }
+  .stm-box .sub { color: var(--muted); font-size: 0.75em; }
+  .stm-box .specs { margin-top: 12px; font-size: 0.75em; color: #aaa; text-align: left; line-height: 1.8; }
+
+  .block { border-radius: 8px; padding: 10px 12px; border: 2px solid; }
+  .block h3 { font-size: 0.85em; margin-bottom: 6px; }
+  .block .pins { font-size: 0.75em; color: #ccc; line-height: 1.7; }
+  .block .pins b { font-family: monospace; }
+
+  .arrow-right { text-align: right; }
+  .arrow-left  { text-align: left; }
+
+  .connector { display: flex; align-items: center; gap: 6px; font-size: 0.72em;
+               color: var(--muted); margin: 3px 0; }
+  .connector .pin-name { font-family: monospace; background: rgba(255,255,255,0.08);
+                         padding: 1px 5px; border-radius: 3px; color: #ddd; }
+  .connector .arrow { flex: 1; border-top: 1px dashed #444; position: relative; }
+  .connector .arrow::after { content: '▶'; position: absolute; right: -6px; top: -8px; font-size: 10px; }
+  .connector .arrow.left::after { content: '◀'; left: -6px; right: auto; }
+
+  /* ============ STYLE 2: CHIP VIEW ============ */
+  .chip-wrap { max-width: 900px; margin: 0 auto; }
+  .chip-container { position: relative; display: flex; justify-content: center; align-items: center;
+                    padding: 60px 80px; }
+  .chip-body { background: #222; border: 3px solid #555; border-radius: 8px;
+               width: 320px; min-height: 380px; position: relative;
+               display: flex; flex-direction: column; justify-content: center; align-items: center;
+               box-shadow: 0 0 30px rgba(233,69,96,0.3); }
+  .chip-body h2 { color: var(--accent); font-size: 1em; }
+  .chip-body .chip-sub { color: #888; font-size: 0.7em; margin-top: 4px; }
+  .chip-body .chip-mark { position: absolute; top: 8px; left: 8px; width: 12px; height: 12px;
+                           border-radius: 50%; background: #444; }
+
+  /* Pins around chip */
+  .pins-top, .pins-bottom { position: absolute; left: 80px; right: 80px;
+                              display: flex; justify-content: space-around; }
+  .pins-top    { top: 10px; }
+  .pins-bottom { bottom: 10px; }
+  .pins-left, .pins-right { position: absolute; top: 60px; bottom: 60px;
+                              display: flex; flex-direction: column; justify-content: space-around; }
+  .pins-left  { left: 0; align-items: flex-end; }
+  .pins-right { right: 0; align-items: flex-start; }
+
+  .chip-pin { display: flex; align-items: center; gap: 4px; font-size: 0.65em; cursor: pointer; }
+  .chip-pin .pnum { color: #666; min-width: 18px; text-align: right; font-size: 0.9em; }
+  .chip-pin .pbar { width: 18px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .chip-pin .plabel { white-space: nowrap; font-family: monospace; color: #ccc; }
+  .chip-pin:hover .plabel { color: #fff; }
+  .pins-right .chip-pin { flex-direction: row-reverse; }
+  .pins-right .chip-pin .pnum { text-align: left; }
+
+  .pins-top .chip-pin, .pins-bottom .chip-pin {
+    flex-direction: column; writing-mode: vertical-rl;
+  }
+  .pins-top .chip-pin { transform: rotate(180deg); }
+  .pins-top .chip-pin .pbar, .pins-bottom .chip-pin .pbar {
+    width: 8px; height: 18px;
+  }
+
+  /* tooltip */
+  .chip-pin[title]:hover::after {
+    content: attr(title);
+    position: absolute; background: #333; border: 1px solid #555;
+    padding: 4px 8px; border-radius: 4px; font-size: 11px; z-index: 100;
+    white-space: nowrap; color: #fff; pointer-events: none;
+  }
+
+  /* ============ STYLE 3: PIN TABLE ============ */
+  .table-wrap { max-width: 1000px; margin: 0 auto; overflow-x: auto; }
+  .search-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-bar input, .search-bar select {
+    background: var(--surface); border: 1px solid #333; color: var(--text);
+    padding: 8px 12px; border-radius: 6px; font-size: 0.9em; }
+  .search-bar input { flex: 1; min-width: 200px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+  th { background: var(--card); padding: 10px 12px; text-align: left;
+       border-bottom: 2px solid var(--accent); position: sticky; top: 0; cursor: pointer; }
+  th:hover { background: #1a3060; }
+  td { padding: 8px 12px; border-bottom: 1px solid #222; }
+  tr:hover td { background: rgba(255,255,255,0.04); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 3px;
+         font-size: 0.8em; font-weight: bold; }
+
+  /* Color classes */
+  .c-uart   { color: var(--cyan);   border-color: var(--cyan);   background: rgba(0,188,212,0.12); }
+  .c-i2c    { color: var(--purple); border-color: var(--purple); background: rgba(156,39,176,0.12); }
+  .c-step   { color: var(--orange); border-color: var(--orange); background: rgba(255,152,0,0.12); }
+  .c-enc    { color: var(--green);  border-color: var(--green);  background: rgba(76,175,80,0.12); }
+  .c-btn    { color: var(--blue);   border-color: var(--blue);   background: rgba(33,150,243,0.12); }
+  .c-led    { color: var(--yellow); border-color: var(--yellow); background: rgba(255,235,59,0.12); }
+  .c-pwr    { color: var(--red);    border-color: var(--red);    background: rgba(244,67,54,0.12); }
+  .c-misc   { color: var(--lime);   border-color: var(--lime);   background: rgba(139,195,74,0.12); }
+
+  .note { background: rgba(255,152,0,0.1); border: 1px solid var(--orange);
+          border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 0.85em; }
+  .note b { color: var(--orange); }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 768px) {
+    .wiring-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>ELS — Электронная Гитара Токарного Станка
+  <span>STM32F4DISCOVERY (STM32F407VGT6) — Схема подключения v1.0</span>
+</h1>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('wiring')">📦 Блок-диаграмма</div>
+  <div class="tab" onclick="showTab('chip')">🔲 Пины МК (Chip View)</div>
+  <div class="tab" onclick="showTab('table')">📋 Таблица пинов</div>
+</div>
+
+<!-- ========== TAB 1: WIRING ========== -->
+<div id="tab-wiring" class="tab-content active">
+<div class="wiring-wrap">
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#00bcd4"></div>UART</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#9c27b0"></div>I2C</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ff9800"></div>Шаговые моторы</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4caf50"></div>Энкодеры</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2196f3"></div>Кнопки / Джойстик</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ffeb3b"></div>Лимиты / LED</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8bc34a"></div>Прочее</div>
+  </div>
+
+  <div class="wiring-grid">
+
+    <!-- LEFT COLUMN -->
+    <div class="wiring-col">
+
+      <div class="block" style="border-color:#00bcd4">
+        <h3 style="color:#00bcd4">🔌 DRO HS800-2</h3>
+        <div class="pins">
+          Протокол: UART 57600/8N1<br>
+          Пакет: 29 байт, CRC16/MODBUS<br>
+          <b>TX → PA3 (USART2 RX)</b><br>
+          GND → GND<br>
+          <span style="color:#888">Уровни: 3.3В (совместим)</span>
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#9c27b0">
+        <h3 style="color:#9c27b0">🖥 LCD2004 (старый дисплей)</h3>
+        <div class="pins">
+          Протокол: I2C @ 400кГц<br>
+          Адрес: 0x27 (PCF8574)<br>
+          <b>SDA → PB7 (I2C1)</b><br>
+          <b>SCL → PB6 (I2C1)</b><br>
+          VCC: 5В, GND: GND
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#4caf50">
+        <h3 style="color:#4caf50">🔄 Энкодер шпинделя</h3>
+        <div class="pins">
+          1800 линий/оборот<br>
+          <b>Ch A → PA0 (TIM5_CH1 / EXTI0)</b><br>
+          <b>Ch B → PA1 (TIM5_CH2 / EXTI1)</b><br>
+          VCC: 5В, GND: GND<br>
+          <span style="color:#888">Режим: счётчик таймера или EXTI</span>
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#4caf50">
+        <h3 style="color:#4caf50">🎛 Ручной энкодер (100 линий)</h3>
+        <div class="pins">
+          <b>Ch A → PC2 (EXTI2)</b><br>
+          <b>Ch B → PC3 (EXTI3)</b><br>
+          Ось Z/X → <b>PD0, PD1</b><br>
+          Шаг ×1/×10 → <b>PD2, PD3</b><br>
+          Подтяжка: внутренняя PULLUP
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#2196f3">
+        <h3 style="color:#2196f3">🕹 Джойстик + Rapid</h3>
+        <div class="pins">
+          <b>Влево  → PC4</b><br>
+          <b>Вправо → PC5</b><br>
+          <b>Вверх  → PC6</b><br>
+          <b>Вниз   → PC7</b><br>
+          <b>Rapid  → PC8</b><br>
+          Активный уровень: LOW (подтяжка PULLUP)
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CENTER: STM32 -->
+    <div class="wiring-center">
+      <div class="stm-box">
+        <h2>STM32F407VGT6</h2>
+        <div class="sub">STM32F4DISCOVERY</div>
+        <div class="specs">
+          🔧 168 МГц Cortex-M4F<br>
+          💾 1 MB Flash / 192 KB RAM<br>
+          ⚡ FPU (float без задержек)<br>
+          📡 6× UART + DMA<br>
+          🔗 2× I2C<br>
+          ⏱ 14× 16/32-bit Timers<br>
+          🔌 2× CAN (запас)<br>
+          📺 USB OTG FS/HS<br>
+          ─────────────────<br>
+          🔴 Занято на плате:<br>
+          PA0 — USER BTN ⚠<br>
+          PD12-15 — LEDs ⚠<br>
+          PB3 — SWO debug<br>
+          PA13/PA14 — SWD
+        </div>
+      </div>
+      <div style="margin-top:16px; font-size:0.75em; color:#666; text-align:center">
+        ⚠ Пины могут быть переназначены<br>под разводку шилда
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="wiring-col">
+
+      <div class="block" style="border-color:#00bcd4">
+        <h3 style="color:#00bcd4">📺 ESP32-S3 JC4827W543 (новый дисплей)</h3>
+        <div class="pins">
+          Протокол: UART 115200/8N1<br>
+          <b>TX → PE0 (UART8 TX)</b><br>
+          <b>RX ← PE1 (UART8 RX)</b><br>
+          ESP32 GPIO44 (RX) ← PE0<br>
+          ESP32 GPIO43 (TX) → PE1<br>
+          <span style="color:#888">DMA: обновление без блокировки CPU</span>
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#ff9800">
+        <h3 style="color:#ff9800">⚙ Мотор Y (продольная)</h3>
+        <div class="pins">
+          Драйвер: шаговый (Step/Dir/En)<br>
+          <b>STEP → PE9 (TIM1_CH1)</b><br>
+          <b>DIR  → PE10</b><br>
+          <b>EN   → PE11</b><br>
+          <span style="color:#888">Таймер TIM1, DMA для импульсов</span>
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#ff9800">
+        <h3 style="color:#ff9800">⚙ Мотор X (поперечная)</h3>
+        <div class="pins">
+          Драйвер: шаговый (Step/Dir/En)<br>
+          <b>STEP → PE13 (TIM1_CH3)</b><br>
+          <b>DIR  → PE14</b><br>
+          <b>EN   → PE15</b><br>
+          <span style="color:#888">Таймер TIM1, общий с Y</span>
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#ffeb3b">
+        <h3 style="color:#ffeb3b">🛑 Лимитные выключатели + LED</h3>
+        <div class="pins">
+          BTN Left  → <b>PF0</b> | LED Left  → <b>PF1</b><br>
+          BTN Right → <b>PF2</b> | LED Right → <b>PF3</b><br>
+          BTN Front → <b>PF4</b> | LED Front → <b>PF5</b><br>
+          BTN Rear  → <b>PF6</b> | LED Rear  → <b>PF7</b><br>
+          Кнопки: PULLUP, активный LOW<br>
+          LED: открытый коллектор, 470Ом
+        </div>
+      </div>
+
+      <div class="block" style="border-color:#2196f3">
+        <h3 style="color:#2196f3">🔘 Кнопки меню + Переключатели</h3>
+        <div class="pins">
+          BTN Left/Right/Up/Down → <b>PG0-PG3</b><br>
+          BTN Select → <b>PG4</b><br>
+          Submode SW (3 pos)  → <b>PG5, PG6, PG7</b><br>
+          Mode SW (8 pos)     → <b>PG8-PG15</b><br>
+          <b>Tacho out → PE8</b><br>
+          <b>Beeper   → PD12 (TIM4_CH1)</b>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /wiring-grid -->
+
+  <div class="note" style="max-width:1100px; margin: 20px auto;">
+    <b>⚠ Примечание:</b> Данная схема — предварительная. Пины будут уточнены при разработке шилда.
+    Все назначения вынесены в <code>Core/els_config.h</code> — достаточно изменить один файл.
+    | Питание 3.3В для сигналов. Для 5В-периферии (LCD2004, драйверы) — уровень питания через шилд.
+  </div>
+
+</div>
+</div><!-- /tab-wiring -->
+
+<!-- ========== TAB 2: CHIP VIEW ========== -->
+<div id="tab-chip" class="tab-content">
+<div class="chip-wrap">
+  <div class="note">
+    <b>Стиль STM32CubeMX:</b> Показаны ключевые назначенные пины. Наведи мышь на пин для описания.
+    Красные пины — занято онбордом DISCOVERY. Серые — не используются в проекте.
+  </div>
+
+  <div style="overflow-x:auto">
+  <svg viewBox="0 0 860 700" width="100%" style="max-width:860px; display:block; margin:0 auto">
+    <defs>
+      <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#555"/>
+      </marker>
+    </defs>
+
+    <!-- Background -->
+    <rect width="860" height="700" fill="#141428"/>
+
+    <!-- Chip body -->
+    <rect x="260" y="150" width="340" height="380" rx="10" fill="#1e1e3a" stroke="#555" stroke-width="2"/>
+    <!-- Pin 1 marker -->
+    <circle cx="274" cy="164" r="7" fill="#333" stroke="#777" stroke-width="1"/>
+
+    <!-- Chip labels -->
+    <text x="430" y="300" text-anchor="middle" fill="#e94560" font-size="18" font-weight="bold">STM32F407VGT6</text>
+    <text x="430" y="322" text-anchor="middle" fill="#888" font-size="12">LQFP100 • 168 МГц</text>
+    <text x="430" y="342" text-anchor="middle" fill="#888" font-size="11">Cortex-M4F + FPU</text>
+    <text x="430" y="362" text-anchor="middle" fill="#888" font-size="11">1MB Flash / 192KB RAM</text>
+    <text x="430" y="388" text-anchor="middle" fill="#666" font-size="10">6× UART • 2× I2C • TIM1..14</text>
+    <text x="430" y="403" text-anchor="middle" fill="#666" font-size="10">DMA • FPU • 2× CAN</text>
+
+    <!-- ===== TOP PINS (функциональные блоки) ===== -->
+    <!-- USART2 RX - DRO -->
+    <g transform="translate(310,140)">
+      <rect x="-35" y="-28" width="70" height="20" rx="3" fill="rgba(0,188,212,0.25)" stroke="#00bcd4" stroke-width="1"/>
+      <text x="0" y="-14" text-anchor="middle" fill="#00bcd4" font-size="9" font-weight="bold">PA3/USART2_RX</text>
+      <text x="0" y="-4" text-anchor="middle" fill="#aaa" font-size="8">DRO HS800-2</text>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#00bcd4" stroke-width="2"/>
+      <rect x="-4" y="10" width="8" height="12" fill="#00bcd4" rx="1"/>
+    </g>
+
+    <!-- I2C1 SCL/SDA - LCD2004 -->
+    <g transform="translate(385,140)">
+      <rect x="-35" y="-28" width="70" height="20" rx="3" fill="rgba(156,39,176,0.25)" stroke="#9c27b0" stroke-width="1"/>
+      <text x="0" y="-14" text-anchor="middle" fill="#9c27b0" font-size="9" font-weight="bold">PB6,PB7 / I2C1</text>
+      <text x="0" y="-4" text-anchor="middle" fill="#aaa" font-size="8">LCD2004 SCL/SDA</text>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#9c27b0" stroke-width="2"/>
+      <rect x="-4" y="10" width="8" height="12" fill="#9c27b0" rx="1"/>
+    </g>
+
+    <!-- TIM5 Encoder - Spindle -->
+    <g transform="translate(460,140)">
+      <rect x="-35" y="-28" width="70" height="20" rx="3" fill="rgba(76,175,80,0.25)" stroke="#4caf50" stroke-width="1"/>
+      <text x="0" y="-14" text-anchor="middle" fill="#4caf50" font-size="9" font-weight="bold">PA0,PA1/TIM5</text>
+      <text x="0" y="-4" text-anchor="middle" fill="#aaa" font-size="8">Энкодер шпинделя</text>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#4caf50" stroke-width="2"/>
+      <rect x="-4" y="10" width="8" height="12" fill="#4caf50" rx="1"/>
+    </g>
+
+    <!-- UART8 - ESP32 -->
+    <g transform="translate(535,140)">
+      <rect x="-35" y="-28" width="70" height="20" rx="3" fill="rgba(0,188,212,0.25)" stroke="#00bcd4" stroke-width="1"/>
+      <text x="0" y="-14" text-anchor="middle" fill="#00bcd4" font-size="9" font-weight="bold">PE0,PE1/UART8</text>
+      <text x="0" y="-4" text-anchor="middle" fill="#aaa" font-size="8">ESP32 115200 DMA</text>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#00bcd4" stroke-width="2"/>
+      <rect x="-4" y="10" width="8" height="12" fill="#00bcd4" rx="1"/>
+    </g>
+
+    <!-- ===== BOTTOM PINS ===== -->
+    <!-- Motor Y TIM1 -->
+    <g transform="translate(320,550)">
+      <line x1="0" y1="0" x2="0" y2="-12" stroke="#ff9800" stroke-width="2"/>
+      <rect x="-4" y="-22" width="8" height="12" fill="#ff9800" rx="1"/>
+      <rect x="-40" y="8" width="80" height="32" rx="3" fill="rgba(255,152,0,0.2)" stroke="#ff9800" stroke-width="1"/>
+      <text x="0" y="21" text-anchor="middle" fill="#ff9800" font-size="9" font-weight="bold">PE9,PE10,PE11</text>
+      <text x="0" y="33" text-anchor="middle" fill="#aaa" font-size="8">Мотор Y TIM1_CH1</text>
+    </g>
+
+    <!-- Motor X TIM1 -->
+    <g transform="translate(430,550)">
+      <line x1="0" y1="0" x2="0" y2="-12" stroke="#ff9800" stroke-width="2"/>
+      <rect x="-4" y="-22" width="8" height="12" fill="#ff9800" rx="1"/>
+      <rect x="-40" y="8" width="80" height="32" rx="3" fill="rgba(255,152,0,0.2)" stroke="#ff9800" stroke-width="1"/>
+      <text x="0" y="21" text-anchor="middle" fill="#ff9800" font-size="9" font-weight="bold">PE13,PE14,PE15</text>
+      <text x="0" y="33" text-anchor="middle" fill="#aaa" font-size="8">Мотор X TIM1_CH3</text>
+    </g>
+
+    <!-- Beeper + Tacho -->
+    <g transform="translate(540,550)">
+      <line x1="0" y1="0" x2="0" y2="-12" stroke="#8bc34a" stroke-width="2"/>
+      <rect x="-4" y="-22" width="8" height="12" fill="#8bc34a" rx="1"/>
+      <rect x="-40" y="8" width="80" height="32" rx="3" fill="rgba(139,195,74,0.2)" stroke="#8bc34a" stroke-width="1"/>
+      <text x="0" y="21" text-anchor="middle" fill="#8bc34a" font-size="9" font-weight="bold">PD12 / PE8</text>
+      <text x="0" y="33" text-anchor="middle" fill="#aaa" font-size="8">Beeper / Tacho</text>
+    </g>
+
+    <!-- ===== LEFT PINS ===== -->
+    <!-- Hand encoder -->
+    <g transform="translate(240,210)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#4caf50" stroke-width="2"/>
+      <rect x="12" y="-4" width="12" height="8" fill="#4caf50" rx="1"/>
+      <rect x="-90" y="-16" width="90" height="30" rx="3" fill="rgba(76,175,80,0.2)" stroke="#4caf50" stroke-width="1"/>
+      <text x="-45" y="-4" text-anchor="middle" fill="#4caf50" font-size="9" font-weight="bold">PC2,PC3 / EXTI</text>
+      <text x="-45" y="8" text-anchor="middle" fill="#aaa" font-size="8">Ручной энкодер A/B</text>
+    </g>
+
+    <!-- Hand axis / scale switch -->
+    <g transform="translate(240,260)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#4caf50" stroke-width="2"/>
+      <rect x="12" y="-4" width="12" height="8" fill="#4caf50" rx="1"/>
+      <rect x="-90" y="-16" width="90" height="30" rx="3" fill="rgba(76,175,80,0.2)" stroke="#4caf50" stroke-width="1"/>
+      <text x="-45" y="-4" text-anchor="middle" fill="#4caf50" font-size="9" font-weight="bold">PD0-PD3</text>
+      <text x="-45" y="8" text-anchor="middle" fill="#aaa" font-size="8">Ось Z/X • Шаг ×1/×10</text>
+    </g>
+
+    <!-- Limit buttons -->
+    <g transform="translate(240,330)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#ffeb3b" stroke-width="2"/>
+      <rect x="12" y="-4" width="12" height="8" fill="#ffeb3b" rx="1"/>
+      <rect x="-90" y="-16" width="90" height="30" rx="3" fill="rgba(255,235,59,0.2)" stroke="#ffeb3b" stroke-width="1"/>
+      <text x="-45" y="-4" text-anchor="middle" fill="#ffeb3b" font-size="9" font-weight="bold">PF0,PF2,PF4,PF6</text>
+      <text x="-45" y="8" text-anchor="middle" fill="#aaa" font-size="8">Лимиты BTN L/R/F/B</text>
+    </g>
+
+    <!-- Limit LEDs -->
+    <g transform="translate(240,380)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#ffeb3b" stroke-width="2"/>
+      <rect x="12" y="-4" width="12" height="8" fill="#ffeb3b" rx="1"/>
+      <rect x="-90" y="-16" width="90" height="30" rx="3" fill="rgba(255,235,59,0.2)" stroke="#ffeb3b" stroke-width="1"/>
+      <text x="-45" y="-4" text-anchor="middle" fill="#ffeb3b" font-size="9" font-weight="bold">PF1,PF3,PF5,PF7</text>
+      <text x="-45" y="8" text-anchor="middle" fill="#aaa" font-size="8">Лимиты LED L/R/F/B</text>
+    </g>
+
+    <!-- Joystick -->
+    <g transform="translate(240,450)">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#2196f3" stroke-width="2"/>
+      <rect x="12" y="-4" width="12" height="8" fill="#2196f3" rx="1"/>
+      <rect x="-90" y="-16" width="90" height="30" rx="3" fill="rgba(33,150,243,0.2)" stroke="#2196f3" stroke-width="1"/>
+      <text x="-45" y="-4" text-anchor="middle" fill="#2196f3" font-size="9" font-weight="bold">PC4-PC8</text>
+      <text x="-45" y="8" text-anchor="middle" fill="#aaa" font-size="8">Джойстик L/R/U/D + Rapid</text>
+    </g>
+
+    <!-- ===== RIGHT PINS ===== -->
+    <!-- Menu buttons -->
+    <g transform="translate(620,210)">
+      <line x1="0" y1="0" x2="-20" y2="0" stroke="#2196f3" stroke-width="2"/>
+      <rect x="-24" y="-4" width="12" height="8" fill="#2196f3" rx="1"/>
+      <rect x="0" y="-16" width="95" height="30" rx="3" fill="rgba(33,150,243,0.2)" stroke="#2196f3" stroke-width="1"/>
+      <text x="47" y="-4" text-anchor="middle" fill="#2196f3" font-size="9" font-weight="bold">PG0-PG4</text>
+      <text x="47" y="8" text-anchor="middle" fill="#aaa" font-size="8">Кнопки меню L/R/U/D/Sel</text>
+    </g>
+
+    <!-- Submode switch -->
+    <g transform="translate(620,260)">
+      <line x1="0" y1="0" x2="-20" y2="0" stroke="#2196f3" stroke-width="2"/>
+      <rect x="-24" y="-4" width="12" height="8" fill="#2196f3" rx="1"/>
+      <rect x="0" y="-16" width="95" height="30" rx="3" fill="rgba(33,150,243,0.2)" stroke="#2196f3" stroke-width="1"/>
+      <text x="47" y="-4" text-anchor="middle" fill="#2196f3" font-size="9" font-weight="bold">PG5,PG6,PG7</text>
+      <text x="47" y="8" text-anchor="middle" fill="#aaa" font-size="8">Переключатель Submode</text>
+    </g>
+
+    <!-- Mode switch -->
+    <g transform="translate(620,330)">
+      <line x1="0" y1="0" x2="-20" y2="0" stroke="#2196f3" stroke-width="2"/>
+      <rect x="-24" y="-4" width="12" height="8" fill="#2196f3" rx="1"/>
+      <rect x="0" y="-16" width="95" height="30" rx="3" fill="rgba(33,150,243,0.2)" stroke="#2196f3" stroke-width="1"/>
+      <text x="47" y="-4" text-anchor="middle" fill="#2196f3" font-size="9" font-weight="bold">PG8-PG15</text>
+      <text x="47" y="8" text-anchor="middle" fill="#aaa" font-size="8">Переключатель Mode (8 поз)</text>
+    </g>
+
+    <!-- USART1 Debug -->
+    <g transform="translate(620,410)">
+      <line x1="0" y1="0" x2="-20" y2="0" stroke="#00bcd4" stroke-width="2"/>
+      <rect x="-24" y="-4" width="12" height="8" fill="#00bcd4" rx="1"/>
+      <rect x="0" y="-16" width="95" height="30" rx="3" fill="rgba(0,188,212,0.2)" stroke="#00bcd4" stroke-width="1"/>
+      <text x="47" y="-4" text-anchor="middle" fill="#00bcd4" font-size="9" font-weight="bold">PA9,PA10/USART1</text>
+      <text x="47" y="8" text-anchor="middle" fill="#aaa" font-size="8">Debug/Serial Monitor</text>
+    </g>
+
+    <!-- ONBOARD warning -->
+    <rect x="280" y="450" width="300" height="60" rx="6" fill="rgba(244,67,54,0.1)" stroke="#f44336" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="430" y="470" text-anchor="middle" fill="#f44336" font-size="10" font-weight="bold">⚠ Занято на плате DISCOVERY</text>
+    <text x="430" y="484" text-anchor="middle" fill="#f44336" font-size="9">PA0 — USER Button | PD12-PD15 — LEDs</text>
+    <text x="430" y="497" text-anchor="middle" fill="#f44336" font-size="9">PA13/PA14 — SWD | PB3 — SWO</text>
+
+  </svg>
+  </div>
+</div>
+</div><!-- /tab-chip -->
+
+<!-- ========== TAB 3: TABLE ========== -->
+<div id="tab-table" class="tab-content">
+<div class="table-wrap">
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Поиск по пину, функции..." oninput="filterTable()">
+    <select id="catFilter" onchange="filterTable()">
+      <option value="">Все категории</option>
+      <option value="uart">UART</option>
+      <option value="i2c">I2C</option>
+      <option value="stepper">Шаговые</option>
+      <option value="encoder">Энкодер</option>
+      <option value="button">Кнопки</option>
+      <option value="led">LED/Лимиты</option>
+      <option value="misc">Прочее</option>
+    </select>
+  </div>
+
+  <div class="note">
+    <b>⚠ Предварительно:</b> Пины будут уточнены. Все значения задаются в <code>Core/els_config.h</code>.
+    Колонка "Mega" — исходный пин Arduino Mega для сравнения.
+  </div>
+
+  <table id="pinTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">STM32 Пин ↕</th>
+        <th onclick="sortTable(1)">Функция ↕</th>
+        <th onclick="sortTable(2)">Описание</th>
+        <th onclick="sortTable(3)">Направление</th>
+        <th onclick="sortTable(4)">Mega (было)</th>
+        <th onclick="sortTable(5)">Категория</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- UART -->
+      <tr data-cat="uart"><td>PA3</td><td>USART2_RX</td><td>DRO HS800-2 приём</td><td>INPUT</td><td>Pin17 RX2</td><td><span class="tag c-uart">UART</span></td></tr>
+      <tr data-cat="uart"><td>PE0</td><td>UART8_TX</td><td>ESP32-S3 отправка (DMA)</td><td>OUTPUT</td><td>Pin51 SW-TX</td><td><span class="tag c-uart">UART</span></td></tr>
+      <tr data-cat="uart"><td>PE1</td><td>UART8_RX</td><td>ESP32-S3 приём (DMA)</td><td>INPUT</td><td>Pin52 SW-RX</td><td><span class="tag c-uart">UART</span></td></tr>
+      <tr data-cat="uart"><td>PA9</td><td>USART1_TX</td><td>Debug / Serial Monitor</td><td>OUTPUT</td><td>Pin1 TX0</td><td><span class="tag c-uart">UART</span></td></tr>
+      <tr data-cat="uart"><td>PA10</td><td>USART1_RX</td><td>Debug / Serial Monitor</td><td>INPUT</td><td>Pin0 RX0</td><td><span class="tag c-uart">UART</span></td></tr>
+      <!-- I2C -->
+      <tr data-cat="i2c"><td>PB6</td><td>I2C1_SCL</td><td>LCD2004 тактирование</td><td>OUTPUT OD</td><td>Pin21 SCL</td><td><span class="tag c-i2c">I2C</span></td></tr>
+      <tr data-cat="i2c"><td>PB7</td><td>I2C1_SDA</td><td>LCD2004 данные</td><td>BIDIR OD</td><td>Pin20 SDA</td><td><span class="tag c-i2c">I2C</span></td></tr>
+      <!-- Encoder spindle -->
+      <tr data-cat="encoder"><td>PA0</td><td>TIM5_CH1</td><td>Энкодер шпинделя Ch A (1800 лин)</td><td>INPUT</td><td>Pin21 INT0</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PA1</td><td>TIM5_CH2</td><td>Энкодер шпинделя Ch B</td><td>INPUT</td><td>Pin20 INT1</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <!-- Hand encoder -->
+      <tr data-cat="encoder"><td>PC2</td><td>EXTI2</td><td>Ручной энкодер Ch A</td><td>INPUT PU</td><td>Pin19 PD2</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PC3</td><td>EXTI3</td><td>Ручной энкодер Ch B</td><td>INPUT PU</td><td>Pin18 PD3</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PD0</td><td>GPIO_IN</td><td>Ручной энкодер: ось Z/X sw1</td><td>INPUT PU</td><td>Pin58 PE4</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PD1</td><td>GPIO_IN</td><td>Ручной энкодер: ось Z/X sw2</td><td>INPUT PU</td><td>Pin59 PE5</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PD2</td><td>GPIO_IN</td><td>Шаг ×1 (Scale Switch)</td><td>INPUT PU</td><td>Pin15 PJ0</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <tr data-cat="encoder"><td>PD3</td><td>GPIO_IN</td><td>Шаг ×10 (Scale Switch)</td><td>INPUT PU</td><td>Pin14 PJ1</td><td><span class="tag c-enc">Энкодер</span></td></tr>
+      <!-- Steppers -->
+      <tr data-cat="stepper"><td>PE9</td><td>TIM1_CH1</td><td>Мотор Y (продольная) STEP</td><td>OUTPUT</td><td>Pin49 PL0</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <tr data-cat="stepper"><td>PE10</td><td>GPIO_OUT</td><td>Мотор Y DIR (CW/CCW)</td><td>OUTPUT</td><td>Pin43 PL6</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <tr data-cat="stepper"><td>PE11</td><td>GPIO_OUT</td><td>Мотор Y ENABLE</td><td>OUTPUT</td><td>Pin45 PL4</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <tr data-cat="stepper"><td>PE13</td><td>TIM1_CH3</td><td>Мотор X (поперечная) STEP</td><td>OUTPUT</td><td>Pin48 PL1</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <tr data-cat="stepper"><td>PE14</td><td>GPIO_OUT</td><td>Мотор X DIR</td><td>OUTPUT</td><td>Pin44 PL5</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <tr data-cat="stepper"><td>PE15</td><td>GPIO_OUT</td><td>Мотор X ENABLE</td><td>OUTPUT</td><td>Pin46 PL3</td><td><span class="tag c-step">Мотор</span></td></tr>
+      <!-- Buttons / Joystick -->
+      <tr data-cat="button"><td>PC4</td><td>GPIO_IN</td><td>Джойстик Влево</td><td>INPUT PU</td><td>A8 PK0</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PC5</td><td>GPIO_IN</td><td>Джойстик Вправо</td><td>INPUT PU</td><td>A9 PK1</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PC6</td><td>GPIO_IN</td><td>Джойстик Вверх</td><td>INPUT PU</td><td>A10 PK2</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PC7</td><td>GPIO_IN</td><td>Джойстик Вниз</td><td>INPUT PU</td><td>A11 PK3</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PC8</td><td>GPIO_IN</td><td>Кнопка Rapid</td><td>INPUT PU</td><td>A12 PK4</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG0</td><td>GPIO_IN</td><td>Кнопка меню Влево</td><td>INPUT PU</td><td>A0 PF0</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG1</td><td>GPIO_IN</td><td>Кнопка меню Вправо</td><td>INPUT PU</td><td>A1 PF1</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG2</td><td>GPIO_IN</td><td>Кнопка меню Вверх</td><td>INPUT PU</td><td>A2 PF2</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG3</td><td>GPIO_IN</td><td>Кнопка меню Вниз</td><td>INPUT PU</td><td>A3 PF3</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG4</td><td>GPIO_IN</td><td>Кнопка Select</td><td>INPUT PU</td><td>A4 PF4</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG5</td><td>GPIO_IN</td><td>Submode SW: Внутренний</td><td>INPUT PU</td><td>A13 PK5</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG6</td><td>GPIO_IN</td><td>Submode SW: Ручной</td><td>INPUT PU</td><td>A14 PK6</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG7</td><td>GPIO_IN</td><td>Submode SW: Наружный</td><td>INPUT PU</td><td>A15 PK7</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG8</td><td>GPIO_IN</td><td>Mode SW: бит 0 (Mode_Feed)</td><td>INPUT PU</td><td>PC0 Pin37</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG9</td><td>GPIO_IN</td><td>Mode SW: бит 1</td><td>INPUT PU</td><td>PC1 Pin36</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG10</td><td>GPIO_IN</td><td>Mode SW: бит 2</td><td>INPUT PU</td><td>PC2 Pin35</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG11</td><td>GPIO_IN</td><td>Mode SW: бит 3</td><td>INPUT PU</td><td>PC3 Pin34</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG12</td><td>GPIO_IN</td><td>Mode SW: бит 4</td><td>INPUT PU</td><td>PC4 Pin33</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG13</td><td>GPIO_IN</td><td>Mode SW: бит 5</td><td>INPUT PU</td><td>PC5 Pin32</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG14</td><td>GPIO_IN</td><td>Mode SW: бит 6</td><td>INPUT PU</td><td>PC6 Pin31</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <tr data-cat="button"><td>PG15</td><td>GPIO_IN</td><td>Mode SW: бит 7</td><td>INPUT PU</td><td>PC7 Pin30</td><td><span class="tag c-btn">Кнопки</span></td></tr>
+      <!-- Limits / LEDs -->
+      <tr data-cat="led"><td>PF0</td><td>GPIO_IN</td><td>Лимит BTN Влево</td><td>INPUT PU</td><td>Pin22 PA0</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF1</td><td>GPIO_OUT</td><td>Лимит LED Влево</td><td>OUTPUT</td><td>Pin29 PA7</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF2</td><td>GPIO_IN</td><td>Лимит BTN Вправо</td><td>INPUT PU</td><td>Pin24 PA2</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF3</td><td>GPIO_OUT</td><td>Лимит LED Вправо</td><td>OUTPUT</td><td>Pin27 PA5</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF4</td><td>GPIO_IN</td><td>Лимит BTN Вперёд</td><td>INPUT PU</td><td>Pin26 PA4</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF5</td><td>GPIO_OUT</td><td>Лимит LED Вперёд</td><td>OUTPUT</td><td>Pin25 PA3</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF6</td><td>GPIO_IN</td><td>Лимит BTN Назад</td><td>INPUT PU</td><td>Pin28 PA6</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <tr data-cat="led"><td>PF7</td><td>GPIO_OUT</td><td>Лимит LED Назад</td><td>OUTPUT</td><td>Pin23 PA1</td><td><span class="tag c-led">Лимиты</span></td></tr>
+      <!-- Misc -->
+      <tr data-cat="misc"><td>PE8</td><td>GPIO_OUT</td><td>Тахометр выход</td><td>OUTPUT</td><td>Pin42 PL7</td><td><span class="tag c-misc">Прочее</span></td></tr>
+      <tr data-cat="misc"><td>PD12</td><td>TIM4_CH1</td><td>Зуммер (PWM тон)</td><td>OUTPUT</td><td>Pin16 PH1</td><td><span class="tag c-misc">Прочее</span></td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:16px; color:#666; font-size:0.82em">
+    Всего пинов: <b id="rowCount">45</b> | PU = Pull-Up | OD = Open-Drain
+  </div>
+</div>
+</div><!-- /tab-table -->
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const cat = document.getElementById('catFilter').value;
+  let count = 0;
+  document.querySelectorAll('#pinTable tbody tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const rowCat = row.getAttribute('data-cat');
+    const show = text.includes(q) && (!cat || rowCat === cat);
+    row.style.display = show ? '' : 'none';
+    if (show) count++;
+  });
+  document.getElementById('rowCount').textContent = count;
+}
+
+let sortDir = {};
+function sortTable(col) {
+  const tbody = document.querySelector('#pinTable tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  sortDir[col] = !sortDir[col];
+  rows.sort((a, b) => {
+    const av = a.cells[col].textContent.trim();
+    const bv = b.cells[col].textContent.trim();
+    return sortDir[col] ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+</body>
+</html>
