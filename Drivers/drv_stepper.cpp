@@ -206,3 +206,49 @@ uint8_t DRV_Stepper_IsMoving(Axis_t axis) {
 void DRV_Stepper_Update(void) {
     // Всё обрабатывается в ISR (HardwareTimer callback)
 }
+
+// ============================================================
+// Непрерывное движение — steps_left = INT32_MAX
+// ============================================================
+void DRV_Stepper_SetContinuous(Axis_t axis, uint32_t speed_hz, int8_t dir) {
+    if (speed_hz == 0) { DRV_Stepper_Stop(axis); return; }
+
+    AxisState* ax = &s_ax[axis];
+    ax->dir        = dir;
+    ax->steps_left = 0x7FFFFFFF; // "бесконечно"
+    ax->moving     = 1;
+
+    if (axis == AXIS_Y) {
+        digitalWrite(PIN_DIR_Y, (dir > 0) ? HIGH : LOW);
+        GPIOE->BSRR = (uint32_t)GPIO_PIN_11 << 16u; // EN LOW = включить
+    } else {
+        digitalWrite(PIN_DIR_X, (dir > 0) ? HIGH : LOW);
+        GPIOE->BSRR = (uint32_t)GPIO_PIN_15 << 16u;
+    }
+
+    if (!s_ch1_active && !s_ch3_active) {
+        s_htim1->setOverflow(speed_hz, HERTZ_FORMAT);
+        uint32_t period_us = 1000000UL / speed_hz;
+        uint32_t duty = (period_us >= 20u) ? 1u : 5u;
+        s_htim1->setCaptureCompare(1, duty, PERCENT_COMPARE_FORMAT);
+        s_htim1->setCaptureCompare(3, duty, PERCENT_COMPARE_FORMAT);
+    }
+
+    if (axis == AXIS_Y) { s_ch1_active = 1; TIM1->CCER |= TIM_CCER_CC1E; }
+    else                { s_ch3_active = 1; TIM1->CCER |= TIM_CCER_CC3E; }
+}
+
+// ============================================================
+// Изменить частоту текущего движения (ISR-safe: только ARR)
+// ============================================================
+void DRV_Stepper_SetSpeed(Axis_t axis, uint32_t speed_hz) {
+    (void)axis;
+    if (speed_hz == 0) return;
+    // Меняем ARR напрямую (обе оси на одном таймере, меняем сразу)
+    uint32_t clk = s_htim1->getTimerClkFreq();
+    uint32_t psc = TIM1->PSC + 1u;
+    uint32_t arr = clk / psc / speed_hz;
+    if (arr < 20u)     arr = 20u;
+    if (arr > 0xFFFFu) arr = 0xFFFFu;
+    TIM1->ARR = arr - 1u;
+}

@@ -2,6 +2,8 @@
 #include "els_config.h"
 #include "els_main.h"
 #include "els_state.h"
+#include "els_control.h"
+#include "els_serial.h"
 #include "../Drivers/drv_dro.h"
 #include "../Drivers/drv_display.h"
 #include "../Drivers/drv_lcd2004.h"
@@ -46,7 +48,11 @@ void ELS_Init(void) {
     DRV_Inputs_Init();
     DRV_Stepper_Init();
 
+    ELS_Control_Init();
+    ELS_Serial_Init();
+
     Serial.println("[ELS] Init complete");
+    Serial.println("[ELS] Type HELP for commands");
 
 #if USE_LCD2004
     DRV_LCD2004_Print(1, 0, "Ready           ");
@@ -99,6 +105,10 @@ void ELS_Loop(void) {
     // Обработка входов (кнопки, джойстик)
     DRV_Inputs_Process();
 
-    // TODO: Этап 7 — управление двигателями
-    // DRV_Stepper_Update();
+    // Этап 7+8: управление двигателями
+    DRV_Stepper_Update();
+    ELS_Control_Update();
+
+    // Этап 9: Serial Monitor команды
+    ELS_Serial_Process();
 }

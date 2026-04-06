@@ -29,3 +29,9 @@ uint8_t DRV_Stepper_IsMoving(Axis_t axis);
 
 // Вызывать из loop() — обслуживает шаговые импульсы
 void DRV_Stepper_Update(void);
+
+// Непрерывное движение (до Stop или лимита); dir = +1 или -1
+void DRV_Stepper_SetContinuous(Axis_t axis, uint32_t speed_hz, int8_t dir);
+
+// Изменить скорость текущего движения (не меняет позицию назначения)
+void DRV_Stepper_SetSpeed(Axis_t axis, uint32_t speed_hz);
