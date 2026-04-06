@@ -67,7 +67,7 @@ void ELS_Loop(void) {
         els.pos_x = new_x;
         els.pos_y = new_y;
 #if USE_ESP32_DISPLAY
-        DRV_Display_SendPosition(els.pos_x, els.pos_y);
+        DRV_Display_SendPosition(els.pos_y, els.pos_x);
 #endif
 #if USE_LCD2004
         DRV_LCD2004_UpdatePosition(els.pos_x, els.pos_y);
@@ -86,6 +86,11 @@ void ELS_Loop(void) {
         Serial.print("  errs=");
         Serial.println(DRV_DRO_GetErrorCount());
     }
+#endif
+
+    // Обработка входящих команд от ESP32
+#if USE_ESP32_DISPLAY
+    DRV_Display_Process();
 #endif
 
     // Обработка энкодера шпинделя
