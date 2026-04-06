@@ -9,6 +9,7 @@
 #include "../Drivers/drv_inputs.h"
 #include "../Drivers/drv_stepper.h"
 #include "../Drivers/drv_beeper.h"
+#include <stdlib.h>  // abs()
 
 // ============================================================
 void ELS_Init(void) {
@@ -58,8 +59,10 @@ void ELS_Loop(void) {
     DRV_DRO_Process();
 
     // Обновляем позицию из DRO
-    int32_t new_x = DRV_DRO_GetX();
-    int32_t new_y = DRV_DRO_GetY();
+    // Знак: DRO отдаёт положительные значения при движении "от нуля",
+    // но на дисплее логика инвертирована (как в оригинальном Arduino-коде)
+    int32_t new_x = -DRV_DRO_GetX();
+    int32_t new_y = -DRV_DRO_GetY();
     if (new_x != els.pos_x || new_y != els.pos_y) {
         els.pos_x = new_x;
         els.pos_y = new_y;
@@ -69,6 +72,19 @@ void ELS_Loop(void) {
 #if USE_LCD2004
         DRV_LCD2004_UpdatePosition(els.pos_x, els.pos_y);
 #endif
+        // Debug: выводим позицию в Serial Monitor
+        Serial.print("[DRO] X=");
+        Serial.print(els.pos_x / 1000L);
+        Serial.print(".");
+        Serial.print(abs(els.pos_x % 1000L));
+        Serial.print("mm  Y=");
+        Serial.print(els.pos_y / 1000L);
+        Serial.print(".");
+        Serial.print(abs(els.pos_y % 1000L));
+        Serial.print("mm  pkts=");
+        Serial.print(DRV_DRO_GetPacketCount());
+        Serial.print("  errs=");
+        Serial.println(DRV_DRO_GetErrorCount());
     }
 #endif
 
