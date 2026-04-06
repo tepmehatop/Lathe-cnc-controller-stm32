@@ -682,10 +682,14 @@
 // VISUAL SCHEMATIC — Canvas pan/zoom engine
 // ============================================================
 (function(){
-  const SW=3200,SH=2200;
+  // ---- HiDPI / Retina support: draw at native resolution ----
+  const SW=3200,SH=2400;
+  const dpr=window.devicePixelRatio||1;
   const canvas=document.getElementById('sch-canvas');
-  canvas.width=SW; canvas.height=SH;
+  canvas.width=SW*dpr; canvas.height=SH*dpr;
+  canvas.style.width=SW+'px'; canvas.style.height=SH+'px';
   const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
   const wrap=document.getElementById('sch-wrap');
 
   let scale=0.5,tx=0,ty=0,drag=false,lastX,lastY;
@@ -729,16 +733,17 @@
   // ---- Draw ----
   function draw(){
     ctx.fillStyle='#111827'; ctx.fillRect(0,0,SW,SH);
-    // Grid
     for(let x=0;x<SW;x+=50)line(x,0,x,SH,'#1a2035',0.5);
     for(let y=0;y<SH;y+=50)line(0,y,SW,y,'#1a2035',0.5);
 
     txt('ELS — Электронная Гитара Токарного Станка',SW/2,48,24,'#e94560','center',true);
     txt('STM32F4DISCOVERY  •  STM32F407VGT6  •  168 МГц  •  Полная схема подключения',SW/2,76,14,'#888','center');
-    txt('⚠ ПРЕДВАРИТЕЛЬНАЯ СХЕМА — пины могут быть переназначены под разводку шилда. Параметры в Core/els_config.h',SW/2,100,11,'#c97a00','center');
+    txt('⚠ ПРЕДВАРИТЕЛЬНАЯ СХЕМА — пины могут быть переназначены под разводку шилда. Параметры: Core/els_config.h',SW/2,100,11,'#c97a00','center');
 
-    // ---- STM32F4DISCOVERY BOARD ----
-    const BX=1230,BY=240,BW=380,BH=1420;
+    // ============================================================
+    // STM32F4DISCOVERY BOARD (centre)
+    // ============================================================
+    const BX=1300,BY=280,BW=380,BH=1560;
     rect(BX,BY,BW,BH,'#0a2010','#2d6a20',8);
     rect(BX+14,BY+14,BW-28,BH-28,'#0d2812',null,6);
     txt('STM32F4DISCOVERY',BX+BW/2,BY+36,14,'#5dba42','center',true);
@@ -747,350 +752,509 @@
     txt('ST',BX+BW/2-8,BY+81,12,'#2196f3','center',true);
     txt('MICRO',BX+BW/2+10,BY+81,7,'#1565c0','center');
     // IC chip body
-    rect(BX+80,BY+200,BW-160,BH-580,'#111','#444',6);
-    txt('STM32F407VGT6',BX+BW/2,BY+280,10,'#888','center');
-    txt('LQFP-100  168MHz',BX+BW/2,BY+296,9,'#666','center');
-    txt('Cortex-M4F+FPU',BX+BW/2,BY+312,9,'#666','center');
-    txt('1MB Flash / 192KB RAM',BX+BW/2,BY+330,9,'#666','center');
-    txt('6× UART • 2× I2C • DMA',BX+BW/2,BY+346,9,'#666','center');
-    // USB
-    rect(BX+BW/2-24,BY+1370,48,36,'#222','#888',4);
-    rect(BX+BW/2-14,BY+1394,28,28,'#333',null,2);
-    txt('Mini-USB',BX+BW/2,BY+1418,8,'#888','center');
-    // Buttons & LEDs
-    rect(BX+BW-60,BY+1360,36,24,'#444','#888',3); txt('RST',BX+BW-42,BY+1376,8,'#888','center');
-    rect(BX+24,BY+1360,36,24,'#00448c','#2196f3',3); txt('USR',BX+42,BY+1376,8,'#2196f3','center');
-    const lc=['#4caf50','#f9a825','#e53935','#1565c0'];
-    for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(BX+60+i*22,BY+100,6,0,Math.PI*2);ctx.fillStyle=lc[i]+'88';ctx.fill();ctx.strokeStyle=lc[i];ctx.lineWidth=1;ctx.stroke();}
-    txt('⚠ PD12-15 заняты онбордными LED',BX+145,BY+112,8,'#c97a00','left');
-    // SWD
+    rect(BX+80,BY+200,BW-160,BH-560,'#111','#444',6);
+    txt('STM32F407VGT6',BX+BW/2,BY+290,10,'#888','center');
+    txt('LQFP-100  168MHz',BX+BW/2,BY+308,9,'#666','center');
+    txt('Cortex-M4F+FPU',BX+BW/2,BY+326,9,'#666','center');
+    txt('1MB Flash / 192KB RAM',BX+BW/2,BY+344,9,'#666','center');
+    txt('6× UART • 2× I2C • DMA',BX+BW/2,BY+362,9,'#666','center');
+    // USB connector
+    rect(BX+BW/2-24,BY+1510,48,36,'#222','#888',4);
+    txt('Mini-USB',BX+BW/2,BY+1528,8,'#888','center');
+    txt('Power/Debug',BX+BW/2,BY+1542,7,'#666','center');
+    // Onboard buttons
+    rect(BX+BW-60,BY+1500,36,24,'#444','#888',3); txt('RST',BX+BW-42,BY+1516,8,'#888','center');
+    rect(BX+24,BY+1500,36,24,'#00448c','#2196f3',3); txt('USR',BX+42,BY+1516,8,'#2196f3','center');
+    // Onboard LEDs
+    const lcols=['#4caf50','#f9a825','#e53935','#1565c0'];
+    for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(BX+60+i*22,BY+110,6,0,Math.PI*2);ctx.fillStyle=lcols[i]+'88';ctx.fill();ctx.strokeStyle=lcols[i];ctx.lineWidth=1;ctx.stroke();}
+    txt('⚠ PD12-15 заняты LED',BX+155,BY+116,8,'#c97a00','left');
+    // SWD header
     rect(BX+BW-80,BY+30,56,36,'#1a3020','#4caf50',3);
     txt('SWD',BX+BW-52,BY+46,8,'#4caf50','center',true);
     txt('PA13 SWDIO',BX+BW-52,BY+58,7,'#666','center');
     txt('PA14 SWCLK',BX+BW-52,BY+66,7,'#666','center');
 
-    // ---- LEFT SIDE PINS ----
-    const LP=BX;
+    // ============================================================
+    // PIN ROWS ON BOARD EDGES
+    // Each entry: [y_offset_from_BY+130, label, color]
+    // ============================================================
+    const LP=BX, RP=BX+BW;
+
     const LEFT_PINS=[
-      [0,'PA3','#00bcd4'],[28,'PA9','#00bcd4'],[56,'PA10','#00bcd4'],
-      [112,'PB6','#9c27b0'],[140,'PB7','#9c27b0'],
-      [196,'PA0','#4caf50'],[224,'PA1','#4caf50'],
-      [280,'PC2','#4caf50'],[308,'PC3','#4caf50'],
-      [336,'PD0','#4caf50'],[364,'PD1','#4caf50'],
-      [392,'PD2','#4caf50'],[420,'PD3','#4caf50'],
-      [476,'PC4','#2196f3'],[504,'PC5','#2196f3'],[532,'PC6','#2196f3'],
-      [560,'PC7','#2196f3'],[588,'PC8','#2196f3'],
-      [644,'PD12','#8bc34a'],
+      [0,  'PA3',  '#00bcd4'],
+      [32, 'PA9',  '#00bcd4'],
+      [64, 'PA10', '#00bcd4'],
+      [128,'PB6',  '#9c27b0'],
+      [160,'PB7',  '#9c27b0'],
+      [224,'PA0',  '#4caf50'],
+      [256,'PA1',  '#4caf50'],
+      [320,'PC2',  '#4caf50'],
+      [352,'PC3',  '#4caf50'],
+      [384,'PD0',  '#4caf50'],
+      [416,'PD1',  '#4caf50'],
+      [448,'PD2',  '#4caf50'],
+      [480,'PD3',  '#4caf50'],
+      [544,'PC4',  '#2196f3'],
+      [576,'PC5',  '#2196f3'],
+      [608,'PC6',  '#2196f3'],
+      [640,'PC7',  '#2196f3'],
+      [672,'PC8',  '#2196f3'],
+      [736,'PD12', '#8bc34a'],
     ];
+    const RIGHT_PINS=[
+      [0,  'PE0',  '#00bcd4'],
+      [32, 'PE1',  '#00bcd4'],
+      [96, 'PE8',  '#8bc34a'],
+      [128,'PE9',  '#ff9800'],
+      [160,'PE10', '#ff9800'],
+      [192,'PE11', '#ff9800'],
+      [256,'PE13', '#ff9800'],
+      [288,'PE14', '#ff9800'],
+      [320,'PE15', '#ff9800'],
+      [384,'PF0',  '#ffeb3b'],
+      [416,'PF1',  '#ffeb3b'],
+      [448,'PF2',  '#ffeb3b'],
+      [480,'PF3',  '#ffeb3b'],
+      [512,'PF4',  '#ffeb3b'],
+      [544,'PF5',  '#ffeb3b'],
+      [576,'PF6',  '#ffeb3b'],
+      [608,'PF7',  '#ffeb3b'],
+      [672,'PG5',  '#2196f3'],
+      [704,'PG6',  '#2196f3'],
+      [736,'PG7',  '#2196f3'],
+      [800,'PG0',  '#2196f3'],
+      [832,'PG1',  '#2196f3'],
+      [864,'PG2',  '#2196f3'],
+      [896,'PG3',  '#2196f3'],
+      [928,'PG4',  '#2196f3'],
+      [992,'PG8',  '#2196f3'],
+      [1024,'PG9', '#2196f3'],
+      [1056,'PG10','#2196f3'],
+      [1088,'PG11','#2196f3'],
+      [1120,'PG12','#2196f3'],
+      [1152,'PG13','#2196f3'],
+      [1184,'PG14','#2196f3'],
+      [1216,'PG15','#2196f3'],
+    ];
+
     LEFT_PINS.forEach(([dy,label,col])=>{
-      const py=BY+120+dy;
+      const py=BY+130+dy;
       rect(LP-10,py-5,10,10,'#1a1a1a',col,1);
       rect(LP-14,py-3,4,6,col,null,0);
       txt(label,LP+6,py+4,9,col,'left');
     });
-
-    // ---- RIGHT SIDE PINS ----
-    const RP=BX+BW;
-    const RIGHT_PINS=[
-      [0,'PE0','#00bcd4'],[28,'PE1','#00bcd4'],
-      [84,'PE8','#8bc34a'],
-      [112,'PE9','#ff9800'],[140,'PE10','#ff9800'],[168,'PE11','#ff9800'],
-      [224,'PE13','#ff9800'],[252,'PE14','#ff9800'],[280,'PE15','#ff9800'],
-      [336,'PF0','#ffeb3b'],[364,'PF1','#ffeb3b'],[392,'PF2','#ffeb3b'],[420,'PF3','#ffeb3b'],
-      [448,'PF4','#ffeb3b'],[476,'PF5','#ffeb3b'],[504,'PF6','#ffeb3b'],[532,'PF7','#ffeb3b'],
-      [588,'PG5','#2196f3'],[616,'PG6','#2196f3'],[644,'PG7','#2196f3'],
-      [700,'PG0','#2196f3'],[728,'PG1','#2196f3'],[756,'PG2','#2196f3'],[784,'PG3','#2196f3'],[812,'PG4','#2196f3'],
-      [868,'PG8','#2196f3'],[896,'PG9','#2196f3'],[924,'PG10','#2196f3'],[952,'PG11','#2196f3'],
-      [980,'PG12','#2196f3'],[1008,'PG13','#2196f3'],[1036,'PG14','#2196f3'],[1064,'PG15','#2196f3'],
-    ];
     RIGHT_PINS.forEach(([dy,label,col])=>{
-      const py=BY+120+dy;
+      const py=BY+130+dy;
       rect(RP,py-5,10,10,'#1a1a1a',col,1);
       rect(RP+10,py-3,4,6,col,null,0);
       txt(label,RP-6,py+4,9,col,'right');
     });
 
-    // ===== LEFT PERIPHERALS =====
-    const CW=220,scl_mid=LP-80;
-    const pa3_x=LP-14;
+    // ============================================================
+    // WIRE HELPER: route wire from peripheral (px,py) to board pin
+    // via unique turn_x, place pullup component above junction
+    // comp: {type:'res'|'pullup'|'cap'|'rc'|'bjt'|null, val, col}
+    // ============================================================
+    function routeL(px,py,turn_x,pin_dy,col,comp){
+      const pin_y=BY+130+pin_dy;
+      const board_x=LP-14;
+      // horizontal from peripheral to turn_x
+      wire([[px,py],[turn_x,py],[turn_x,pin_y],[board_x,pin_y]],col,2);
+      dot(turn_x,pin_y,col);
+      if(!comp||comp.type===null)return;
+      const cx=turn_x,cy=pin_y;
+      if(comp.type==='res'){
+        resistorV(cx,cy-30,comp.val,col);
+        vcc(cx,cy-68,comp.vcc||'3.3V');
+      } else if(comp.type==='pullup'){
+        resistorV(cx,cy-30,comp.val,col);
+        vcc(cx,cy-68,comp.vcc||'3.3V');
+      } else if(comp.type==='cap'){
+        capacitorV(cx,cy+14,comp.val,col);
+        gnd(cx,cy+36);
+      } else if(comp.type==='rc'){
+        // series resistor on horizontal segment
+        resistor(turn_x+50,py,comp.val,col+'c0');
+        // shunt cap to GND at junction
+        capacitorV(cx,cy+14,comp.cap||'10нФ',col+'80');
+        gnd(cx,cy+36);
+      } else if(comp.type==='inline_res'){
+        resistor(turn_x+50,py,comp.val,col);
+      }
+    }
 
-    // -- DRO HS800-2 --
-    const DX=60,DY=BY+100;
-    rect(DX,DY,CW,130,'#0a1a2a','#00bcd4',6);
+    // ============================================================
+    // LEFT PERIPHERALS
+    // Turn x-positions — each wire gets a UNIQUE column, min 35px apart
+    // so no components can overlap horizontally
+    // ============================================================
+    const CW=220; // component box width, right edge = 60+220=280
+
+    // Pin y values (absolute)
+    const pin={
+      pa3: BY+130+0,   pa9: BY+130+32,  pa10:BY+130+64,
+      pb6: BY+130+128, pb7: BY+130+160,
+      pa0: BY+130+224, pa1: BY+130+256,
+      pc2: BY+130+320, pc3: BY+130+352,
+      pd0: BY+130+384, pd1: BY+130+416, pd2:BY+130+448, pd3:BY+130+480,
+      pc4: BY+130+544, pc5: BY+130+576, pc6:BY+130+608, pc7:BY+130+640, pc8:BY+130+672,
+      pd12:BY+130+736,
+    };
+
+    // Turn x-lanes (left side): well-spaced columns
+    // Each lane is dedicated so no two components are in same column
+    const T={ // turn_x values
+      pa3: 1220, pa9:1175, pa10:1140,
+      pb6: 1080, pb7:1040,
+      pa0: 990,  pa1:950,
+      pc2: 900,  pc3:860, pd0:820, pd1:780, pd2:740, pd3:700,
+      pc4: 900,  pc5:860, pc6:820, pc7:780, pc8:740,
+      pd12:640,
+    };
+    // Note: joystick PC4-PC8 shares turn lanes with hand encoder but their
+    // wire y-positions are far apart so no visual overlap on the lanes.
+
+    // ---- DRO HS800-2 ----
+    const DX=60,DY=BY+120;
+    rect(DX,DY,CW,140,'#0a1a2a','#00bcd4',6);
     rect(DX,DY,CW,22,'#00bcd422','#00bcd4',6);
     txt('DRO HS800-2',DX+CW/2,DY+15,11,'#00bcd4','center',true);
-    txt('STM32F030 UART',DX+8,DY+36,9,'#aaa','left');
-    txt('57600/8N1  29-byte packet',DX+8,DY+50,9,'#666','left');
-    txt('TX (3.3V) ●',DX+CW-10,DY+50,9,'#00bcd4','right');
-    txt('X: bytes[6..9] int32 LE',DX+8,DY+66,8,'#888','left');
-    txt('Y: bytes[10..13] int32 LE',DX+8,DY+82,8,'#888','left');
-    txt('CRC16/MODBUS',DX+8,DY+98,8,'#666','left');
-    txt('GND',DX+8,DY+116,9,'#888','left');
-    const dro_y=DY+50,pa3_y=BY+120+0;
-    wire([[DX+CW,dro_y],[pa3_x-60,dro_y],[pa3_x-60,pa3_y],[pa3_x,pa3_y]],'#00bcd4',2);
-    capacitor(pa3_x-60+40,dro_y,'100нФ','#00bcd4');
-    gnd(pa3_x-60+40,dro_y+8);
-    txt('USART2_RX',pa3_x-60+40,dro_y-22,8,'#00bcd480','center');
+    txt('STM32F030  UART 57600/8N1',DX+8,DY+36,9,'#aaa','left');
+    txt('29-byte packet CRC16/MODBUS',DX+8,DY+52,8,'#666','left');
+    txt('TX (3.3V) ●',DX+CW-10,DY+68,9,'#00bcd4','right');
+    txt('X: bytes[6..9] int32 LE',DX+8,DY+84,8,'#888','left');
+    txt('Y: bytes[10..13] int32 LE',DX+8,DY+100,8,'#888','left');
+    txt('GND',DX+8,DY+122,9,'#888','left');
+    // route: DRO TX → 100нФ decoupling at turn, then to PA3
+    wire([[DX+CW,DY+68],[T.pa3,DY+68],[T.pa3,pin.pa3],[LP-14,pin.pa3]],'#00bcd4',2);
+    dot(T.pa3,pin.pa3,'#00bcd4');
+    // decoupling cap on wire (at y level of DRO TX, no pullup to VCC)
+    capacitor(T.pa3-60,DY+68,'100нФ','#00bcd4');
+    gnd(T.pa3-60,DY+76);
+    txt('USART2_RX',T.pa3-60,DY+53,8,'#00bcd460','center');
 
-    // -- DEBUG UART --
-    const DBGX=60,DBGY=BY+245;
-    rect(DBGX,DBGY,CW,100,'#0a1a2a','#00bcd4',6);
+    // ---- Debug / Serial Monitor ----
+    const DBGX=60,DBGY=BY+280;
+    rect(DBGX,DBGY,CW,110,'#0a1a2a','#00bcd4',6);
     rect(DBGX,DBGY,CW,22,'#00bcd422','#00bcd4',6);
     txt('Debug / Serial Monitor',DBGX+CW/2,DBGY+15,10,'#00bcd4','center',true);
     txt('USART1 via ST-Link VCP',DBGX+8,DBGY+36,9,'#aaa','left');
     txt('115200 baud',DBGX+8,DBGY+52,9,'#666','left');
-    txt('TX (PA9)  ●',DBGX+CW-10,DBGY+52,9,'#00bcd4','right');
-    txt('RX (PA10) ●',DBGX+CW-10,DBGY+68,9,'#00bcd4','right');
-    const pa9_y=BY+120+28,pa10_y=BY+120+56;
-    wire([[DBGX+CW,DBGY+52],[pa3_x-30,DBGY+52],[pa3_x-30,pa9_y],[pa3_x,pa9_y]],'#00bcd4',2);
-    wire([[DBGX+CW,DBGY+68],[pa3_x-20,DBGY+68],[pa3_x-20,pa10_y],[pa3_x,pa10_y]],'#00bcd4',2);
-    resistor(pa3_x-30+30,DBGY+52,'33Ω','#00bcd4');
+    txt('TX → PA9 ●',DBGX+CW-10,DBGY+68,9,'#00bcd4','right');
+    txt('RX ← PA10 ●',DBGX+CW-10,DBGY+84,9,'#00bcd4','right');
+    // TX with 33Ω series resistor
+    wire([[DBGX+CW,DBGY+68],[T.pa9,DBGY+68],[T.pa9,pin.pa9],[LP-14,pin.pa9]],'#00bcd4',2);
+    resistor(T.pa9+50,DBGY+68,'33Ω','#00bcd4');
+    dot(T.pa9,pin.pa9,'#00bcd4');
+    // RX direct
+    wire([[DBGX+CW,DBGY+84],[T.pa10,DBGY+84],[T.pa10,pin.pa10],[LP-14,pin.pa10]],'#00bcd4',2);
+    dot(T.pa10,pin.pa10,'#00bcd4');
 
-    // -- LCD2004 --
-    const LX=60,LY=BY+460;
+    // ---- LCD2004 ----
+    const LX=60,LY=BY+510;
     rect(LX,LY,CW,150,'#160a2a','#9c27b0',6);
     rect(LX,LY,CW,22,'#9c27b022','#9c27b0',6);
     txt('LCD 2004 (старый дисплей)',LX+CW/2,LY+15,10,'#9c27b0','center',true);
-    txt('I2C • PCF8574 • addr 0x27',LX+8,LY+36,9,'#aaa','left');
+    txt('I2C1 • PCF8574 • addr 0x27',LX+8,LY+36,9,'#aaa','left');
     txt('400 кГц  •  20×4 символов',LX+8,LY+52,9,'#666','left');
     txt('VCC: 5В',LX+8,LY+68,9,'#888','left');
-    txt('SCL ●',LX+CW-10,LY+84,9,'#9c27b0','right');
-    txt('SDA ●',LX+CW-10,LY+100,9,'#9c27b0','right');
-    const pb6_y=BY+120+112,pb7_y=BY+120+140;
-    wire([[LX+CW,LY+84],[scl_mid,LY+84],[scl_mid,pb6_y],[pa3_x,pb6_y]],'#9c27b0',2);
-    wire([[LX+CW,LY+100],[scl_mid-10,LY+100],[scl_mid-10,pb7_y],[pa3_x,pb7_y]],'#9c27b0',2);
-    resistorV(scl_mid+20,pb6_y-25,'4.7кΩ','#9c27b0'); vcc(scl_mid+20,pb6_y-50,'3.3V'); dot(scl_mid,pb6_y,'#9c27b0');
-    resistorV(scl_mid+10,pb7_y-25,'4.7кΩ','#9c27b0'); vcc(scl_mid+10,pb7_y-50,'3.3V'); dot(scl_mid-10,pb7_y,'#9c27b0');
+    txt('SCL → PB6 ●',LX+CW-10,LY+88,9,'#9c27b0','right');
+    txt('SDA → PB7 ●',LX+CW-10,LY+104,9,'#9c27b0','right');
+    // SCL: turn at T.pb6, pullup 4.7kΩ above
+    wire([[LX+CW,LY+88],[T.pb6,LY+88],[T.pb6,pin.pb6],[LP-14,pin.pb6]],'#9c27b0',2);
+    resistorV(T.pb6,pin.pb6-36,'4.7кΩ','#9c27b0'); vcc(T.pb6,pin.pb6-74,'3.3V'); dot(T.pb6,pin.pb6,'#9c27b0');
+    txt('I2C1_SCL',T.pb6,pin.pb6-84,8,'#9c27b060','center');
+    // SDA: turn at T.pb7, pullup 4.7kΩ above
+    wire([[LX+CW,LY+104],[T.pb7,LY+104],[T.pb7,pin.pb7],[LP-14,pin.pb7]],'#9c27b0',2);
+    resistorV(T.pb7,pin.pb7-36,'4.7кΩ','#9c27b0'); vcc(T.pb7,pin.pb7-74,'3.3V'); dot(T.pb7,pin.pb7,'#9c27b0');
+    txt('I2C1_SDA',T.pb7,pin.pb7-84,8,'#9c27b060','center');
 
-    // -- SPINDLE ENCODER --
-    const EX=60,EY=BY+700;
-    rect(EX,EY,CW,160,'#0a200a','#4caf50',6);
+    // ---- Spindle Encoder ----
+    const EX=60,EY=BY+780;
+    rect(EX,EY,CW,165,'#0a200a','#4caf50',6);
     rect(EX,EY,CW,22,'#4caf5022','#4caf50',6);
     txt('Энкодер шпинделя',EX+CW/2,EY+15,11,'#4caf50','center',true);
     txt('1800 линий/об  TIM5 счётчик',EX+8,EY+36,9,'#aaa','left');
-    txt('VCC: 5В   PA0,PA1 — FT пины',EX+8,EY+52,9,'#888','left');
-    txt('Ch A (PA0) TIM5_CH1 ●',EX+CW-10,EY+68,9,'#4caf50','right');
-    txt('Ch B (PA1) TIM5_CH2 ●',EX+CW-10,EY+84,9,'#4caf50','right');
-    txt('⚠ PA0 = USER BTN на плате!',EX+8,EY+110,8,'#c97a00','left');
-    txt('Снять перемычку SB9',EX+8,EY+124,8,'#888','left');
-    const pa0_y=BY+120+196,pa1_y=BY+120+224;
-    wire([[EX+CW,EY+68],[scl_mid-30,EY+68],[scl_mid-30,pa0_y],[pa3_x,pa0_y]],'#4caf50',2);
-    wire([[EX+CW,EY+84],[scl_mid-40,EY+84],[scl_mid-40,pa1_y],[pa3_x,pa1_y]],'#4caf50',2);
-    resistorV(scl_mid-30,pa0_y-25,'4.7кΩ','#4caf50'); vcc(scl_mid-30,pa0_y-50,'3.3V'); dot(scl_mid-30,pa0_y,'#4caf50');
-    resistorV(scl_mid-40,pa1_y-25,'4.7кΩ','#4caf50'); vcc(scl_mid-40,pa1_y-50,'3.3V'); dot(scl_mid-40,pa1_y,'#4caf50');
+    txt('VCC: 5В  •  FT пины PA0,PA1',EX+8,EY+52,8,'#888','left');
+    txt('Ch A → PA0 TIM5_CH1 ●',EX+CW-10,EY+72,9,'#4caf50','right');
+    txt('Ch B → PA1 TIM5_CH2 ●',EX+CW-10,EY+88,9,'#4caf50','right');
+    txt('⚠ PA0 = USER BTN на плате!',EX+8,EY+114,8,'#c97a00','left');
+    txt('Снять перемычку SB9',EX+8,EY+130,8,'#888','left');
+    txt('Pullup: 4.7кΩ только если OC-выход',EX+8,EY+148,7,'#666','left');
+    // Ch A at T.pa0
+    wire([[EX+CW,EY+72],[T.pa0,EY+72],[T.pa0,pin.pa0],[LP-14,pin.pa0]],'#4caf50',2);
+    resistorV(T.pa0,pin.pa0-36,'4.7кΩ','#4caf50'); vcc(T.pa0,pin.pa0-74,'3.3V'); dot(T.pa0,pin.pa0,'#4caf50');
+    // Ch B at T.pa1
+    wire([[EX+CW,EY+88],[T.pa1,EY+88],[T.pa1,pin.pa1],[LP-14,pin.pa1]],'#4caf50',2);
+    resistorV(T.pa1,pin.pa1-36,'4.7кΩ','#4caf50'); vcc(T.pa1,pin.pa1-74,'3.3V'); dot(T.pa1,pin.pa1,'#4caf50');
 
-    // -- HAND ENCODER --
-    const HX=60,HY=BY+980;
-    rect(HX,HY,CW,230,'#0a200a','#4caf50',6);
+    // ---- Hand Encoder ----
+    const HX=60,HY=BY+1070;
+    rect(HX,HY,CW,245,'#0a200a','#4caf50',6);
     rect(HX,HY,CW,22,'#4caf5022','#4caf50',6);
     txt('Ручной Энкодер (100 лин.)',HX+CW/2,HY+15,10,'#4caf50','center',true);
-    txt('Ch A (PC2) ●',HX+CW-10,HY+38,9,'#4caf50','right');
-    txt('Ch B (PC3) ●',HX+CW-10,HY+54,9,'#4caf50','right');
+    txt('Ch A → PC2 EXTI2 ●',HX+CW-10,HY+38,9,'#4caf50','right');
+    txt('Ch B → PC3 EXTI3 ●',HX+CW-10,HY+54,9,'#4caf50','right');
     txt('── Переключатель Ось ──',HX+8,HY+74,8,'#333','left');
-    txt('Z (PD0) ●',HX+CW-10,HY+92,9,'#4caf50','right');
-    txt('X (PD1) ●',HX+CW-10,HY+108,9,'#4caf50','right');
+    txt('Z/Y → PD0 ●',HX+CW-10,HY+92,9,'#4caf50','right');
+    txt('X → PD1 ●',HX+CW-10,HY+108,9,'#4caf50','right');
     txt('── Переключатель Шаг ──',HX+8,HY+126,8,'#333','left');
-    txt('×1  (PD2) ●',HX+CW-10,HY+144,9,'#4caf50','right');
-    txt('×10 (PD3) ●',HX+CW-10,HY+160,9,'#4caf50','right');
-    txt('Подтяжка 10кОм к 3.3В',HX+8,HY+185,8,'#888','left');
-    const hmid=pa3_x-90;
-    const pc2_y=BY+120+280,pc3_y=BY+120+308,pd0_y=BY+120+336,pd1_y=BY+120+364,pd2_y=BY+120+392,pd3_y=BY+120+420;
-    [[HX+CW,HY+38,pc2_y],[HX+CW,HY+54,pc3_y],[HX+CW,HY+92,pd0_y],[HX+CW,HY+108,pd1_y],[HX+CW,HY+144,pd2_y],[HX+CW,HY+160,pd3_y]].forEach(([sx,sy,py],i)=>{
-      const mx=hmid-i*8;
-      wire([[sx,sy],[mx,sy],[mx,py],[pa3_x,py]],'#4caf50',2);
-      resistorV(mx,py-25,'10кΩ','#4caf5080'); vcc(mx,py-50,'3.3V'); dot(mx,py,'#4caf50');
+    txt('×1 → PD2 ●',HX+CW-10,HY+144,9,'#4caf50','right');
+    txt('×10 → PD3 ●',HX+CW-10,HY+160,9,'#4caf50','right');
+    txt('Pullup 10кΩ к 3.3В',HX+8,HY+190,8,'#888','left');
+    // 6 wires, each on dedicated turn lane
+    const henc=[
+      [HX+CW,HY+38,T.pc2,0+320,'pc2'],
+      [HX+CW,HY+54,T.pc3,0+352,'pc3'],
+      [HX+CW,HY+92,T.pd0,0+384,'pd0'],
+      [HX+CW,HY+108,T.pd1,0+416,'pd1'],
+      [HX+CW,HY+144,T.pd2,0+448,'pd2'],
+      [HX+CW,HY+160,T.pd3,0+480,'pd3'],
+    ];
+    henc.forEach(([px,py,tx2,dy])=>{
+      const piny=BY+130+dy;
+      wire([[px,py],[tx2,py],[tx2,piny],[LP-14,piny]],'#4caf50',2);
+      resistorV(tx2,piny-36,'10кΩ','#4caf5090'); vcc(tx2,piny-74,'3.3V'); dot(tx2,piny,'#4caf50');
     });
 
-    // -- JOYSTICK --
-    const JX=60,JY=BY+1330;
-    rect(JX,JY,CW,180,'#0a0a2a','#2196f3',6);
+    // ---- Joystick ----
+    const JX=60,JY=BY+1440;
+    rect(JX,JY,CW,185,'#0a0a2a','#2196f3',6);
     rect(JX,JY,CW,22,'#2196f322','#2196f3',6);
     txt('Джойстик + Rapid',JX+CW/2,JY+15,11,'#2196f3','center',true);
     txt('Active LOW  внутр. PULLUP STM32',JX+8,JY+36,8,'#888','left');
-    ['Влево  (PC4)●','Вправо (PC5)●','Вверх  (PC6)●','Вниз   (PC7)●','Rapid  (PC8)●'].forEach((t,i)=>{txt(t,JX+CW-10,JY+58+i*20,9,'#2196f3','right');});
-    txt('RC фильтр 100Ω+10нФ на кнопку',JX+8,JY+162,8,'#888','left');
-    const joys=[BY+120+476,BY+120+504,BY+120+532,BY+120+560,BY+120+588];
-    const jhoys=[JY+58,JY+78,JY+98,JY+118,JY+138];
-    joys.forEach((py,i)=>{
-      const mx=hmid-40-i*6;
-      wire([[JX+CW,jhoys[i]],[mx,jhoys[i]],[mx,py],[pa3_x,py]],'#2196f3',2);
-      resistor(mx+40,jhoys[i],'100Ω','#2196f380');
-      capacitorV(mx,py+10,'10нФ','#2196f380'); gnd(mx,py+30); dot(mx,py,'#2196f3');
+    txt('RC фильтр: 100Ω + 10нФ / кнопка',JX+8,JY+50,8,'#666','left');
+    const jlabels=['Влево  → PC4 ●','Вправо → PC5 ●','Вверх  → PC6 ●','Вниз   → PC7 ●','Rapid  → PC8 ●'];
+    jlabels.forEach((t,i)=>txt(t,JX+CW-10,JY+70+i*22,9,'#2196f3','right'));
+    const jPins=[T.pc4,T.pc5,T.pc6,T.pc7,T.pc8];
+    const jDys=[544,576,608,640,672];
+    jPins.forEach((tx2,i)=>{
+      const sy=JY+70+i*22, piny=BY+130+jDys[i];
+      wire([[JX+CW,sy],[tx2,sy],[tx2,piny],[LP-14,piny]],'#2196f3',2);
+      // series resistor on horizontal segment (drawn on the long horizontal run)
+      resistor(tx2+60,sy,'100Ω','#2196f3a0');
+      // shunt cap to GND at turn point
+      capacitorV(tx2,piny+16,'10нФ','#2196f380');
+      gnd(tx2,piny+38);
+      dot(tx2,piny,'#2196f3');
     });
 
-    // -- BEEPER --
-    const BPX=60,BPY=BY+1630;
-    rect(BPX,BPY,CW,130,'#0a0a1a','#8bc34a',6);
+    // ---- Beeper ----
+    const BPX=60,BPY=BY+1750;
+    rect(BPX,BPY,CW,145,'#0a0a1a','#8bc34a',6);
     rect(BPX,BPY,CW,22,'#8bc34a22','#8bc34a',6);
     txt('Зуммер (Beeper)',BPX+CW/2,BPY+15,11,'#8bc34a','center',true);
     txt('TIM4_CH1 PWM тон',BPX+8,BPY+36,9,'#aaa','left');
     txt('⚠ PD12 = LED LD4 на плате!',BPX+8,BPY+52,8,'#c97a00','left');
     txt('Снять перемычку LD4',BPX+8,BPY+66,8,'#888','left');
     txt('5В зуммер → NPN BC547',BPX+8,BPY+82,8,'#888','left');
-    txt('3.3В зуммер → напрямую',BPX+8,BPY+98,8,'#888','left');
-    txt('PD12 ●',BPX+CW-10,BPY+114,9,'#8bc34a','right');
-    const pd12_y=BY+120+644;
-    wire([[BPX+CW,BPY+114],[hmid-60,BPY+114],[hmid-60,pd12_y],[pa3_x,pd12_y]],'#8bc34a',2);
-    resistor(hmid-60+50,BPY+114,'100Ω','#8bc34a');
-    // BJT NPN symbol (simplified)
-    const bjx=hmid-60+50,bjy=BPY+114;
-    ctx.save();ctx.translate(bjx,bjy+30);
-    ctx.beginPath();ctx.arc(0,0,10,0,Math.PI*2);ctx.strokeStyle='#8bc34a';ctx.lineWidth=1.5;ctx.stroke();
-    line(-10,0,-4,0,'#8bc34a',1.5); line(-4,-8,-4,8,'#8bc34a',1.5);
-    line(-4,4,10,12,'#8bc34a',1.5); line(-4,-4,10,-12,'#8bc34a',1.5);
-    // arrow on collector
-    ctx.beginPath();ctx.moveTo(6,10);ctx.lineTo(10,12);ctx.lineTo(8,7);ctx.fillStyle='#8bc34a';ctx.fill();
-    ctx.restore();
-    txt('BC547',bjx+14,bjy+44,8,'#8bc34a','left');
-    txt('NPN',bjx+14,bjy+54,8,'#8bc34a80','left');
-    // 5V buzzer coil above
-    rect(bjx-18,bjy-80,36,28,'#111','#8bc34a',3);
-    txt('BZR',bjx,bjy-66,9,'#8bc34a','center');
-    line(bjx,bjy-52,bjx,bjy+20,'#8bc34a',1.5); // collector to buzzer
-    vcc(bjx,bjy-88,'5V');
-    gnd(bjx,bjy+50);
+    txt('PD12 ●',BPX+CW-10,BPY+106,9,'#8bc34a','right');
+    // wire from Beeper to PD12 via T.pd12
+    wire([[BPX+CW,BPY+106],[T.pd12,BPY+106],[T.pd12,pin.pd12],[LP-14,pin.pd12]],'#8bc34a',2);
+    resistor(T.pd12+60,BPY+106,'100Ω','#8bc34a'); dot(T.pd12,pin.pd12,'#8bc34a');
+    // BJT NPN symbol
+    const bjx=T.pd12,bjy=pin.pd12;
+    ctx.save(); ctx.translate(bjx,bjy+44);
+    ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2);
+    ctx.strokeStyle='#8bc34a'; ctx.lineWidth=1.5; ctx.stroke();
+    line(-11,0,-5,0,'#8bc34a',1.5); line(-5,-9,-5,9,'#8bc34a',1.5);
+    line(-5,4,11,13,'#8bc34a',1.5); line(-5,-4,11,-13,'#8bc34a',1.5);
+    // arrow on emitter
+    ctx.beginPath(); ctx.moveTo(7,11); ctx.lineTo(11,13); ctx.lineTo(9,7);
+    ctx.fillStyle='#8bc34a'; ctx.fill(); ctx.restore();
+    txt('BC547',bjx+16,bjy+50,8,'#8bc34a','left');
+    // buzzer above BJT
+    rect(bjx-18,bjy-54,36,28,'#111','#8bc34a',3);
+    txt('BZR',bjx,bjy-40,9,'#8bc34a','center');
+    line(bjx,bjy-26,bjx,bjy+33,'#8bc34a',1.5);
+    vcc(bjx,bjy-62,'5V'); gnd(bjx,bjy+68);
 
-    // ===== RIGHT PERIPHERALS =====
-    const RC=SW-60-CW,rmid=RC-50;
-    const rp=RP+14;
+    // ============================================================
+    // RIGHT PERIPHERALS
+    // ============================================================
+    const RC=SW-60-CW, rp=RP+14;
+    // Turn x-lanes for right side
+    const TR={
+      pe0:1720, pe1:1756,
+      pe8:1720,
+      pe9:1720, pe10:1756, pe11:1792,
+      pe13:1720, pe14:1756, pe15:1792,
+      pf0:1720, pf1:1756, pf2:1792, pf3:1828, pf4:1864, pf5:1900, pf6:1936, pf7:1972,
+      pg5:1720, pg6:1756, pg7:1792,
+      pg0:1720, pg1:1756, pg2:1792, pg3:1828, pg4:1864,
+      pg8:1720, pg9:1746, pg10:1772, pg11:1798, pg12:1824, pg13:1850, pg14:1876, pg15:1902,
+    };
+    const pinR={
+      pe0:BY+130+0,  pe1:BY+130+32,
+      pe8:BY+130+96,
+      pe9:BY+130+128, pe10:BY+130+160, pe11:BY+130+192,
+      pe13:BY+130+256, pe14:BY+130+288, pe15:BY+130+320,
+      pf0:BY+130+384, pf1:BY+130+416, pf2:BY+130+448, pf3:BY+130+480,
+      pf4:BY+130+512, pf5:BY+130+544, pf6:BY+130+576, pf7:BY+130+608,
+      pg5:BY+130+672, pg6:BY+130+704, pg7:BY+130+736,
+      pg0:BY+130+800, pg1:BY+130+832, pg2:BY+130+864, pg3:BY+130+896, pg4:BY+130+928,
+      pg8:BY+130+992, pg9:BY+130+1024, pg10:BY+130+1056, pg11:BY+130+1088,
+      pg12:BY+130+1120, pg13:BY+130+1152, pg14:BY+130+1184, pg15:BY+130+1216,
+    };
 
-    // -- ESP32-S3 --
-    const EX2=RC,EY2=BY+100;
-    rect(EX2,EY2,CW,190,'#0a1a2a','#00bcd4',6);
+    function routeR(cx2,cy2,tx2,pin_name,col,comp){
+      const piny=pinR[pin_name];
+      wire([[rp,piny],[tx2,piny],[tx2,cy2],[cx2,cy2]],col,2);
+      dot(tx2,piny,col);
+      if(!comp||comp.type===null)return;
+      if(comp.type==='res') resistor(tx2-60,piny,comp.val,col);
+      if(comp.type==='pullup'){ resistorV(tx2,piny-36,comp.val,col); vcc(tx2,piny-74,comp.vcc||'3.3V'); }
+      if(comp.type==='cap'){ capacitorV(tx2,piny+16,comp.val,col+'80'); gnd(tx2,piny+38); }
+    }
+
+    // ---- ESP32-S3 ----
+    const EX2=RC,EY2=BY+120;
+    rect(EX2,EY2,CW,195,'#0a1a2a','#00bcd4',6);
     rect(EX2,EY2,CW,22,'#00bcd422','#00bcd4',6);
     txt('ESP32-S3 JC4827W543',EX2+CW/2,EY2+15,10,'#00bcd4','center',true);
     txt('4.3"  480×272  GT911 Touch',EX2+8,EY2+36,9,'#aaa','left');
     txt('UART8  115200/8N1  DMA',EX2+8,EY2+52,9,'#666','left');
     txt('VCC: 5В → 3.3В (внутри)',EX2+8,EY2+68,9,'#888','left');
-    txt('● GPIO44 (RX ← STM32 TX)',EX2+10,EY2+88,9,'#00bcd4','left');
-    txt('● GPIO43 (TX → STM32 RX)',EX2+10,EY2+104,9,'#00bcd4','left');
-    txt('GND',EX2+8,EY2+175,9,'#888','left');
-    const pe0_y=BY+120+0,pe1_y=BY+120+28;
-    wire([[rp,pe0_y],[RC-60,pe0_y],[RC-60,EY2+88],[EX2,EY2+88]],'#00bcd4',2);
-    wire([[rp,pe1_y],[RC-80,pe1_y],[RC-80,EY2+104],[EX2,EY2+104]],'#00bcd4',2);
-    resistor(RC-60-30,pe0_y,'33Ω','#00bcd4'); txt('UART8_TX',RC-60-30,pe0_y-14,8,'#00bcd460','center');
-    resistor(RC-80-30,pe1_y,'33Ω','#00bcd4'); txt('UART8_RX',RC-80-30,pe1_y-14,8,'#00bcd460','center');
+    txt('● GPIO44 (RX ← STM32 TX)',EX2+10,EY2+92,9,'#00bcd4','left');
+    txt('● GPIO43 (TX → STM32 RX)',EX2+10,EY2+108,9,'#00bcd4','left');
+    txt('GND',EX2+8,EY2+180,9,'#888','left');
+    // UART8 TX: PE0 → ESP32 RX — with 33Ω
+    wire([[rp,pinR.pe0],[TR.pe0,pinR.pe0],[TR.pe0,EY2+92],[EX2,EY2+92]],'#00bcd4',2);
+    resistor(TR.pe0-60,pinR.pe0,'33Ω','#00bcd4'); dot(TR.pe0,pinR.pe0,'#00bcd4');
+    txt('UART8_TX',TR.pe0-60,pinR.pe0-14,8,'#00bcd460','center');
+    // UART8 RX: PE1 ← ESP32 TX
+    wire([[rp,pinR.pe1],[TR.pe1,pinR.pe1],[TR.pe1,EY2+108],[EX2,EY2+108]],'#00bcd4',2);
+    resistor(TR.pe1-60,pinR.pe1,'33Ω','#00bcd4'); dot(TR.pe1,pinR.pe1,'#00bcd4');
+    txt('UART8_RX',TR.pe1-60,pinR.pe1-14,8,'#00bcd460','center');
 
-    // -- MOTOR Y --
-    const MY_X=RC,MY_Y=BY+430;
+    // ---- Motor Y ----
+    const MY_X=RC,MY_Y=BY+440;
     rect(MY_X,MY_Y,CW,190,'#1a1000','#ff9800',6);
     rect(MY_X,MY_Y,CW,22,'#ff980022','#ff9800',6);
     txt('Драйвер Мотора Y (продольная)',MY_X+CW/2,MY_Y+15,10,'#ff9800','center',true);
     txt('A4988 / DRV8825 / TMC2208',MY_X+8,MY_Y+36,9,'#aaa','left');
-    txt('Микрошаг: ×4',MY_X+8,MY_Y+52,8,'#666','left');
-    txt('● STEP (PE9)  TIM1_CH1',MY_X+10,MY_Y+72,9,'#ff9800','left');
-    txt('● DIR  (PE10)',MY_X+10,MY_Y+88,9,'#ff9800','left');
-    txt('● EN   (PE11) LOW=вкл',MY_X+10,MY_Y+104,9,'#ff9800','left');
-    txt('VCC: 5В  VMOT: 12-24В',MY_X+8,MY_Y+148,8,'#888','left');
-    txt('Мотор 4-wire bipolar',MY_X+8,MY_Y+162,8,'#666','left');
-    const pe9_y=BY+120+112,pe10_y=BY+120+140,pe11_y=BY+120+168;
-    [[pe9_y,MY_Y+72],[pe10_y,MY_Y+88],[pe11_y,MY_Y+104]].forEach(([py,cy],i)=>{
-      wire([[rp,py],[rmid-i*10,py],[rmid-i*10,cy],[MY_X,cy]],'#ff9800',2);
-      resistor(rmid-i*10-30,py,'100Ω','#ff9800');
-      capacitorV(rmid-i*10,py+12,'10нФ','#ff980060'); gnd(rmid-i*10,py+30); dot(rmid-i*10,py,'#ff9800');
+    txt('Микрошаг: ×4  (SW на драйвере)',MY_X+8,MY_Y+52,8,'#666','left');
+    txt('● STEP ← PE9  TIM1_CH1',MY_X+10,MY_Y+76,9,'#ff9800','left');
+    txt('● DIR  ← PE10',MY_X+10,MY_Y+92,9,'#ff9800','left');
+    txt('● EN   ← PE11  LOW=вкл',MY_X+10,MY_Y+108,9,'#ff9800','left');
+    txt('VCC: 5В  VMOT: 12-24В',MY_X+8,MY_Y+150,8,'#888','left');
+    txt('Мотор 4-wire bipolar',MY_X+8,MY_Y+166,8,'#666','left');
+    // 3 wires with 100Ω series resistors on each
+    [[pinR.pe9,TR.pe9,MY_Y+76],[pinR.pe10,TR.pe10,MY_Y+92],[pinR.pe11,TR.pe11,MY_Y+108]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[MY_X,cy]],'#ff9800',2);
+      resistor(tx2-60,py,'100Ω','#ff9800'); dot(tx2,py,'#ff9800');
     });
-    txt('TIM1_CH1 STEP pulse',rmid-30,pe9_y-14,7,'#ff980060','center');
+    txt('TIM1_CH1 STEP',TR.pe9-60,pinR.pe9-14,7,'#ff980070','center');
 
-    // -- MOTOR X --
-    const MX_X=RC,MX_Y=BY+770;
+    // ---- Motor X ----
+    const MX_X=RC,MX_Y=BY+790;
     rect(MX_X,MX_Y,CW,190,'#1a1000','#ff9800',6);
     rect(MX_X,MX_Y,CW,22,'#ff980022','#ff9800',6);
     txt('Драйвер Мотора X (поперечная)',MX_X+CW/2,MX_Y+15,10,'#ff9800','center',true);
     txt('A4988 / DRV8825 / TMC2208',MX_X+8,MX_Y+36,9,'#aaa','left');
     txt('Микрошаг: ×4',MX_X+8,MX_Y+52,8,'#666','left');
-    txt('● STEP (PE13) TIM1_CH3',MX_X+10,MX_Y+72,9,'#ff9800','left');
-    txt('● DIR  (PE14)',MX_X+10,MX_Y+88,9,'#ff9800','left');
-    txt('● EN   (PE15)',MX_X+10,MX_Y+104,9,'#ff9800','left');
-    const pe13_y=BY+120+224,pe14_y=BY+120+252,pe15_y=BY+120+280;
-    [[pe13_y,MX_Y+72],[pe14_y,MX_Y+88],[pe15_y,MX_Y+104]].forEach(([py,cy],i)=>{
-      wire([[rp,py],[rmid-20-i*10,py],[rmid-20-i*10,cy],[MX_X,cy]],'#ff9800',2);
-      resistor(rmid-20-i*10-30,py,'100Ω','#ff9800');
-      capacitorV(rmid-20-i*10,py+12,'10нФ','#ff980060'); gnd(rmid-20-i*10,py+30); dot(rmid-20-i*10,py,'#ff9800');
+    txt('● STEP ← PE13  TIM1_CH3',MX_X+10,MX_Y+76,9,'#ff9800','left');
+    txt('● DIR  ← PE14',MX_X+10,MX_Y+92,9,'#ff9800','left');
+    txt('● EN   ← PE15',MX_X+10,MX_Y+108,9,'#ff9800','left');
+    [[pinR.pe13,TR.pe13,MX_Y+76],[pinR.pe14,TR.pe14,MX_Y+92],[pinR.pe15,TR.pe15,MX_Y+108]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[MX_X,cy]],'#ff9800',2);
+      resistor(tx2-60,py,'100Ω','#ff9800'); dot(tx2,py,'#ff9800');
     });
 
-    // -- TACHO --
-    const TX2=RC,TY2=BY+1100;
+    // ---- Tacho ----
+    const TX2=RC,TY2=BY+1140;
     rect(TX2,TY2,CW,120,'#001a10','#8bc34a',6);
     rect(TX2,TY2,CW,22,'#8bc34a22','#8bc34a',6);
     txt('Тахометр (выход)',TX2+CW/2,TY2+15,11,'#8bc34a','center',true);
     txt('1 импульс / оборот шпинделя',TX2+8,TY2+36,9,'#aaa','left');
     txt('GPIO output PE8',TX2+8,TY2+52,9,'#666','left');
-    txt('● PE8',TX2+10,TY2+72,9,'#8bc34a','left');
-    txt('RPM счётчик / осциллограф',TX2+8,TY2+90,8,'#666','left');
-    const pe8_y=BY+120+84;
-    wire([[rp,pe8_y],[RC-40,pe8_y],[RC-40,TY2+72],[TX2,TY2+72]],'#8bc34a',2);
-    resistor(RC-40-30,pe8_y,'470Ω','#8bc34a');
-    led(RC-40-30,pe8_y+22,'down','#8bc34a'); gnd(RC-40-30,pe8_y+52);
+    txt('● PE8',TX2+10,TY2+76,9,'#8bc34a','left');
+    wire([[rp,pinR.pe8],[TR.pe8,pinR.pe8],[TR.pe8,TY2+76],[TX2,TY2+76]],'#8bc34a',2);
+    resistor(TR.pe8-60,pinR.pe8,'470Ω','#8bc34a'); dot(TR.pe8,pinR.pe8,'#8bc34a');
+    // LED symbol
+    led(TR.pe8-60,pinR.pe8+24,'down','#8bc34a'); gnd(TR.pe8-60,pinR.pe8+52);
 
-    // -- LIMIT SWITCHES + LEDs --
-    const LIM_X=RC,LIM_Y=BY+1280;
-    rect(LIM_X,LIM_Y,CW,290,'#1a1800','#ffeb3b',6);
+    // ---- Limit Switches + LEDs ----
+    const LIM_X=RC,LIM_Y=BY+1330;
+    rect(LIM_X,LIM_Y,CW,300,'#1a1800','#ffeb3b',6);
     rect(LIM_X,LIM_Y,CW,22,'#ffeb3b22','#ffeb3b',6);
     txt('Лимиты + Светодиоды',LIM_X+CW/2,LIM_Y+15,11,'#ffeb3b','center',true);
-    txt('Кнопки: Active LOW + PULLUP 10кОм',LIM_X+8,LIM_Y+36,8,'#888','left');
-    txt('LED: 470Ом + открытый коллектор',LIM_X+8,LIM_Y+50,8,'#888','left');
-    ['BTN Left  (PF0)●','BTN Right (PF2)●','BTN Front (PF4)●','BTN Rear  (PF6)●'].forEach((t,i)=>txt(t,LIM_X+CW-10,LIM_Y+70+i*20,9,'#ffeb3b','right'));
-    txt('──────────────────',LIM_X+8,LIM_Y+160,8,'#333','left');
-    ['LED Left  (PF1)●','LED Right (PF3)●','LED Front (PF5)●','LED Rear  (PF7)●'].forEach((t,i)=>txt(t,LIM_X+CW-10,LIM_Y+178+i*20,9,'#ffeb3b','right'));
-    const pf_y=[BY+120+336,BY+120+392,BY+120+448,BY+120+504];
-    const pf_led_y=[BY+120+364,BY+120+420,BY+120+476,BY+120+532];
-    pf_y.forEach((py,i)=>{wire([[rp,py],[rmid-60-i*8,py],[rmid-60-i*8,LIM_Y+70+i*20],[LIM_X,LIM_Y+70+i*20]],'#ffeb3b',2);resistorV(rmid-60-i*8,py-25,'10кΩ','#ffeb3b');vcc(rmid-60-i*8,py-50,'3.3V');dot(rmid-60-i*8,py,'#ffeb3b');});
-    pf_led_y.forEach((py,i)=>{wire([[rp,py],[rmid-100-i*8,py],[rmid-100-i*8,LIM_Y+178+i*20],[LIM_X,LIM_Y+178+i*20]],'#ffeb3b',2);resistor(rmid-100-i*8-30,py,'470Ω','#ffeb3b');led(rmid-100-i*8,py,'right','#ffeb3b');dot(rmid-100-i*8,py,'#ffeb3b');});
+    txt('Кнопки: Active LOW + PULLUP 10кΩ',LIM_X+8,LIM_Y+36,8,'#888','left');
+    txt('LED: 470Ω + открытый коллектор',LIM_X+8,LIM_Y+50,8,'#888','left');
+    ['BTN Left  → PF0 ●','BTN Right → PF2 ●','BTN Front → PF4 ●','BTN Rear  → PF6 ●'].forEach((t,i)=>txt(t,LIM_X+CW-10,LIM_Y+72+i*22,9,'#ffeb3b','right'));
+    txt('─────────────────────',LIM_X+8,LIM_Y+168,8,'#333','left');
+    ['LED Left  ← PF1 ●','LED Right ← PF3 ●','LED Front ← PF5 ●','LED Rear  ← PF7 ●'].forEach((t,i)=>txt(t,LIM_X+CW-10,LIM_Y+188+i*22,9,'#ffeb3b','right'));
+    // BTN wires with pullup
+    [[pinR.pf0,TR.pf0,LIM_Y+72],[pinR.pf2,TR.pf2,LIM_Y+94],[pinR.pf4,TR.pf4,LIM_Y+116],[pinR.pf6,TR.pf6,LIM_Y+138]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[LIM_X,cy]],'#ffeb3b',2);
+      resistorV(tx2,py-36,'10кΩ','#ffeb3b'); vcc(tx2,py-74,'3.3V'); dot(tx2,py,'#ffeb3b');
+    });
+    // LED wires with 470Ω and LED symbol
+    [[pinR.pf1,TR.pf1,LIM_Y+188],[pinR.pf3,TR.pf3,LIM_Y+210],[pinR.pf5,TR.pf5,LIM_Y+232],[pinR.pf7,TR.pf7,LIM_Y+254]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[LIM_X,cy]],'#ffeb3b',2);
+      resistor(tx2-50,py,'470Ω','#ffeb3b'); led(tx2-50,py+22,'down','#ffeb3b'); dot(tx2,py,'#ffeb3b');
+    });
 
-    // -- SUBMODE SWITCH --
-    const SM_X=RC,SM_Y=BY+1640;
+    // ---- Submode Switch ----
+    const SM_X=RC,SM_Y=BY+1710;
     rect(SM_X,SM_Y,CW,120,'#0a0a2a','#2196f3',6);
     rect(SM_X,SM_Y,CW,22,'#2196f322','#2196f3',6);
     txt('Переключатель Submode',SM_X+CW/2,SM_Y+15,10,'#2196f3','center',true);
     txt('3 позиции: Внутр/Ручн/Нар',SM_X+8,SM_Y+36,8,'#aaa','left');
-    txt('Подтяжка 1кОм к 3.3В!',SM_X+8,SM_Y+50,8,'#c97a00','left');
-    ['Внутр (PG5)●','Ручн  (PG6)●','Нар   (PG7)●'].forEach((t,i)=>txt(t,SM_X+CW-10,SM_Y+70+i*16,9,'#2196f3','right'));
-    const pg5_y=BY+120+588,pg6_y=BY+120+616,pg7_y=BY+120+644;
-    [[pg5_y,SM_Y+70],[pg6_y,SM_Y+86],[pg7_y,SM_Y+102]].forEach(([py,cy],i)=>{wire([[rp,py],[rmid-120-i*8,py],[rmid-120-i*8,cy],[SM_X,cy]],'#2196f3',2);resistorV(rmid-120-i*8,py-25,'1кΩ','#2196f3');vcc(rmid-120-i*8,py-50,'3.3V');dot(rmid-120-i*8,py,'#2196f3');});
+    txt('Подтяжка 1кΩ к 3.3В!',SM_X+8,SM_Y+50,8,'#c97a00','left');
+    ['Внутр → PG5 ●','Ручн  → PG6 ●','Нар   → PG7 ●'].forEach((t,i)=>txt(t,SM_X+CW-10,SM_Y+72+i*18,9,'#2196f3','right'));
+    [[pinR.pg5,TR.pg5,SM_Y+72],[pinR.pg6,TR.pg6,SM_Y+90],[pinR.pg7,TR.pg7,SM_Y+108]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[SM_X,cy]],'#2196f3',2);
+      resistorV(tx2,py-36,'1кΩ','#2196f3'); vcc(tx2,py-74,'3.3V'); dot(tx2,py,'#2196f3');
+    });
 
-    // -- MENU BUTTONS --
-    const MB_X=RC,MB_Y=BY+1830;
-    rect(MB_X,MB_Y,CW,140,'#0a0a2a','#2196f3',6);
+    // ---- Menu Buttons ----
+    const MB_X=RC,MB_Y=BY+1910;
+    rect(MB_X,MB_Y,CW,145,'#0a0a2a','#2196f3',6);
     rect(MB_X,MB_Y,CW,22,'#2196f322','#2196f3',6);
     txt('Кнопки Меню',MB_X+CW/2,MB_Y+15,11,'#2196f3','center',true);
-    txt('Active LOW  PULLUP 10кОм',MB_X+8,MB_Y+36,8,'#888','left');
-    ['Left   (PG0)●','Right  (PG1)●','Up     (PG2)●','Down   (PG3)●','Select (PG4)●'].forEach((t,i)=>txt(t,MB_X+CW-10,MB_Y+56+i*16,9,'#2196f3','right'));
-    const pg_btn=[BY+120+700,BY+120+728,BY+120+756,BY+120+784,BY+120+812];
-    const mb_cys=[MB_Y+56,MB_Y+72,MB_Y+88,MB_Y+104,MB_Y+120];
-    pg_btn.forEach((py,i)=>{wire([[rp,py],[rmid-140-i*8,py],[rmid-140-i*8,mb_cys[i]],[MB_X,mb_cys[i]]],'#2196f3',2);resistorV(rmid-140-i*8,py-25,'10кΩ','#2196f380');vcc(rmid-140-i*8,py-50,'3.3V');dot(rmid-140-i*8,py,'#2196f3');});
+    txt('Active LOW  PULLUP 10кΩ',MB_X+8,MB_Y+36,8,'#888','left');
+    ['Left   → PG0 ●','Right  → PG1 ●','Up     → PG2 ●','Down   → PG3 ●','Select → PG4 ●'].forEach((t,i)=>txt(t,MB_X+CW-10,MB_Y+58+i*18,9,'#2196f3','right'));
+    [[pinR.pg0,TR.pg0,MB_Y+58],[pinR.pg1,TR.pg1,MB_Y+76],[pinR.pg2,TR.pg2,MB_Y+94],[pinR.pg3,TR.pg3,MB_Y+112],[pinR.pg4,TR.pg4,MB_Y+130]].forEach(([py,tx2,cy])=>{
+      wire([[rp,py],[tx2,py],[tx2,cy],[MB_X,cy]],'#2196f3',2);
+      resistorV(tx2,py-36,'10кΩ','#2196f380'); vcc(tx2,py-74,'3.3V'); dot(tx2,py,'#2196f3');
+    });
 
-    // -- MODE SWITCH --
-    const MOD_X=RC-20,MOD_Y=BY+2040,MOD_W=CW+20;
+    // ---- Mode Switch ----
+    const MOD_X=RC-20,MOD_Y=BY+2130,MOD_W=CW+20;
     rect(MOD_X,MOD_Y,MOD_W,200,'#0a0a2a','#2196f3',6);
     rect(MOD_X,MOD_Y,MOD_W,22,'#2196f322','#2196f3',6);
-    txt('Переключатель Mode (8 позиций)',MOD_X+MOD_W/2,MOD_Y+15,10,'#2196f3','center',true);
+    txt('Переключатель Mode (8 поз.)',MOD_X+MOD_W/2,MOD_Y+15,10,'#2196f3','center',true);
     txt('Бинарный код PG15..PG8',MOD_X+8,MOD_Y+36,8,'#aaa','left');
-    txt('Подтяжка 1кОм ОБЯЗАТЕЛЬНА!',MOD_X+8,MOD_Y+50,8,'#c97a00','left');
-    txt('mode = (~GPIOG->IDR>>8)&0xFF',MOD_X+8,MOD_Y+64,8,'#666','left');
-    ['PG8 бит0●','PG9 бит1●','PG10 бит2●','PG11 бит3●','PG12 бит4●','PG13 бит5●','PG14 бит6●','PG15 бит7●'].forEach((t,i)=>txt(t,MOD_X+MOD_W-10,MOD_Y+82+i*14,9,'#2196f3','right'));
-    const pg_mode_y=[BY+120+868,BY+120+896,BY+120+924,BY+120+952,BY+120+980,BY+120+1008,BY+120+1036,BY+120+1064];
-    const mod_cys=pg_mode_y.map((_,i)=>MOD_Y+82+i*14);
-    pg_mode_y.forEach((py,i)=>{wire([[rp,py],[rmid-160-i*6,py],[rmid-160-i*6,mod_cys[i]],[MOD_X,mod_cys[i]]],'#2196f3',1.5);resistorV(rmid-160-i*6,py-22,'1кΩ','#2196f360');vcc(rmid-160-i*6,py-48,'3.3V');dot(rmid-160-i*6,py,'#2196f3');});
+    txt('Подтяжка 1кΩ ОБЯЗАТЕЛЬНА!',MOD_X+8,MOD_Y+50,8,'#c97a00','left');
+    txt('mode=(~GPIOG->IDR>>8)&0xFF',MOD_X+8,MOD_Y+64,8,'#666','left');
+    ['бит0 → PG8 ●','бит1 → PG9 ●','бит2 → PG10 ●','бит3 → PG11 ●','бит4 → PG12 ●','бит5 → PG13 ●','бит6 → PG14 ●','бит7 → PG15 ●'].forEach((t,i)=>txt(t,MOD_X+MOD_W-10,MOD_Y+82+i*14,9,'#2196f3','right'));
+    const modPins=[pinR.pg8,pinR.pg9,pinR.pg10,pinR.pg11,pinR.pg12,pinR.pg13,pinR.pg14,pinR.pg15];
+    const modTR=[TR.pg8,TR.pg9,TR.pg10,TR.pg11,TR.pg12,TR.pg13,TR.pg14,TR.pg15];
+    modPins.forEach((py,i)=>{
+      const cy=MOD_Y+82+i*14;
+      wire([[rp,py],[modTR[i],py],[modTR[i],cy],[MOD_X,cy]],'#2196f3',1.5);
+      resistorV(modTR[i],py-30,'1кΩ','#2196f360'); vcc(modTR[i],py-68,'3.3V'); dot(modTR[i],py,'#2196f3');
+    });
 
-    // -- POWER SECTION --
+    // ---- Power Section ----
     const PWR_X=BX+BW/2-160,PWR_Y=BY+BH+60;
-    rect(PWR_X,PWR_Y,320,190,'#1a0a0a','#f44336',6);
+    rect(PWR_X,PWR_Y,320,200,'#1a0a0a','#f44336',6);
     rect(PWR_X,PWR_Y,320,22,'#f4433622','#f44336',6);
     txt('Питание',PWR_X+160,PWR_Y+15,12,'#f44336','center',true);
     txt('Внешнее 12В/24В (БП станка)',PWR_X+10,PWR_Y+36,9,'#aaa','left');
     txt('↓ DC-DC LM2596  →  5В',PWR_X+10,PWR_Y+52,9,'#ff9800','left');
-    txt('   → Драйверы моторов, LCD VCC',PWR_X+10,PWR_Y+66,8,'#888','left');
-    txt('↓ LDO AMS1117-3.3  →  3.3В',PWR_X+10,PWR_Y+82,9,'#f44336','left');
-    txt('   → STM32 VIN, подтяжки, логика',PWR_X+10,PWR_Y+96,8,'#888','left');
-    txt('100мкФ + 100нФ на каждую шину',PWR_X+10,PWR_Y+112,8,'#666','left');
-    txt('⚠ Общий GND для всего!',PWR_X+10,PWR_Y+128,8,'#c97a00','left');
-    txt('Не смешивать USB и внешнее питание',PWR_X+10,PWR_Y+144,8,'#888','left');
-    txt('(развязывающий диод 1N4007)',PWR_X+10,PWR_Y+158,8,'#666','left');
-    // decoupling caps on power
-    capacitorV(PWR_X+270,PWR_Y+40,'100мкФ','#f44336'); vcc(PWR_X+250,PWR_Y+26,'3.3V'); gnd(PWR_X+270,PWR_Y+66);
+    txt('   Драйверы моторов, LCD VCC',PWR_X+10,PWR_Y+68,8,'#888','left');
+    txt('↓ LDO AMS1117-3.3  →  3.3В',PWR_X+10,PWR_Y+86,9,'#f44336','left');
+    txt('   STM32 VIN, подтяжки, логика',PWR_X+10,PWR_Y+102,8,'#888','left');
+    txt('100мкФ + 100нФ на каждую шину',PWR_X+10,PWR_Y+118,8,'#666','left');
+    txt('⚠ Общий GND для всего!',PWR_X+10,PWR_Y+134,8,'#c97a00','left');
+    txt('Не Mix USB + внешнее питание!',PWR_X+10,PWR_Y+150,8,'#888','left');
+    capacitorV(PWR_X+285,PWR_Y+44,'100мкФ','#f44336'); vcc(PWR_X+270,PWR_Y+30,'3.3V'); gnd(PWR_X+285,PWR_Y+70);
     line(BX+BW/2,BY+BH,BX+BW/2,PWR_Y,'#f44336',2); dot(BX+BW/2,BY+BH,'#f44336');
 
-    txt('ELS STM32F407 Wiring Diagram v1.0',SW/2,SH-30,11,'#444','center');
+    txt('ELS STM32F407 Wiring Diagram v1.0 — ПРЕДВАРИТЕЛЬНАЯ СХЕМА',SW/2,SH-30,11,'#444','center');
     txt('Все параметры в Core/els_config.h • Актуализировать при смене пинов!',SW/2,SH-14,10,'#333','center');
   }
 
