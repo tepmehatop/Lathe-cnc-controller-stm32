@@ -26,3 +26,6 @@ int32_t DRV_Stepper_GetPos(Axis_t axis);
 
 // В движении?
 uint8_t DRV_Stepper_IsMoving(Axis_t axis);
+
+// Вызывать из loop() — обслуживает шаговые импульсы
+void DRV_Stepper_Update(void);
