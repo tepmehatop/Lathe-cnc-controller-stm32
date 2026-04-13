@@ -72,26 +72,22 @@ void ELS_Loop(void) {
         DRV_LCD2004_PrintELS(&els);
     }
 
-    // ESP32: обновление позиции и RPM не чаще 1 раза в 100мс
-    // и только если значения изменились — чтобы не забивать очередь UART
+    // ESP32: обновление позиции и RPM раз в 250мс (как в оригинале Arduino),
+    // только при реальном изменении значений.
 #if USE_ESP32_DISPLAY
-    if ((millis() - s_disp_t) >= 100) {
+    if ((millis() - s_disp_t) >= 250) {
         s_disp_t = millis();
 
         static int32_t s_last_pos_y = 0x7FFFFFFF;
         static int32_t s_last_pos_x = 0x7FFFFFFF;
         static int32_t s_last_rpm   = 0x7FFFFFFF;
 
-        bool pos_changed = ((els.pos_y != s_last_pos_y) ||
-                            (els.pos_x != s_last_pos_x));
-        bool rpm_changed = (els.spindle_rpm != s_last_rpm);
-
-        if (pos_changed) {
+        if (els.pos_y != s_last_pos_y || els.pos_x != s_last_pos_x) {
             DRV_Display_SendPosition(els.pos_y, els.pos_x);
             s_last_pos_y = els.pos_y;
             s_last_pos_x = els.pos_x;
         }
-        if (rpm_changed) {
+        if (els.spindle_rpm != s_last_rpm) {
             DRV_Display_SendRpm(els.spindle_rpm);
             s_last_rpm = els.spindle_rpm;
         }

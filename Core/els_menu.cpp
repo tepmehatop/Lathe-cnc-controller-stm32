@@ -22,6 +22,9 @@
 #include "../Drivers/drv_inputs.h"
 #include <Arduino.h>
 
+// Forward declarations
+static void _key_select(void);
+
 // ============================================================
 // Применить режим и обновить ESP32
 // ============================================================
@@ -92,6 +95,9 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
         case TOUCH_S1: _set_submode(SUBMODE_INTERNAL); return;
         case TOUCH_S2: _set_submode(SUBMODE_MANUAL);   return;
         case TOUCH_S3: _set_submode(SUBMODE_EXTERNAL); return;
+
+        // Двойной тап на row6 → переключение select_menu (как физическая кнопка SELECT)
+        case TOUCH_PARAM_OK: _key_select(); return;
 
         // Навигация по меню (SelectMenu)
         case TOUCH_KEY_LEFT:
