@@ -79,13 +79,13 @@
 #define DRO_UART_BAUD           57600
 
 /** ESP32-S3 JC4827W543: двусторонний обмен.
- *  UART8. Скорость: 115200 бод (в 2× быстрее чем SoftwareSerial на Mega). */
-#define DISP_UART               UART8
-#define DISP_UART_PIN_TX        GPIO_PIN_0      // PE0
-#define DISP_UART_PORT_TX       GPIOE
-#define DISP_UART_PIN_RX        GPIO_PIN_1      // PE1
-#define DISP_UART_PORT_RX       GPIOE
-#define DISP_UART_BAUD          115200
+ *  USART3. PB10=TX → ESP32 GPIO44(RX), PB11=RX ← ESP32 GPIO43(TX). */
+#define DISP_UART               USART3
+#define DISP_UART_PIN_TX        GPIO_PIN_10     // PB10
+#define DISP_UART_PORT_TX       GPIOB
+#define DISP_UART_PIN_RX        GPIO_PIN_11     // PB11
+#define DISP_UART_PORT_RX       GPIOB
+#define DISP_UART_BAUD          57600
 
 /** Debug / Serial Monitor.
  *  USART1 (через ST-Link VCP на DISCOVERY). Скорость: 115200. */
@@ -291,3 +291,12 @@
 
 /** Количество заходов резьбы максимум. */
 #define MAX_STARTS              8
+
+/** Количество чистовых проходов по умолчанию (PASS_FINISH в Arduino). */
+#define PASS_FINISH             2
+
+/** Отскок Z по умолчанию в микрошагах (REBOUND_Z в Arduino). */
+#define REBOUND_Z               200
+
+/** Ускорение на подачах. */
+#define FEED_ACCEL              3

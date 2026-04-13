@@ -8,6 +8,7 @@
 
 #include "els_serial.h"
 #include "els_state.h"
+#include "els_tables.h"
 #include "els_config.h"
 #include "els_control.h"
 #include "../Drivers/drv_stepper.h"
@@ -46,22 +47,34 @@ static void _print_mm(const char* label, int32_t val_001mm) {
 // Вывод HELP
 // ============================================================
 static void _cmd_help(void) {
-    _println("--- ELS STM32 Commands ---");
+    _println("=== ELS STM32 Serial Monitor ===");
     _println("  HELP              List commands");
     _println("  INFO              Show current state");
-    _println("  START             Start movement");
-    _println("  STOP              Stop movement");
-    _println("  MODE:N            Set mode (0=FEED 1=AFEED 2=THREAD 3=CONE)");
-    _println("  FEED:N            Set feed mm/rev x100 (5..200)");
-    _println("  AFEED:N           Set async feed mm/min x100 (5..300)");
-    _println("  PITCH:N           Set thread pitch 0.001mm (100..5000)");
-    _println("  STARTS:N          Set thread starts (1..8)");
-    _println("  ZERO:Y            Zero Y (longitudinal) position");
-    _println("  ZERO:X            Zero X (cross) position");
-    _println("  LIMIT:ON          Enable limits");
-    _println("  LIMIT:OFF         Disable limits");
-    _println("  55                Test preset: MODE_FEED, 300RPM, 0.20mm/rev");
-    _println("--------------------------");
+    _println("--- Режимы ---");
+    _println("  MODE:0            FEED (синхронная подача)");
+    _println("  MODE:1            AFEED (асинхронная)");
+    _println("  MODE:2            THREAD (резьба)");
+    _println("  MODE:3            CONE_L (конус левый)");
+    _println("  MODE:4            CONE_R (конус правый)");
+    _println("  MODE:5            SPHERE (сфера)");
+    _println("  MODE:6            DIVIDER (делитель)");
+    _println("  SM:1              SelectMenu=1 (основной экран)");
+    _println("  SM:2              SelectMenu=2 (параметры)");
+    _println("  SM:3              SelectMenu=3 (линейка)");
+    _println("  SUBMODE:0         Internal / Внутренний");
+    _println("  SUBMODE:1         Manual / Ручной");
+    _println("  SUBMODE:2         External / Наружный");
+    _println("--- Параметры ---");
+    _println("  FEED:N            Feed mm/rev x100 (10=0.10mm)");
+    _println("  AFEED:N           Async feed mm/min (10..400)");
+    _println("  PITCH:N           Thread pitch 0.001mm (200=1mm)");
+    _println("  THRSTEP:N         Thread table index (0..66)");
+    _println("  CONESTEP:N        Cone table index (0..61)");
+    _println("--- Движение ---");
+    _println("  START / STOP");
+    _println("  ZERO:Y / ZERO:X   Zero axis");
+    _println("  LIMIT:ON / OFF    Enable/disable limits");
+    _println("================================");
 }
 
 // ============================================================
@@ -69,7 +82,7 @@ static void _cmd_help(void) {
 // ============================================================
 static void _cmd_info(void) {
     char buf[48];
-    const char* mode_str[] = {"FEED","AFEED","THREAD","CONE","SPHERE","DIVIDER","--","--"};
+    const char* mode_str[] = {"FEED","AFEED","THREAD","CONE_L","CONE_R","SPHERE","DIVIDER","RESERVE"};
     const char* sub_str[]  = {"Internal","Manual","External"};
 
     _println("--- ELS State ---");
@@ -161,9 +174,9 @@ static void _dispatch(char* line) {
     } else if (strcmp(cmd, "FEED") == 0) {
         int32_t v = atol(prm);
         if (v >= MIN_FEED && v <= MAX_FEED) {
-            els.feed = v;
+            els.Feed_mm = (uint16_t)v;
 #if USE_ESP32_DISPLAY
-            DRV_Display_SendFeed(els.feed, els.afeed);
+            DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
 #endif
             char buf[32];
             snprintf(buf, sizeof(buf), "[ELS] Feed = %ld.%02ld mm/rev",
@@ -177,19 +190,16 @@ static void _dispatch(char* line) {
 
     } else if (strcmp(cmd, "AFEED") == 0) {
         int32_t v = atol(prm);
-        if (v >= MIN_AFEED && v <= MAX_AFEED) {
-            els.afeed = v;
+        if (v >= 10 && v <= 400) {
+            els.aFeed_mm = (uint16_t)v;
 #if USE_ESP32_DISPLAY
-            DRV_Display_SendFeed(els.feed, els.afeed);
+            DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
 #endif
             char buf[32];
-            snprintf(buf, sizeof(buf), "[ELS] AFeed = %ld.%02ld mm/min",
-                (long)(v/100), (long)(v%100));
+            snprintf(buf, sizeof(buf), "[ELS] AFeed = %ld mm/min", (long)v);
             _println(buf);
         } else {
-            char buf[48];
-            snprintf(buf, sizeof(buf), "[ERR] AFeed %d..%d", MIN_AFEED, MAX_AFEED);
-            _println(buf);
+            _println("[ERR] AFeed 10..400");
         }
 
     } else if (strcmp(cmd, "PITCH") == 0) {
@@ -240,12 +250,77 @@ static void _dispatch(char* line) {
             _println("[ELS] Limits OFF");
         }
 
+    } else if (strcmp(cmd, "SM") == 0) {
+        int n = atoi(prm);
+        if (n >= 1 && n <= 3) {
+            els.select_menu = (uint8_t)n;
+#if USE_ESP32_DISPLAY
+            DRV_Display_SendSelectMenu(els.select_menu);
+#endif
+            char buf[32];
+            snprintf(buf, sizeof(buf), "[ELS] SelectMenu = %d", n);
+            _println(buf);
+        } else {
+            _println("[ERR] SM 1..3");
+        }
+
+    } else if (strcmp(cmd, "SUBMODE") == 0) {
+        int n = atoi(prm);
+        if (n >= 0 && n <= 2) {
+            ELS_Submode_t sub = (ELS_Submode_t)n;
+            els.submode = sub;
+            switch (els.mode) {
+                case MODE_FEED:    els.sub_feed   = n; break;
+                case MODE_AFEED:   els.sub_afeed  = n; break;
+                case MODE_THREAD:  els.sub_thread = n; break;
+                case MODE_CONE_L:
+                case MODE_CONE_R:  els.sub_cone   = n; break;
+                case MODE_SPHERE:  els.sub_sphere = n; break;
+                default: break;
+            }
+#if USE_ESP32_DISPLAY
+            DRV_Display_SendMode(els.mode, els.submode);
+#endif
+            const char* names[] = {"Internal","Manual","External"};
+            char buf[40];
+            snprintf(buf, sizeof(buf), "[ELS] Submode = %s", names[n]);
+            _println(buf);
+        } else {
+            _println("[ERR] SUBMODE 0..2");
+        }
+
+    } else if (strcmp(cmd, "THRSTEP") == 0) {
+        int n = atoi(prm);
+        extern const uint8_t TOTAL_THREADS;
+        if (n >= 0 && n < (int)TOTAL_THREADS) {
+            els.Thread_Step = (uint8_t)n;
+            char buf[40];
+            extern const thread_info_t Thread_Info[];
+            snprintf(buf, sizeof(buf), "[ELS] ThreadStep=%d  %s", n,
+                Thread_Info[n].Thread_Print);
+            _println(buf);
+        } else {
+            _println("[ERR] THRSTEP 0..66");
+        }
+
+    } else if (strcmp(cmd, "CONESTEP") == 0) {
+        int n = atoi(prm);
+        extern const uint8_t TOTAL_CONE;
+        if (n >= 0 && n < (int)TOTAL_CONE) {
+            els.Cone_Step = (uint8_t)n;
+            char buf[40];
+            extern const cone_info_t Cone_Info[];
+            snprintf(buf, sizeof(buf), "[ELS] ConeStep=%d  %s", n,
+                Cone_Info[n].Cone_Print);
+            _println(buf);
+        } else {
+            _println("[ERR] CONESTEP 0..61");
+        }
+
     } else if (strcmp(cmd, "55") == 0 || strcmp(line, "55") == 0) {
-        // Тестовый пресет
         ELS_Control_Stop();
-        els.mode  = MODE_FEED;
-        els.feed  = 20; // 0.20 мм/об
-        // Шпиндель не меняем — используем реальный RPM из энкодера
+        els.mode    = MODE_FEED;
+        els.Feed_mm = 20;
         _println("[ELS] Test preset: FEED 0.20mm/rev, START when spindle turns");
         ELS_Control_Start();
 
@@ -261,7 +336,8 @@ static void _dispatch(char* line) {
 // ============================================================
 void ELS_Serial_Init(void) {
     s_len = 0;
-    // Serial.begin уже вызван в ELS_Init
+    // Баннер НЕ выводим здесь — Serial.println блокирует если монитор не подключён.
+    // Баннер появится при первом вводе любой команды (или вручную: команда HELP).
 }
 
 void ELS_Serial_Process(void) {

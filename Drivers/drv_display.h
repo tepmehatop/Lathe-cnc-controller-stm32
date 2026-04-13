@@ -67,3 +67,4 @@ void DRV_Display_SendInt2(const char* cmd, int32_t a, int32_t b);
 // ---- Полное обновление состояния (при READY/PONG от ESP32) ----
 // Заполняется снаружи через колбэк или вручную из els_main
 void DRV_Display_SendAll(void);
+int  DRV_Display_TxFree(void);

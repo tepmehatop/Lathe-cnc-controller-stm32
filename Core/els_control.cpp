@@ -219,13 +219,13 @@ void ELS_Control_Update(void) {
         _apply_speed(AXIS_Y, hz_y, dir_y, &s_last_speed_y, &s_last_dir_y);
         break;
 
-    case MODE_CONE:
+    case MODE_CONE_L:
+    case MODE_CONE_R:
         // Конус: Y + X одновременно
-        // Отношение X/Y задаётся через thread_pitch (угол конуса как соотношение)
-        // TODO Этап 8.2: правильный расчёт угла конуса
+        // TODO Этап 12: правильный расчёт угла конуса из Cone_Info[els.Cone_Step]
         if (rpm >= MIN_RPM_FOR_SYNC) {
             hz_y = _calc_sync_hz(rpm, els.feed * 10L, STEPS_PER_MM_Y);
-            hz_x = hz_y / 2; // TODO: заменить на реальное соотношение
+            hz_x = hz_y / 2; // TODO: реальное соотношение Cs_Div/Cm_Div
         }
         _apply_speed(AXIS_Y, hz_y, dir_y, &s_last_speed_y, &s_last_dir_y);
         _apply_speed(AXIS_X, hz_x, dir_x, &s_last_speed_x, &s_last_dir_x);
@@ -233,8 +233,7 @@ void ELS_Control_Update(void) {
 
     case MODE_DIVIDER:
     case MODE_SPHERE:
-    case MODE_UNUSED6:
-    case MODE_UNUSED7:
+    case MODE_RESERVE:
     default:
         // Нет движения мотора
         break;

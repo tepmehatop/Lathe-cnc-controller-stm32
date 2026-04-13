@@ -12,6 +12,7 @@
 
 #include "drv_lcd2004.h"
 #include "../Core/els_config.h"
+#include "../Core/els_tables.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <stdio.h>
@@ -69,10 +70,18 @@ static const uint8_t s_char_diameter[8]    = {0x01,0x0E,0x13,0x15,0x19,0x0E,0x10
 // ============================================================
 // Низкоуровневая запись в PCF8574
 // ============================================================
+// Счётчик ошибок I2C — для диагностики
+volatile uint32_t g_i2c_err_cnt = 0;
+volatile uint8_t  g_i2c_last_err = 0;
+
 static void _pcf_write(uint8_t val) {
     Wire.beginTransmission(s_addr);
     Wire.write(val | s_backlight);
-    Wire.endTransmission();
+    uint8_t err = Wire.endTransmission();
+    if (err) {
+        g_i2c_err_cnt++;
+        g_i2c_last_err = err;
+    }
 }
 
 // Строб EN: выставить → пауза → снять
@@ -194,47 +203,582 @@ void DRV_LCD2004_PrintRow(uint8_t row, const char* str20) {
 }
 
 // ============================================================
-// Отображение позиций — аналог фрагмента Print.ino для M1 SM=2
-// Строка 2: "Ocь X:  \3  ±XXX.XXмм"
-// Строка 3: "Ocь Y:  \4  ±XXX.XXмм"
+// Отображение позиций
+// pos_y, pos_x в единицах 0.001 мм
+// Строка 2: "X: +XXX.XXX mm      "  (20 символов)
+// Строка 3: "Y: +XXX.XXX mm      "
 // ============================================================
 void DRV_LCD2004_UpdatePosition(int32_t pos_y, int32_t pos_x) {
-    char buf[21];
+    char buf[24];
 
     // Строка 2: ось X (поперечная)
-    DRV_LCD2004_SetCursor(0, 2);
-    if (pos_x <= 0) {
-        snprintf(buf, sizeof(buf), "Oc\xFC X:  \x03   ");
-    } else {
-        snprintf(buf, sizeof(buf), "Oc\xFC X:  \x03  -");
-    }
-    // Вывести метку
-    const char* p = buf;
-    while (*p) _data((uint8_t)*p++);
-    // Значение
-    char val[12];
-    snprintf(val, sizeof(val), "%3ld.%02d",
-        (long)abs((int)(pos_x / 100L)),
-        (int)abs((int)(pos_x % 100L)));
-    p = val;
-    while (*p) _data((uint8_t)*p++);
-    _data('\xEC'); _data('\xBC'); // "мм" в KOI8-R / или просто "mm"
+    int32_t ax = (pos_x < 0) ? -pos_x : pos_x;
+    snprintf(buf, sizeof(buf), "X:%c%4ld.%03ld mm     ",
+        (pos_x < 0) ? '-' : '+',
+        (long)(ax / 1000L),
+        (long)(ax % 1000L));
+    buf[20] = '\0';
+    DRV_LCD2004_PrintRow(2, buf);
 
     // Строка 3: ось Y (продольная)
-    DRV_LCD2004_SetCursor(0, 3);
-    if (pos_y <= 0) {
-        snprintf(buf, sizeof(buf), "Oc\xFC Y:  \x04   ");
-    } else {
-        snprintf(buf, sizeof(buf), "Oc\xFC Y:  \x04  -");
+    int32_t ay = (pos_y < 0) ? -pos_y : pos_y;
+    snprintf(buf, sizeof(buf), "Y:%c%4ld.%03ld mm     ",
+        (pos_y < 0) ? '-' : '+',
+        (long)(ay / 1000L),
+        (long)(ay % 1000L));
+    buf[20] = '\0';
+    DRV_LCD2004_PrintRow(3, buf);
+}
+
+// ============================================================
+// Полное меню ELS — точный порт Print.ino
+// ============================================================
+
+// ============================================================
+// Хелперы для порта Print.ino (имитируют lcd.setCursor/lcd.print)
+// Поддержка кириллицы UTF-8 → HD44780 Russian ROM (AIP31066W3/Surenoo)
+// Таблица из библиотеки LCDI2C_Multilingual ROM/Russian.h
+// ============================================================
+static uint8_t _cyr_to_hd44780(uint16_t cp) {
+    switch (cp) {
+        case 0x0401: return 0xA2; // Ё
+        case 0x0410: return 0x41; // А
+        case 0x0411: return 0xA0; // Б
+        case 0x0412: return 0x42; // В
+        case 0x0413: return 0xA1; // Г
+        case 0x0414: return 0xE0; // Д
+        case 0x0415: return 0x45; // Е
+        case 0x0416: return 0xA3; // Ж
+        case 0x0417: return 0xA4; // З
+        case 0x0418: return 0xA5; // И
+        case 0x0419: return 0xA6; // Й
+        case 0x041A: return 0x4B; // К
+        case 0x041B: return 0xA7; // Л
+        case 0x041C: return 0x4D; // М
+        case 0x041D: return 0x48; // Н
+        case 0x041E: return 0x4F; // О
+        case 0x041F: return 0xA8; // П
+        case 0x0420: return 0x50; // Р
+        case 0x0421: return 0x43; // С
+        case 0x0422: return 0x54; // Т
+        case 0x0423: return 0xA9; // У
+        case 0x0424: return 0xAA; // Ф
+        case 0x0425: return 0x58; // Х
+        case 0x0426: return 0xE1; // Ц
+        case 0x0427: return 0xAB; // Ч
+        case 0x0428: return 0xAC; // Ш
+        case 0x0429: return 0xE2; // Щ
+        case 0x042A: return 0xAD; // Ъ
+        case 0x042B: return 0xAE; // Ы
+        case 0x042C: return 0x62; // Ь
+        case 0x042D: return 0xAF; // Э
+        case 0x042E: return 0xB0; // Ю
+        case 0x042F: return 0xB1; // Я
+        case 0x0430: return 0x61; // а
+        case 0x0431: return 0xB2; // б
+        case 0x0432: return 0xB3; // в
+        case 0x0433: return 0xB4; // г
+        case 0x0434: return 0xE3; // д
+        case 0x0435: return 0x65; // е
+        case 0x0436: return 0xB6; // ж
+        case 0x0437: return 0xB7; // з
+        case 0x0438: return 0xB8; // и
+        case 0x0439: return 0xB9; // й
+        case 0x043A: return 0xBA; // к
+        case 0x043B: return 0xBB; // л
+        case 0x043C: return 0xBC; // м
+        case 0x043D: return 0xBD; // н
+        case 0x043E: return 0x6F; // о
+        case 0x043F: return 0xBE; // п
+        case 0x0440: return 0x70; // р
+        case 0x0441: return 0x63; // с
+        case 0x0442: return 0xBF; // т
+        case 0x0443: return 0x79; // у
+        case 0x0444: return 0xE4; // ф
+        case 0x0445: return 0x78; // х
+        case 0x0446: return 0xE5; // ц
+        case 0x0447: return 0xC0; // ч
+        case 0x0448: return 0xC1; // ш
+        case 0x0449: return 0xE6; // щ
+        case 0x044A: return 0xC2; // ъ
+        case 0x044B: return 0xC3; // ы
+        case 0x044C: return 0xC4; // ь
+        case 0x044D: return 0xC5; // э
+        case 0x044E: return 0xC6; // ю
+        case 0x044F: return 0xC7; // я
+        case 0x0451: return 0xB5; // ё
+        default:     return '?';
     }
-    p = buf;
-    while (*p) _data((uint8_t)*p++);
-    snprintf(val, sizeof(val), "%3ld.%02d",
-        (long)abs((int)(pos_y / 100L)),
-        (int)abs((int)(pos_y % 100L)));
-    p = val;
-    while (*p) _data((uint8_t)*p++);
-    _data('\xEC'); _data('\xBC');
+}
+
+static void _lcd_set(uint8_t col, uint8_t row) {
+    DRV_LCD2004_SetCursor(col, row);
+}
+static void _lcd_str(const char* s) {
+    const uint8_t* p = (const uint8_t*)s;
+    while (*p) {
+        uint8_t b = *p++;
+        if (b < 0x80) {
+            _data(b);  // ASCII + кастомные 0x01-0x06
+        } else if (b == 0xD0 && *p) {
+            uint8_t b2 = *p++;
+            // 0xD0 0x80..0xBF → U+0400..U+043F
+            _data(_cyr_to_hd44780((uint16_t)(0x0400 | (b2 & 0x3F))));
+        } else if (b == 0xD1 && *p) {
+            uint8_t b2 = *p++;
+            // 0xD1 0x80..0xBF → U+0440..U+047F
+            _data(_cyr_to_hd44780((uint16_t)(0x0440 | (b2 & 0x3F))));
+        } else {
+            while (*p && (*p & 0xC0) == 0x80) p++;
+        }
+    }
+}
+static char _lcd_buf[24];
+#define LCD_SET(col, row) _lcd_set(col, row)
+#define LCD_P(s)          _lcd_str(s)
+#define LCD_BUF           _lcd_buf
+
+// Приветственный экран — как в Arduino setup()
+void DRV_LCD2004_PrintWelcome(void) {
+    LCD_SET(0,0); LCD_P("  www.chipmaker.ru  ");
+    LCD_SET(0,1); LCD_P(" Система управления ");
+    LCD_SET(0,2); LCD_P("  Токарным станком  ");
+    LCD_SET(0,3); LCD_P("   STM32  7e2 V4.0  ");
+    delay(2000);
+    LCD_SET(0,1); LCD_P(" Инициализация...   ");
+}
+
+void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
+
+    // ── Экраны ошибок и завершения ──────────────────────────
+    if (s->err_0_flag) {
+        LCD_SET(0,0); LCD_P("      ВНИМАНИЕ      ");
+        LCD_SET(0,1); LCD_P("Установите джойстик ");
+        LCD_SET(0,2); LCD_P("   в нейтральное    ");
+        LCD_SET(0,3); LCD_P("     положение      ");
+        return;
+    }
+    if (s->err_1_flag) {
+        LCD_SET(0,0); LCD_P(" ВНИМАНИЕ:          ");
+        LCD_SET(0,1); LCD_P("                    ");
+        LCD_SET(0,2); LCD_P("   УСТАНОВИТЕ УПОРЫ!");
+        LCD_SET(0,3); LCD_P("                    ");
+        return;
+    }
+    if (s->err_2_flag) {
+        LCD_SET(0,0); LCD_P(" ВНИМАНИЕ:          ");
+        LCD_SET(0,1); LCD_P("                    ");
+        LCD_SET(0,2); LCD_P("УСТАНОВИТЕ СУППОРТ  ");
+        LCD_SET(0,3); LCD_P(" В ИСХОДНУЮ ПОЗИЦИЮ!");
+        return;
+    }
+    if (s->Complete_flag) {
+        LCD_SET(0,0); LCD_P("                    ");
+        LCD_SET(0,1); LCD_P("ОПЕРАЦИЯ ЗАВЕРШЕНА! ");
+        LCD_SET(0,2); LCD_P("                    ");
+        LCD_SET(0,3); LCD_P("                    ");
+        return;
+    }
+
+    // ── SelectMenu == 2: Ввод диаметра / сброс осей (Feed/Thread/Cone/aFeed/Sphere) ──
+    if ((s->mode == MODE_FEED   && s->select_menu == 2) ||
+        (s->mode == MODE_CONE_L && s->select_menu == 3) ||
+        (s->mode == MODE_CONE_R && s->select_menu == 3) ||
+        (s->mode == MODE_AFEED  && s->select_menu == 3) ||
+        (s->mode == MODE_SPHERE && s->select_menu == 3) ||
+        (s->mode == MODE_THREAD && s->select_menu == 3))
+    {
+        LCD_SET(0,0); LCD_P(" Ввод \x06  Сброс_осей ");
+        LCD_SET(0,1);
+        if (s->MSize_X_mm <= 0) LCD_P("Диаметр \x01\x02  ");
+        else                     LCD_P("Диаметр \x01\x02 -");
+        snprintf(LCD_BUF, 7, "%3ld.%02ld", (long)abs((int32_t)(s->MSize_X_mm/100)),
+                                            (long)abs((int32_t)(s->MSize_X_mm%100)));
+        LCD_P(LCD_BUF); LCD_P("мм");
+        LCD_SET(0,2);
+        if (s->Size_X_mm <= 0) LCD_P("Ось X:  \x03   ");
+        else                    LCD_P("Ось X:  \x03  -");
+        snprintf(LCD_BUF, 7, "%3ld.%02ld", (long)abs((int32_t)(s->Size_X_mm/100)),
+                                            (long)abs((int32_t)(s->Size_X_mm%100)));
+        LCD_P(LCD_BUF); LCD_P("мм");
+        LCD_SET(0,3);
+        if (s->Size_Z_mm <= 0) LCD_P("Ось Y:  \x04   ");
+        else                    LCD_P("Ось Y:  \x04  -");
+        snprintf(LCD_BUF, 7, "%3ld.%02ld", (long)abs((int32_t)(s->Size_Z_mm/100)),
+                                            (long)abs((int32_t)(s->Size_Z_mm%100)));
+        LCD_P(LCD_BUF); LCD_P("мм");
+        return;  // только этот экран
+    }
+
+    // ── SelectMenu == 1: общая часть — линейка (строки 1-3, левая часть) ──
+    if ((s->mode == MODE_FEED   && s->select_menu == 1) ||
+        (s->mode == MODE_CONE_L && s->select_menu == 1) ||
+        (s->mode == MODE_CONE_R && s->select_menu == 1) ||
+        (s->mode == MODE_AFEED  && s->select_menu == 1) ||
+        (s->mode == MODE_SPHERE && s->select_menu == 1) ||
+        (s->mode == MODE_THREAD && s->select_menu == 1))
+    {
+        // Строка 1: диаметр (левые 8 символов)
+        LCD_SET(0,1);
+        if (s->MSize_X_mm <= 0)
+            snprintf(LCD_BUF, 9, "\x06 %2ld.%02ld", (long)abs((int32_t)(s->MSize_X_mm/100)),
+                                                      (long)abs((int32_t)(s->MSize_X_mm%100)));
+        else
+            snprintf(LCD_BUF, 9, "\x06-%2ld.%02ld", (long)abs((int32_t)(s->MSize_X_mm/100)),
+                                                      (long)abs((int32_t)(s->MSize_X_mm%100)));
+        LCD_P(LCD_BUF); LCD_P(" ");
+        // Строка 2: X (левые 8 символов)
+        LCD_SET(0,2);
+        if (s->Size_X_mm <= 0)
+            snprintf(LCD_BUF, 9, "X %2ld.%02ld", (long)abs((int32_t)(s->Size_X_mm/100)),
+                                                   (long)abs((int32_t)(s->Size_X_mm%100)));
+        else
+            snprintf(LCD_BUF, 9, "X-%2ld.%02ld", (long)abs((int32_t)(s->Size_X_mm/100)),
+                                                   (long)abs((int32_t)(s->Size_X_mm%100)));
+        LCD_P(LCD_BUF); LCD_P(" ");
+        // Строка 3: Y (левые 8 символов)
+        LCD_SET(0,3);
+        if (s->Size_Z_mm <= 0)
+            snprintf(LCD_BUF, 9, "Y %2ld.%02ld", (long)abs((int32_t)(s->Size_Z_mm/100)),
+                                                   (long)abs((int32_t)(s->Size_Z_mm%100)));
+        else
+            snprintf(LCD_BUF, 9, "Y-%2ld.%02ld", (long)abs((int32_t)(s->Size_Z_mm/100)),
+                                                   (long)abs((int32_t)(s->Size_Z_mm%100)));
+        LCD_P(LCD_BUF); LCD_P(" ");
+    }
+
+    // ── Режим РЕЗЬБА ────────────────────────────────────────
+    if (s->mode == MODE_THREAD) {
+        if (s->select_menu == 1) {
+            // Строка 0, правая часть (cols 8-19): режим
+            if ((s->Ph > 1) && (!s->ConL_Thr_flag || !s->ConR_Thr_flag)) {
+                LCD_SET(8,0); LCD_P("\x02  Резьба");
+                snprintf(LCD_BUF, 5, " %2d", (int)s->Gewinde_flag);
+                LCD_P(LCD_BUF);
+            } else if (s->ConL_Thr_flag && s->Ph == 1) {
+                LCD_SET(8,0);
+                snprintf(LCD_BUF, 8, "<%s ", Cone_Info[s->Cone_Step].Cone_Print);
+                LCD_P(LCD_BUF); LCD_P("Резьба");
+            } else if (s->ConR_Thr_flag && s->Ph == 1) {
+                LCD_SET(8,0);
+                snprintf(LCD_BUF, 8, ">%s ", Cone_Info[s->Cone_Step].Cone_Print);
+                LCD_P(LCD_BUF); LCD_P("Резьба");
+            } else {
+                LCD_SET(8,0); LCD_P("\x02  Резьба   ");
+            }
+            LCD_SET(8,2); LCD_P(" Циклов:  ");
+            LCD_SET(8,1); LCD_P(" Шаг: ");
+            snprintf(LCD_BUF, 7, "%s", Thread_Info[s->Thread_Step].Thread_Print);
+            LCD_P(LCD_BUF);
+            // Строка 0, левая часть: подрежим
+            switch (s->sub_thread) {
+                case Sub_Mode_Thread_Int:
+                    LCD_SET(0,0); LCD_P(" Внутр  ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2d",
+                        (int)((Thread_Info[s->Thread_Step].Pass - s->Pass_Nr + 1
+                               + PASS_FINISH + s->Pass_Fin) + s->Thr_Pass_Summ));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Thread_Man:
+                    LCD_SET(0,0); LCD_P(" Ручная ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2d",
+                        (int)((Thread_Info[s->Thread_Step].Pass
+                               + PASS_FINISH + s->Pass_Fin) + s->Thr_Pass_Summ));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Thread_Ext:
+                    LCD_SET(0,0); LCD_P(" Наружн ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2d",
+                        (int)((Thread_Info[s->Thread_Step].Pass - s->Pass_Nr + 1
+                               + PASS_FINISH + s->Pass_Fin) + s->Thr_Pass_Summ));
+                    LCD_P(LCD_BUF); break;
+            }
+            // Строка 3 правая: ход резьбы или об/мин
+            if (s->Ph > 1) {
+                int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * s->Ph);
+                LCD_SET(8,3); LCD_P(" Ход: ");
+                snprintf(LCD_BUF, 5, "%1d.%02d", thstep_mm/100, thstep_mm%100);
+                LCD_P(LCD_BUF); LCD_P("мм");
+            } else {
+                LCD_SET(8,3); LCD_P(" Об/мин: ");
+                snprintf(LCD_BUF, 4, "%3d", (int)Thread_Info[s->Thread_Step].Limit_Print);
+                LCD_P(LCD_BUF);
+            }
+        } else if (s->select_menu == 2) {
+            int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * s->Ph);
+            LCD_SET(0,0); LCD_P("Чист проходов: \x01\x02 ");
+            snprintf(LCD_BUF, 3, "%2d", (int)(PASS_FINISH + s->Pass_Fin));
+            LCD_P(LCD_BUF);
+            LCD_SET(0,1); LCD_P("Колич заходов: \x03\x04 ");
+            snprintf(LCD_BUF, 3, "%2d", (int)s->Ph);
+            LCD_P(LCD_BUF);
+            LCD_SET(0,2); LCD_P("Ход резьбы:   ");
+            snprintf(LCD_BUF, 5, "%1d.%02d", thstep_mm/100, thstep_mm%100);
+            LCD_P(LCD_BUF); LCD_P("мм");
+            LCD_SET(0,3); LCD_P("Шаг резьбы:   ");
+            snprintf(LCD_BUF, 7, "%s", Thread_Info[s->Thread_Step].Thread_Print);
+            LCD_P(LCD_BUF);
+        }
+    }
+
+    // ── Режим ПОДАЧА СИНХРОННАЯ ──────────────────────────────
+    else if (s->mode == MODE_FEED) {
+        if (s->select_menu == 1) {
+            // Строка 0 правая: режим + маркер модификации
+            LCD_SET(8,0);
+            if (s->OTSKOK_Z < REBOUND_Z || s->TENSION_Z > 0)
+                LCD_P("\x02  Синхрон *");
+            else
+                LCD_P("\x02  Синхрон  ");
+            LCD_SET(8,1); LCD_P(" Подача:");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Feed_mm/100), (int)(s->Feed_mm%100));
+            LCD_P(LCD_BUF);
+            LCD_SET(8,2); LCD_P(" Циклов:  ");
+            LCD_SET(8,3); LCD_P(" Съём \x06:");
+            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            LCD_P(LCD_BUF);
+            switch (s->sub_feed) {
+                case Sub_Mode_Feed_Int:
+                    LCD_SET(0,0); LCD_P(" Внутре ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Feed_Man:
+                    LCD_SET(0,0); LCD_P(" Ручной ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)s->Pass_Total);
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Feed_Ext:
+                    LCD_SET(0,0); LCD_P(" Наружн ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+            }
+        } else if (s->select_menu == 3) {
+            LCD_SET(0,0); LCD_P("Отскок Y: \x01\x02");
+            snprintf(LCD_BUF, 16, " %2ld.%02ldmm",
+                (long)abs((int32_t)(s->OTSKOK_Z_mm/100)),
+                (long)abs((int32_t)(s->OTSKOK_Z_mm%100)));
+            LCD_P(LCD_BUF);
+            LCD_SET(0,1); LCD_P("                    ");
+            LCD_SET(0,2); LCD_P("Ослабление \x03        ");
+            LCD_SET(0,3); LCD_P("натяга Y:  \x04");
+            snprintf(LCD_BUF, 16, " %2ld.%02ldmm",
+                (long)abs((int32_t)(s->TENSION_Z_mm/100)),
+                (long)abs((int32_t)(s->TENSION_Z_mm%100)));
+            LCD_P(LCD_BUF);
+        }
+    }
+
+    // ── Режим ПОДАЧА АСИНХРОННАЯ ─────────────────────────────
+    else if (s->mode == MODE_AFEED) {
+        if (s->select_menu == 1) {
+            LCD_SET(8,0); LCD_P("\x02  Асинхрон ");
+            LCD_SET(8,1); LCD_P(" Подача: ");
+            snprintf(LCD_BUF, 4, "%3d", (int)s->aFeed_mm);
+            LCD_P(LCD_BUF);
+            LCD_SET(8,2); LCD_P(" Циклов:  ");
+            LCD_SET(8,3); LCD_P(" Съём R:");
+            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            LCD_P(LCD_BUF);
+            switch (s->sub_afeed) {
+                case Sub_Mode_aFeed_Int:
+                    LCD_SET(0,0); LCD_P(" Внутре ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_aFeed_Man:
+                    LCD_SET(0,0); LCD_P(" Ручной ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)s->Pass_Total);
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_aFeed_Ext:
+                    LCD_SET(0,0); LCD_P(" Наружн ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+            }
+        } else if (s->select_menu == 2) {
+            LCD_SET(0,0); LCD_P("Текущий  угол:");
+            snprintf(LCD_BUF, 7, "%3ld.%01ld",
+                (long)(s->Spindle_Angle/1000),
+                (long)(s->Spindle_Angle%1000/100));
+            LCD_P(LCD_BUF); LCD_P("\x05");
+            LCD_SET(0,1); LCD_P("Делим круг на:");
+            snprintf(LCD_BUF, 5, "%3d ", (int)s->Total_Tooth);
+            LCD_P(LCD_BUF); LCD_P("\x03\x04");
+            LCD_SET(0,2); LCD_P("Выбор отметки:");
+            snprintf(LCD_BUF, 5, "%3d ", (int)s->Current_Tooth);
+            LCD_P(LCD_BUF); LCD_P("\x01\x02");
+            LCD_SET(0,3); LCD_P("Угол  сектора:");
+            snprintf(LCD_BUF, 7, "%3ld.%01ld",
+                (long)(s->Required_Angle/1000),
+                (long)(s->Required_Angle%1000/100));
+            LCD_P(LCD_BUF); LCD_P("\x05");
+        }
+    }
+
+    // ── Режим КОНУС ЛЕВЫЙ < ──────────────────────────────────
+    else if (s->mode == MODE_CONE_L) {
+        if (s->select_menu == 1) {
+            LCD_SET(8,0);
+            snprintf(LCD_BUF, 8, "<%s ", Cone_Info[s->Cone_Step].Cone_Print);
+            LCD_P(LCD_BUF);
+            LCD_SET(13,0); LCD_P(" Конус ");
+            LCD_SET(8,1); LCD_P(" Подача:");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Feed_mm/100), (int)(s->Feed_mm%100));
+            LCD_P(LCD_BUF);
+            LCD_SET(8,2); LCD_P(" Циклов:  ");
+            LCD_SET(8,3); LCD_P(" Съём \x06:");
+            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            LCD_P(LCD_BUF);
+            switch (s->sub_cone) {
+                case Sub_Mode_Cone_Int:
+                    LCD_SET(0,0); LCD_P(" Внутре ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Cone_Man:
+                    LCD_SET(0,0); LCD_P(" Ручной ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)s->Pass_Total);
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Cone_Ext:
+                    LCD_SET(0,0); LCD_P(" Наружн ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+            }
+        } else if (s->select_menu == 2) {
+            LCD_SET(0,0); LCD_P("Конус  < ");
+            snprintf(LCD_BUF, 5, "%s", Cone_Info[s->Cone_Step].Cone_Print);
+            LCD_P(LCD_BUF);
+            LCD_SET(13,0); LCD_P("    \x01 \x02");
+            LCD_SET(0,2); LCD_P("Коническая        \x03 ");
+            if (s->ConL_Thr_flag) {
+                LCD_SET(0,1); LCD_P("  В режиме резьба   ");
+                LCD_SET(0,3); LCD_P("резьба:    Вкл    \x04 ");
+            } else {
+                LCD_SET(0,1); LCD_P("                    ");
+                LCD_SET(0,3); LCD_P("резьба:    Выкл   \x04 ");
+            }
+        }
+    }
+
+    // ── Режим КОНУС ПРАВЫЙ > ─────────────────────────────────
+    else if (s->mode == MODE_CONE_R) {
+        if (s->select_menu == 1) {
+            LCD_SET(8,0);
+            snprintf(LCD_BUF, 8, ">%s ", Cone_Info[s->Cone_Step].Cone_Print);
+            LCD_P(LCD_BUF);
+            LCD_SET(13,0); LCD_P(" Конус ");
+            LCD_SET(8,1); LCD_P(" Подача:");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Feed_mm/100), (int)(s->Feed_mm%100));
+            LCD_P(LCD_BUF);
+            LCD_SET(8,2); LCD_P(" Циклов:  ");
+            LCD_SET(8,3); LCD_P(" Съём \x06:");
+            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            LCD_P(LCD_BUF);
+            switch (s->sub_cone) {
+                case Sub_Mode_Cone_Int:
+                    LCD_SET(0,0); LCD_P(" Внутре ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Cone_Man:
+                    LCD_SET(0,0); LCD_P(" Ручной ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)s->Pass_Total);
+                    LCD_P(LCD_BUF); break;
+                case Sub_Mode_Cone_Ext:
+                    LCD_SET(0,0); LCD_P(" Наружн ");
+                    LCD_SET(18,2);
+                    snprintf(LCD_BUF, 3, "%2ld", (long)(s->Pass_Total - s->Pass_Nr + 1));
+                    LCD_P(LCD_BUF); break;
+            }
+        } else if (s->select_menu == 2) {
+            LCD_SET(0,0); LCD_P("Конус  > ");
+            snprintf(LCD_BUF, 5, "%s", Cone_Info[s->Cone_Step].Cone_Print);
+            LCD_P(LCD_BUF);
+            LCD_SET(13,0); LCD_P("    \x01 \x02");
+            LCD_SET(0,2); LCD_P("Коническая        \x03 ");
+            if (s->ConR_Thr_flag) {
+                LCD_SET(0,1); LCD_P("  В режиме резьба   ");
+                LCD_SET(0,3); LCD_P("резьба:    Вкл    \x04 ");
+            } else {
+                LCD_SET(0,1); LCD_P("                    ");
+                LCD_SET(0,3); LCD_P("резьба:    Выкл   \x04 ");
+            }
+        }
+    }
+
+    // ── Режим СФЕРА (шароточка) ──────────────────────────────
+    else if (s->mode == MODE_SPHERE) {
+        if (s->select_menu == 1 && s->sub_sphere != Sub_Mode_Sphere_Int) {
+            LCD_SET(0,0); LCD_P("ШАР \x06");
+            snprintf(LCD_BUF, 5, "%2ld.%01ld",
+                (long)(s->Sph_R_mm * 2 / 100),
+                (long)(s->Sph_R_mm * 2 / 10 % 10));
+            LCD_P(LCD_BUF); LCD_P("мм");
+            LCD_SET(8,1); LCD_P(" Подача:");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Feed_mm/100), (int)(s->Feed_mm%100));
+            LCD_P(LCD_BUF);
+            if (s->sub_sphere == Sub_Mode_Sphere_Man)
+                { LCD_SET(11,0); LCD_P(" Отключен"); }
+            else if (s->sub_sphere == Sub_Mode_Sphere_Ext)
+                { LCD_SET(11,0); LCD_P("  Включен"); }
+            LCD_SET(8,2); LCD_P(" Ножка:\x06");
+            snprintf(LCD_BUF, 5, "%ld.%02ld",
+                (long)(s->Bar_R_mm*2/100),
+                (long)(s->Bar_R_mm*2%100));
+            LCD_P(LCD_BUF);
+            LCD_SET(8,3); LCD_P(" Заходов:");
+            snprintf(LCD_BUF, 4, "%3ld", (long)(s->Pass_Total_Sphr + 2 - s->Pass_Nr));
+            LCD_P(LCD_BUF);
+        } else if (s->select_menu == 2) {
+            LCD_SET(0,0); LCD_P("Ширина резца: ");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Cutter_Width/100), (int)(s->Cutter_Width%100));
+            LCD_P(LCD_BUF); LCD_P("мм");
+            LCD_SET(0,1); LCD_P("Шаг по оси Y: ");
+            snprintf(LCD_BUF, 5, "%1d.%02d",
+                (int)(s->Cutting_Width/100), (int)(s->Cutting_Width%100));
+            LCD_P(LCD_BUF); LCD_P("мм");
+            LCD_SET(0,2); LCD_P("                    ");
+            LCD_SET(0,3); LCD_P("                    ");
+        }
+        if (s->sub_sphere == Sub_Mode_Sphere_Int) {
+            LCD_SET(0,0); LCD_P("                    ");
+            LCD_SET(0,1); LCD_P(" Режим невозможен!  ");
+            LCD_SET(0,2); LCD_P("                    ");
+            LCD_SET(0,3); LCD_P("                    ");
+        }
+    }
+
+    // ── Режим ДЕЛИТЕЛЬ ───────────────────────────────────────
+    else if (s->mode == MODE_DIVIDER) {
+        LCD_SET(0,0); LCD_P("    Текущий угол    ");
+        LCD_SET(0,1); LCD_P("       ");
+        snprintf(LCD_BUF, 9, "%3ld.%01ld",
+            (long)(s->Spindle_Angle/1000),
+            (long)(s->Spindle_Angle%1000/100));
+        LCD_P(LCD_BUF); LCD_P("\x05       ");
+        LCD_SET(0,2); LCD_P("                    ");
+        LCD_SET(0,3); LCD_P("Сброс кнопкой Селект");
+    }
+
+    // ── Режим РЕЗЕРВ ─────────────────────────────────────────
+    else if (s->mode == MODE_RESERVE) {
+        LCD_SET(0,0); LCD_P("                    ");
+        LCD_SET(0,1); LCD_P("                    ");
+        LCD_SET(0,2); LCD_P("                    ");
+        LCD_SET(0,3); LCD_P("              РЕЗЕРВ");
+    }
 }
 
 #else  // USE_LCD2004 = 0
@@ -246,5 +790,7 @@ void DRV_LCD2004_Print(uint8_t r, uint8_t c, const char* s) { (void)r;(void)c;(v
 void DRV_LCD2004_PrintRow(uint8_t r, const char* s) { (void)r;(void)s; }
 void DRV_LCD2004_UpdatePosition(int32_t y, int32_t x) { (void)y;(void)x; }
 void DRV_LCD2004_Backlight(uint8_t o) { (void)o; }
+void DRV_LCD2004_PrintWelcome(void) {}
+void DRV_LCD2004_PrintELS(const ELS_State_t* s) { (void)s; }
 
 #endif

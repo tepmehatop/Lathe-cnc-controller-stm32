@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "../Core/els_state.h"
 
 // LCD2004 через I2C1 (PCF8574, addr 0x27)
 // PB6 = SCL, PB7 = SDA, 400кГц
@@ -13,9 +14,11 @@
 //   \6 = знак диаметра
 
 void DRV_LCD2004_Init(void);
+void DRV_LCD2004_PrintWelcome(void);
 void DRV_LCD2004_Clear(void);
 void DRV_LCD2004_SetCursor(uint8_t col, uint8_t row);
 void DRV_LCD2004_Print(uint8_t row, uint8_t col, const char* str);
 void DRV_LCD2004_PrintRow(uint8_t row, const char* str20); // Ровно 20 символов, выравнивание
 void DRV_LCD2004_UpdatePosition(int32_t pos_y, int32_t pos_x); // 0.001 мм
 void DRV_LCD2004_Backlight(uint8_t on);
+void DRV_LCD2004_PrintELS(const ELS_State_t* s); // Полное меню как в Print.ino

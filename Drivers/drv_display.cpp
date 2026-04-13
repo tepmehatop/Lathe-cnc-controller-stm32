@@ -14,6 +14,7 @@
  */
 
 #include "drv_display.h"
+#include "drv_lcd2004.h"
 #include "../Core/els_config.h"
 #include "../Core/els_state.h"
 #include <Arduino.h>
@@ -26,7 +27,9 @@
 // ============================================================
 // UART8: PE0=TX, PE1=RX  (STM32duino: RX первый, TX второй)
 // ============================================================
-static HardwareSerial DispSerial(PE1, PE0);
+static HardwareSerial DispSerial(PB11, PB10);  // RX=PB11(USART3_RX), TX=PB10(USART3_TX)
+
+int DRV_Display_TxFree(void) { return DispSerial.availableForWrite(); }
 
 // ============================================================
 // RX буфер
@@ -37,6 +40,7 @@ static uint8_t s_rxlen = 0;
 
 // Callback входящих команд
 static DispRxCallback_t s_rx_cb = nullptr;
+static volatile uint8_t s_need_sendall = 0; // флаг: ESP32 прислал READY/PONG
 
 void DRV_Display_SetRxCallback(DispRxCallback_t cb) {
     s_rx_cb = cb;
@@ -74,14 +78,9 @@ static void _parse_rx(const char* raw) {
     DispRxCmd_t rx = {};
     strncpy(rx.cmd, cmd_str, sizeof(rx.cmd)-1);
 
-    Serial.print("[DISP RX] <");
-    Serial.print(inner);
-    Serial.println(">");
-
-    // READY / PONG → отправить всё состояние
+    // READY / PONG → выставить флаг, SendAll вызовется из loop()
     if (strcmp(cmd_str, "READY") == 0 || strcmp(cmd_str, "PONG") == 0) {
-        Serial.println("[DISP] ESP32 ready — sending full state");
-        DRV_Display_SendAll();
+        s_need_sendall = 1;
         return;
     }
 
@@ -141,6 +140,8 @@ static void _parse_rx(const char* raw) {
 // Низкоуровневые функции отправки
 // ============================================================
 void DRV_Display_SendCmd(const char* cmd, const char* params) {
+    // Не блокировать цикл если TX буфер заполнен
+    if (DispSerial.availableForWrite() < 32) return;
     DispSerial.print('<');
     DispSerial.print(cmd);
     if (params && params[0]) {
@@ -175,8 +176,9 @@ void DRV_Display_SendPosition(int32_t pos_y, int32_t pos_x) {
 }
 
 void DRV_Display_SendMode(uint8_t mode, uint8_t submode) {
-    DRV_Display_SendInt("MODE",    (int32_t)mode);
-    DRV_Display_SendInt("SUBMODE", (int32_t)submode);
+    // ESP32 firmware ожидает 1-based (Mode_Feed=1), наш enum 0-based → +1
+    DRV_Display_SendInt("MODE",    (int32_t)mode + 1);
+    DRV_Display_SendInt("SUBMODE", (int32_t)submode + 1);
 }
 
 void DRV_Display_SendFeed(int32_t feed, int32_t afeed) {
@@ -245,13 +247,18 @@ void DRV_Display_SendAll(void) {
 void DRV_Display_Init(void) {
     DispSerial.begin(DISP_UART_BAUD);
     s_rxlen = 0;
-    delay(500);                          // Ждём загрузки ESP32
-    DRV_Display_SendCmd("PING", nullptr);
-    delay(200);
-    DRV_Display_SendAll();
+    // SendAll убран из Init: ESP32 пришлёт <READY> сам когда загрузится,
+    // тогда _parse_rx вызовет DRV_Display_SendAll() через callback.
+    // Отправка всего блока здесь блокирует UART если ESP32 ещё не слушает.
 }
 
 void DRV_Display_Process(void) {
+    // Если ESP32 прислал READY/PONG и TX буфер свободен — отправить всё состояние
+    if (s_need_sendall && DispSerial.availableForWrite() > 100) {
+        s_need_sendall = 0;
+        DRV_Display_SendAll();
+    }
+
     while (DispSerial.available()) {
         char c = (char)DispSerial.read();
         if (c == '\n' || c == '\r') {
