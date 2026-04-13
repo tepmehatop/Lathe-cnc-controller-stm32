@@ -139,8 +139,8 @@ static void _parse_rx(const char* raw) {
 // ============================================================
 // Низкоуровневые функции отправки
 // ============================================================
+// Отправка с дропом если буфер занят (для частых позиций)
 void DRV_Display_SendCmd(const char* cmd, const char* params) {
-    // Не блокировать цикл если TX буфер заполнен
     if (DispSerial.availableForWrite() < 32) return;
     DispSerial.print('<');
     DispSerial.print(cmd);
@@ -149,6 +149,26 @@ void DRV_Display_SendCmd(const char* cmd, const char* params) {
         DispSerial.print(params);
     }
     DispSerial.println('>');
+}
+
+// Приоритетная отправка — ждёт освобождения буфера (для режима/субменю/touch-ответов)
+// Ожидание ограничено 10мс чтобы не блокировать loop надолго
+static void _SendCmdPriority(const char* cmd, const char* params) {
+    uint32_t t = millis();
+    while (DispSerial.availableForWrite() < 32 && (millis() - t) < 10) { /* wait */ }
+    DispSerial.print('<');
+    DispSerial.print(cmd);
+    if (params && params[0]) {
+        DispSerial.print(':');
+        DispSerial.print(params);
+    }
+    DispSerial.println('>');
+}
+
+static void _SendIntPriority(const char* cmd, int32_t val) {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%ld", (long)val);
+    _SendCmdPriority(cmd, buf);
 }
 
 void DRV_Display_SendInt(const char* cmd, int32_t val) {
@@ -177,8 +197,9 @@ void DRV_Display_SendPosition(int32_t pos_y, int32_t pos_x) {
 
 void DRV_Display_SendMode(uint8_t mode, uint8_t submode) {
     // ESP32 firmware ожидает 1-based (Mode_Feed=1), наш enum 0-based → +1
-    DRV_Display_SendInt("MODE",    (int32_t)mode + 1);
-    DRV_Display_SendInt("SUBMODE", (int32_t)submode + 1);
+    // Приоритетная отправка — не дропать при занятом буфере
+    _SendIntPriority("MODE",    (int32_t)mode + 1);
+    _SendIntPriority("SUBMODE", (int32_t)submode + 1);
 }
 
 void DRV_Display_SendFeed(int32_t feed, int32_t afeed) {
@@ -216,7 +237,7 @@ void DRV_Display_SendAlert(int32_t type) {
 }
 
 void DRV_Display_SendSelectMenu(uint8_t menu) {
-    DRV_Display_SendInt("SELECTMENU", (int32_t)menu);
+    _SendIntPriority("SELECTMENU", (int32_t)menu);
 }
 
 // angle_mdeg: 0.001° → делим на 100 → дециградусы (как в Arduino)
