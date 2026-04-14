@@ -196,6 +196,7 @@ static void _switch_mode_hw(ELS_Mode_t new_mode) {
     DRV_Display_SendMode(els.mode, els.submode);
     DRV_Display_SendSelectMenu(1);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+    DRV_Display_SendInt("AP", 0);
 #endif
     DRV_Beeper_Tone(1000, 30);
 }
