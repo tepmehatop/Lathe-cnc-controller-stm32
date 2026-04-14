@@ -43,10 +43,12 @@ static void _set_mode(ELS_Mode_t mode) {
         default: break;
     }
     els.select_menu = 1;
+    els.Ap = 0;
 #if USE_ESP32_DISPLAY
     DRV_Display_SendMode(els.mode, els.submode);
     DRV_Display_SendSelectMenu(els.select_menu);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+    DRV_Display_SendInt("AP", 0);
 #endif
     DRV_Beeper_Tone(1000, 30);  // короткий звук при смене режима
 }
