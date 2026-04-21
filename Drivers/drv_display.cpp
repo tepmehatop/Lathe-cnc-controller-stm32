@@ -17,6 +17,7 @@
 #include "drv_lcd2004.h"
 #include "../Core/els_config.h"
 #include "../Core/els_state.h"
+#include "../Core/els_tables.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -141,7 +142,23 @@ static void _parse_rx(const char* raw) {
 // ============================================================
 // Отправка с дропом если буфер занят (для частых позиций)
 void DRV_Display_SendCmd(const char* cmd, const char* params) {
-    if (DispSerial.availableForWrite() < 32) return;
+    // DBG: считаем drops для POS_Z
+    static uint32_t dbg_posz_ok = 0, dbg_posz_drop = 0, dbg_t = 0;
+    bool is_posz = (strcmp(cmd, "POS_Z") == 0);
+    if (is_posz) {
+        uint32_t now = millis();
+        if (now - dbg_t >= 3000) {
+            Serial.printf("[STM32] POS_Z ok=%lu drop=%lu buf=%d\n",
+                          dbg_posz_ok, dbg_posz_drop, DispSerial.availableForWrite());
+            dbg_posz_ok = 0; dbg_posz_drop = 0; dbg_t = now;
+        }
+    }
+    if (is_posz) dbg_posz_ok++;
+    // Все отправки приоритетные — ждём освобождения буфера (до 10мс)
+    {
+        uint32_t t = millis();
+        while (DispSerial.availableForWrite() < 32 && (millis() - t) < 10) {}
+    }
     DispSerial.print('<');
     DispSerial.print(cmd);
     if (params && params[0]) {
@@ -172,15 +189,13 @@ static void _SendIntPriority(const char* cmd, int32_t val) {
 }
 
 void DRV_Display_SendInt(const char* cmd, int32_t val) {
-    char buf[20];
-    snprintf(buf, sizeof(buf), "%ld", (long)val);
-    DRV_Display_SendCmd(cmd, buf);
+    _SendIntPriority(cmd, val);
 }
 
 void DRV_Display_SendInt2(const char* cmd, int32_t a, int32_t b) {
     char buf[32];
     snprintf(buf, sizeof(buf), "%ld,%ld", (long)a, (long)b);
-    DRV_Display_SendCmd(cmd, buf);
+    _SendCmdPriority(cmd, buf);
 }
 
 // ============================================================
@@ -191,8 +206,8 @@ void DRV_Display_SendInt2(const char* cmd, int32_t a, int32_t b) {
 // ESP32 ожидает оригинальный знак DRO → отправляем -pos
 // Имена: POS_Z = продольная (Y), POS_X = поперечная (X)
 void DRV_Display_SendPosition(int32_t pos_y, int32_t pos_x) {
-    DRV_Display_SendInt("POS_Z", -pos_y);
-    DRV_Display_SendInt("POS_X", -pos_x);
+    _SendIntPriority("POS_Z", -pos_y);
+    _SendIntPriority("POS_X", -pos_x);
 }
 
 void DRV_Display_SendMode(uint8_t mode, uint8_t submode) {
@@ -208,7 +223,7 @@ void DRV_Display_SendFeed(int32_t feed, int32_t afeed) {
 }
 
 void DRV_Display_SendRpm(int32_t rpm) {
-    DRV_Display_SendInt("RPM", rpm);
+    _SendIntPriority("RPM", rpm);
 }
 
 // otskok_mm в 0.001мм → ESP32 ожидает 0.001мм × 10 = 0.0001мм? Нет.
@@ -247,19 +262,83 @@ void DRV_Display_SendAngle(int32_t angle_mdeg) {
 
 // ============================================================
 // Полное состояние (при READY/PONG от ESP32)
-// Отправляем всё что знаем из els_state
+// Полный аналог Arduino Display_Send_All() — все 31 поле.
 // ============================================================
 void DRV_Display_SendAll(void) {
+    // 1. Режим и подрежим
     DRV_Display_SendMode(els.mode, els.submode);
-    DRV_Display_SendFeed(els.feed, els.afeed);
+
+    // 2. Подачи
+    DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+
+    // 3. Данные резьбы (имя из таблицы, шаг, RPM лимит, ход, циклов)
+    {
+        uint8_t ts = els.Thread_Step;
+        if (ts >= TOTAL_THREADS) ts = 0;
+        DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+        DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+        DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+        int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+        DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+        int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+        DRV_Display_SendInt("THREAD_CYCL",  cycl);
+    }
+
+    // 4. Позиции (знак инвертирован как в Arduino)
     DRV_Display_SendPosition(els.pos_y, els.pos_x);
-    DRV_Display_SendOtskok(els.otskok_y);
-    DRV_Display_SendTension(els.tension_y);
-    DRV_Display_SendRpm(els.spindle_rpm);
-    DRV_Display_SendSelectMenu(1);
+
+    // 5. Шар: радиус и заходы
+    DRV_Display_SendInt("SPHERE",    els.Sph_R_mm);
+    DRV_Display_SendInt2("PASS",     els.Pass_Nr, els.Pass_Total);
+
+    // 6. Съём за проход, заходы резьбы
+    DRV_Display_SendInt("AP",   els.Ap);
+    DRV_Display_SendInt("PH",   (els.Ph > 0) ? els.Ph : 1);
+
+    // 7. Угол шпинделя (делитель)
+    DRV_Display_SendAngle((int32_t)els.Spindle_Angle);
+
+    // 8. Конус: индекс и угол
+    {
+        uint8_t cs = els.Cone_Step;
+        if (cs >= TOTAL_CONE_ANGLES) cs = TOTAL_CONE_ANGLES - 1;
+        DRV_Display_SendInt("CONE",       cs);
+        DRV_Display_SendInt("CONE_ANGLE", Cone_Angle_x10[cs]);
+    }
+
+    // 9. Делитель
+    DRV_Display_SendInt("DIVN", (int32_t)els.Total_Tooth);
+    DRV_Display_SendInt("DIVM", (int32_t)els.Current_Tooth);
+
+    // 10. Шар доп.
+    DRV_Display_SendInt("BAR",       els.Bar_R_mm);
+    DRV_Display_SendInt("PASS_SPHR", els.Pass_Total_Sphr);
+
+    // 11. Активный подэкран
+    DRV_Display_SendSelectMenu(els.select_menu);
+
+    // 12. Отскок/натяг Z (в 0.001мм × 10 как в Arduino)
+    DRV_Display_SendOtskok((int32_t)els.OTSKOK_Z_mm * 10L);
+    DRV_Display_SendTension((int32_t)els.TENSION_Z_mm * 10L);
+
+    // 13. Диаметр заготовки (совпадает с Arduino: -(MSize_X_mm * 10))
+    DRV_Display_SendInt("DIAM_X", -(int32_t)els.MSize_X_mm * 10L);
+
+    // 14. Чистовых проходов
+    DRV_Display_SendInt("PASS_FIN", (int32_t)PASS_FINISH + els.Pass_Fin);
+
+    // 15. Коническая резьба флаг (M4/M5 SM=2)
+    DRV_Display_SendInt("CONE_THR", (els.ConL_Thr_flag || els.ConR_Thr_flag) ? 1 : 0);
+
+    // 16. Ширина резца и шаг оси Z (M6 SM=2)
+    DRV_Display_SendInt("CUTTER_W",  els.Cutter_Width);
+    DRV_Display_SendInt("CUTTING_W", els.Cutting_Width);
+
+    // 17. Лимиты
     DRV_Display_SendLimits(0, 0, 0, 0);
-    DRV_Display_SendInt("DIAM_X", -(int32_t)els.pos_x);
-    // Прочие поля (резьба, конус, сфера, делитель) — TODO при Этапах 7-8
+
+    // 18. RPM
+    DRV_Display_SendRpm(els.spindle_rpm);
 }
 
 // ============================================================
@@ -274,8 +353,11 @@ void DRV_Display_Init(void) {
 }
 
 void DRV_Display_Process(void) {
-    // Если ESP32 прислал READY/PONG и TX буфер свободен — отправить всё состояние
-    if (s_need_sendall && DispSerial.availableForWrite() > 100) {
+    // Если ESP32 прислал READY/PONG — отправить полное состояние.
+    // Порог 32 (не 100): при буфере 64-256 байт порог 100 мог не достигаться.
+    // SendAll содержит ~28 сообщений × ~20 байт; неприоритетные сообщения
+    // отправятся быстро т.к. UART 57600 baud = ~5.76 байт/мс.
+    if (s_need_sendall && DispSerial.availableForWrite() > 32) {
         s_need_sendall = 0;
         DRV_Display_SendAll();
     }
