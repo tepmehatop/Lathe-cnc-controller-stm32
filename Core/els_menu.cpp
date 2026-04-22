@@ -166,12 +166,34 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
     if (rx->has_value) {
         if (strcmp(rx->cmd, "FEED") == 0) {
             uint16_t v = (uint16_t)rx->value;
-            if (v >= 1 && v <= 2500) els.Feed_mm = v;
+            if (v >= 1 && v <= 2500) {
+                els.Feed_mm = v;
+                DRV_Display_SendInt("FEED", (int32_t)v);
+            }
         } else if (strcmp(rx->cmd, "AFEED") == 0) {
             uint16_t v = (uint16_t)rx->value;
-            if (v >= 10 && v <= 400) els.aFeed_mm = v;
+            if (v >= 10 && v <= 400) {
+                els.aFeed_mm = v;
+                DRV_Display_SendInt("AFEED", (int32_t)v);
+            }
         } else if (strcmp(rx->cmd, "AP") == 0) {
             els.Ap = (int16_t)rx->value;
+            DRV_Display_SendInt("AP", (int32_t)els.Ap);
+        } else if (strcmp(rx->cmd, "THREAD_STEP") == 0) {
+            int n = (int)rx->value;
+            if (n >= 0 && n < (int)TOTAL_THREADS) {
+                els.Thread_Step = (uint8_t)n;
+                // Обновить шаг резьбы в состоянии
+                els.thread_pitch = (int32_t)(Thread_Info[n].Step * 1000.0f);
+                // Отправить подтверждение на ESP32
+                DRV_Display_SendCmd("THREAD_NAME", Thread_Info[n].Thread_Print);
+                DRV_Display_SendInt("THREAD", (int32_t)(Thread_Info[n].Step * 100.0f));
+                DRV_Display_SendInt("RPM_LIM", Thread_Info[n].Limit_Print);
+                int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+                DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[n].Step * 100.0f * ph));
+                int32_t cycl = (int32_t)Thread_Info[n].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+                DRV_Display_SendInt("THREAD_CYCL", cycl);
+            }
         } else if (strcmp(rx->cmd, "CONE") == 0) {
             if (rx->value >= 0 && rx->value < (long)TOTAL_CONE) {
                 els.Cone_Step = (uint8_t)rx->value;
