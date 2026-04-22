@@ -26,6 +26,15 @@
 static void _key_select(void);
 
 // ============================================================
+// Состояние джойстика от тачскрина
+// Физический джойстик переопределяет тачскрин при активном нажатии,
+// но при возврате в нейтраль очищает оба источника.
+// ============================================================
+static int8_t  s_touch_joy_y   = 0; // +1/-1/0 от TOUCH:JOY:*
+static int8_t  s_touch_joy_x   = 0;
+static uint8_t s_touch_rapid   = 0; // 0=быстро (RAPID_ON), 1=подача (RAPID_OFF)
+
+// ============================================================
 // Применить режим и обновить ESP32
 // ============================================================
 static void _set_mode(ELS_Mode_t mode) {
@@ -133,15 +142,21 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             }
             return;
 
-        // Джойстик — пока только лог
-        case TOUCH_JOY_LEFT:
-        case TOUCH_JOY_RIGHT:
-        case TOUCH_JOY_UP:
-        case TOUCH_JOY_DOWN:
-        case TOUCH_JOY_STOP:
-        case TOUCH_RAPID_ON:
-        case TOUCH_RAPID_OFF:
-            // TODO Этап 15-18: управление движением
+        // Джойстик — управление движением через тачскрин
+        // Флаги s_touch_joy_* читаются в ELS_Menu_Process() и
+        // записываются в els.joy_y/joy_x когда физический джойстик в нейтрали.
+        case TOUCH_JOY_LEFT:  s_touch_joy_y = +1; return;
+        case TOUCH_JOY_RIGHT: s_touch_joy_y = -1; return;
+        case TOUCH_JOY_UP:    s_touch_joy_x = +1; return;
+        case TOUCH_JOY_DOWN:  s_touch_joy_x = -1; return;
+        case TOUCH_JOY_STOP:  s_touch_joy_y = 0; s_touch_joy_x = 0; return;
+        // RAPID_ON = кнопка "RAPID" нажата на экране → быстрый ход
+        // RAPID_OFF = отпущена → режим подачи
+        case TOUCH_RAPID_ON:  s_touch_rapid = 0; return;
+        case TOUCH_RAPID_OFF: s_touch_rapid = 1; return;
+        case TOUCH_ALERT_OK:
+            els.err_1_flag = false;
+            els.err_2_flag = false;
             return;
 
         default: break;
@@ -447,6 +462,9 @@ void ELS_Menu_Process(void) {
     static uint16_t   s_key_cycle = 0;
     BtnState_t btn = DRV_Inputs_GetBtn();
 
+    // Одновременное UP+DOWN = плавающие пины без железа → игнорируем
+    if ((btn & BTN_UP) && (btn & BTN_DOWN)) btn = BTN_NONE;
+
     if (btn != s_btn_old) {
         // Новое нажатие
         s_key_cycle = 0;
@@ -464,4 +482,33 @@ void ELS_Menu_Process(void) {
         }
     }
     s_btn_old = btn;
+
+    // ── 4. Джойстик — обновление els.joy_y/joy_x ─────────────────────────
+    // Физический джойстик имеет приоритет над тачскрином.
+    // При физической нейтрали — тачскрин-состояние тоже сбрасывается
+    // (безопасность: станок не остаётся в движении если отпустить физ. джойстик).
+    //
+    // Обновление происходит ВСЕГДА (не только в Manual submode) чтобы корректно
+    // останавливать моторы. Сам els_control.cpp принимает движение только в Man.
+    {
+        JoyState_t joy = DRV_Inputs_GetJoy();
+        bool phys_active = (joy & (JOY_LEFT | JOY_RIGHT | JOY_UP | JOY_DOWN)) != 0;
+
+        if (phys_active) {
+            // Физический джойстик активен — использовать его состояние
+            els.joy_y = (joy & JOY_LEFT) ? +1 :
+                        (joy & JOY_RIGHT) ? -1 : 0;
+            els.joy_x = (joy & JOY_UP)   ? +1 :
+                        (joy & JOY_DOWN)  ? -1 : 0;
+            els.joy_rapid = (joy & JOY_RAPID) ? 1 : 0;
+            // Сбросить тачскрин-состояние (физ. джойстик перехватил управление)
+            s_touch_joy_y = 0;
+            s_touch_joy_x = 0;
+        } else {
+            // Физический нейтраль → использовать тачскрин-состояние
+            els.joy_y     = s_touch_joy_y;
+            els.joy_x     = s_touch_joy_x;
+            els.joy_rapid = s_touch_rapid;
+        }
+    }
 }

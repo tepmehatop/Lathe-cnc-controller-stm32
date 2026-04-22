@@ -4,12 +4,17 @@
  *
  * Дебаунс 12мс (4 выборки по 3мс): только устойчивый сигнал принимается.
  *
- * Джойстик    PC4-PC8:    Active LOW, INPUT_PULLUP (внутренняя)
- * Кнопки меню PG0-PG4:    Active LOW, INPUT (внешняя 10кОм)
- * Лимиты BTN  PF0,2,4,6:  Active LOW, INPUT (внешняя 10кОм)
+ * Все входы: INPUT_PULLUP (внутренняя подтяжка ~40кОм к 3.3В).
+ * Без подключённого железа пины держатся HIGH → нет ложных нажатий.
+ * При подключении внешней подтяжки 1-10кОм к 3.3В она работает параллельно
+ * с внутренней ~40кОм — итоговое сопротивление сохраняет корректную работу.
+ *
+ * Джойстик    PC4-PC8:    Active LOW, INPUT_PULLUP
+ * Кнопки меню PG0-PG4:    Active LOW, INPUT_PULLUP
+ * Лимиты BTN  PF0,2,4,6:  Active LOW, INPUT_PULLUP
  * Лимиты LED  PF1,3,5,7:  Active HIGH output
- * Submode SW  PG5-PG7:    Active LOW, INPUT (внешняя 1кОм)
- * Mode SW     PG8-PG15:   Active LOW, INPUT (внешняя 1кОм) — байт через IDR
+ * Submode SW  PG5-PG7:    Active LOW, INPUT_PULLUP
+ * Mode SW     PG8-PG15:   Active LOW, INPUT_PULLUP — байт через IDR
  */
 
 #include "drv_inputs.h"
@@ -20,7 +25,7 @@
 // Дебаунс: 4 выборки по 3мс = 12мс стабилизация
 // ============================================================
 #define DEBOUNCE_MS         3
-#define DEBOUNCE_PRESSED    0x0Fu   // последние 4 выборки все = нажато
+#define DEBOUNCE_PRESSED    0xFFu   // все 8 выборок (24мс) = нажато; фильтрует плавающие пины
 
 // Сдвиговые регистры (младшие 4 бита = 4 последних выборки)
 static uint8_t s_joy_raw[5];   // LEFT RIGHT UP DOWN RAPID
@@ -56,18 +61,21 @@ void DRV_Inputs_Init(void) {
     pinMode(PC7, INPUT_PULLUP);
     pinMode(PC8, INPUT_PULLUP);
 
-    // Кнопки меню PG0-PG4: внешняя 10кОм
-    pinMode(PG_0, INPUT);
-    pinMode(PG_1, INPUT);
-    pinMode(PG_2, INPUT);
-    pinMode(PG_3, INPUT);
-    pinMode(PG_4, INPUT);
+    // Кнопки меню PG0-PG4: INPUT_PULLUP (внутренняя).
+    // При подключении внешней 10кОм подтяжки к 3.3В она работает параллельно
+    // с внутренней ~40кОм — итоговое сопротивление ~8кОм, функция не нарушается.
+    // Без внешнего железа пин не плавает → нет ложных нажатий.
+    pinMode(PG_0, INPUT_PULLUP);
+    pinMode(PG_1, INPUT_PULLUP);
+    pinMode(PG_2, INPUT_PULLUP);
+    pinMode(PG_3, INPUT_PULLUP);
+    pinMode(PG_4, INPUT_PULLUP);
 
-    // Лимиты (кнопки) PF0,PF2,PF4,PF6: внешняя 10кОм
-    pinMode(PF_0, INPUT);
-    pinMode(PF_2, INPUT);
-    pinMode(PF_4, INPUT);
-    pinMode(PF_6, INPUT);
+    // Лимиты (кнопки) PF0,PF2,PF4,PF6: INPUT_PULLUP
+    pinMode(PF_0, INPUT_PULLUP);
+    pinMode(PF_2, INPUT_PULLUP);
+    pinMode(PF_4, INPUT_PULLUP);
+    pinMode(PF_6, INPUT_PULLUP);
 
     // Лимиты (LED) PF1,PF3,PF5,PF7: выход, Active HIGH
     pinMode(PF_1, OUTPUT); digitalWrite(PF_1, LOW);
@@ -75,20 +83,23 @@ void DRV_Inputs_Init(void) {
     pinMode(PF_5, OUTPUT); digitalWrite(PF_5, LOW);
     pinMode(PF_7, OUTPUT); digitalWrite(PF_7, LOW);
 
-    // Submode PG5-PG7: внешняя 1кОм
-    pinMode(PG_5, INPUT);
-    pinMode(PG_6, INPUT);
-    pinMode(PG_7, INPUT);
+    // Submode PG5-PG7: INPUT_PULLUP (внутренняя).
+    // Без подключённых переключателей пины держатся HIGH → submode не меняется.
+    pinMode(PG_5, INPUT_PULLUP);
+    pinMode(PG_6, INPUT_PULLUP);
+    pinMode(PG_7, INPUT_PULLUP);
 
-    // Mode PG8-PG15: внешняя 1кОм (ОБЯЗАТЕЛЬНА!)
-    pinMode(PG_8,  INPUT);
-    pinMode(PG_9,  INPUT);
-    pinMode(PG_10, INPUT);
-    pinMode(PG_11, INPUT);
-    pinMode(PG_12, INPUT);
-    pinMode(PG_13, INPUT);
-    pinMode(PG_14, INPUT);
-    pinMode(PG_15, INPUT);
+    // Mode PG8-PG15: INPUT_PULLUP.
+    // Без подключённого переключателя все пины HIGH → mode_raw = 0 → нет смены режима.
+    // При подключении внешней подтяжки 1кОм к 3.3В функция сохраняется.
+    pinMode(PG_8,  INPUT_PULLUP);
+    pinMode(PG_9,  INPUT_PULLUP);
+    pinMode(PG_10, INPUT_PULLUP);
+    pinMode(PG_11, INPUT_PULLUP);
+    pinMode(PG_12, INPUT_PULLUP);
+    pinMode(PG_13, INPUT_PULLUP);
+    pinMode(PG_14, INPUT_PULLUP);
+    pinMode(PG_15, INPUT_PULLUP);
 
     s_last_sample = millis();
 }
