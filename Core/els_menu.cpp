@@ -172,6 +172,14 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             if (v >= 10 && v <= 400) els.aFeed_mm = v;
         } else if (strcmp(rx->cmd, "AP") == 0) {
             els.Ap = (int16_t)rx->value;
+        } else if (strcmp(rx->cmd, "CONE") == 0) {
+            if (rx->value >= 0 && rx->value < (long)TOTAL_CONE) {
+                els.Cone_Step = (uint8_t)rx->value;
+                uint8_t cs = els.Cone_Step;
+                if (cs >= TOTAL_CONE_ANGLES) cs = TOTAL_CONE_ANGLES - 1;
+                DRV_Display_SendInt("CONE",       cs);
+                DRV_Display_SendInt("CONE_ANGLE", Cone_Angle_x10[cs]);
+            }
         } else if (strcmp(rx->cmd, "PASSES") == 0) {
             if (rx->value > 0) els.Pass_Total = rx->value;
         }
