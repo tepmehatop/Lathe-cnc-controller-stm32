@@ -35,3 +35,7 @@ void DRV_Stepper_SetContinuous(Axis_t axis, uint32_t speed_hz, int8_t dir);
 
 // Изменить скорость текущего движения (не меняет позицию назначения)
 void DRV_Stepper_SetSpeed(Axis_t axis, uint32_t speed_hz);
+
+// Конус: Bresenham-слейв X к Y (cs_div/cm_div из Cone_Info[], dir_x = ±1)
+void DRV_Stepper_SetConeRatio(uint8_t cs_div, int16_t cm_div, int8_t dir_x);
+void DRV_Stepper_ClearCone(void);

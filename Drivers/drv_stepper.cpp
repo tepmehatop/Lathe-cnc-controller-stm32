@@ -48,33 +48,85 @@ struct AxisState {
 static AxisState      s_ax[2];
 static HardwareTimer *s_htim1 = nullptr;
 
-static volatile uint8_t s_ch1_active = 0; // Y
-static volatile uint8_t s_ch3_active = 0; // X
+static volatile uint8_t s_ch1_active = 0; // Y (TIM1_CH1 PWM)
+static volatile uint8_t s_ch3_active = 0; // X (TIM1_CH3 PWM, не конус)
+
+// ── Конусный режим: Bresenham X слейвится к Y ──────────────────────────────
+// В конусном режиме PE13 переключается в GPIO OUTPUT. STEP-импульсы X
+// генерируются вручную в ISR (set HIGH → сброс LOW на следующем тике).
+static volatile uint8_t  s_cone_mode    = 0;
+static volatile int8_t   s_cone_dir_x   = 0;
+static volatile uint8_t  s_cone_cs_div  = 1;
+static volatile int16_t  s_cone_cm_div  = 0;
+static volatile int16_t  s_cone_cs_cnt  = 0;
+static volatile int16_t  s_cone_cm_cnt  = 0;
+static volatile uint8_t  s_cone_x_pulse = 0; // 1 = PE13 HIGH, сбросить на следующем тике
+
+// Переключить PE13 между TIM1_CH3 AF и GPIO OUTPUT
+static void _pe13_set_gpio_output(void) {
+    // MODER[27:26] = 01 (output); preserve AF in AFRL
+    GPIOE->MODER = (GPIOE->MODER & ~(3u << 26u)) | (1u << 26u);
+    GPIOE->BSRR  = (uint32_t)GPIO_PIN_13 << 16u; // LOW
+}
+static void _pe13_set_tim1_af(void) {
+    // MODER[27:26] = 10 (AF), AFR[1][21:20] = 0001 (AF1 = TIM1)
+    GPIOE->AFR[1] = (GPIOE->AFR[1] & ~(0xFu << 20u)) | (1u << 20u);
+    GPIOE->MODER  = (GPIOE->MODER  & ~(3u << 26u)) | (2u << 26u);
+}
 
 // ============================================================
-// Callback — вызывается на каждом overflow TIM1 (= 1 шаг)
+// Callback — вызывается на каждом overflow TIM1
 // ============================================================
 static void _step_overflow(void) {
+    // Сброс STEP-импульса X (конус): LOW через один тик после HIGH
+    if (s_cone_x_pulse) {
+        GPIOE->BSRR  = (uint32_t)GPIO_PIN_13 << 16u; // PE13 LOW
+        s_cone_x_pulse = 0;
+    }
+
     // --- Ось Y ---
     if (s_ch1_active) {
         s_ax[AXIS_Y].pos += s_ax[AXIS_Y].dir;
         if (--s_ax[AXIS_Y].steps_left <= 0) {
-            TIM1->CCER &= ~TIM_CCER_CC1E;   // Выключить CH1 output
+            TIM1->CCER  &= ~TIM_CCER_CC1E;
             s_ch1_active             = 0;
             s_ax[AXIS_Y].moving      = 0;
             s_ax[AXIS_Y].steps_left  = 0;
-            GPIOE->BSRR = GPIO_PIN_11;       // EN_Y HIGH = выключить драйвер
+            GPIOE->BSRR = GPIO_PIN_11; // EN_Y HIGH = выключить
+            if (s_cone_mode) {
+                s_ax[AXIS_X].moving = 0;
+                GPIOE->BSRR = GPIO_PIN_15; // EN_X HIGH
+                s_cone_mode = 0;
+            }
+        }
+
+        // Bresenham: за каждый шаг Y → генерируем STEP X если нужно
+        if (s_cone_mode) {
+            if (++s_cone_cs_cnt > (int16_t)s_cone_cs_div) {
+                // Физический STEP-импульс: PE13 HIGH (сбросится на след. тике)
+                GPIOE->BSRR  = GPIO_PIN_13;
+                s_cone_x_pulse = 1;
+                s_ax[AXIS_X].pos += s_cone_dir_x;
+                s_cone_cm_cnt += s_cone_cm_div;
+                if (s_cone_cm_cnt > s_cone_cm_div) {
+                    s_cone_cm_cnt -= 10000;
+                    s_cone_cs_cnt  = 0;
+                } else {
+                    s_cone_cs_cnt  = 1;
+                }
+            }
         }
     }
-    // --- Ось X ---
+
+    // --- Ось X (независимое движение, не конус) ---
     if (s_ch3_active) {
         s_ax[AXIS_X].pos += s_ax[AXIS_X].dir;
         if (--s_ax[AXIS_X].steps_left <= 0) {
-            TIM1->CCER &= ~TIM_CCER_CC3E;
+            TIM1->CCER  &= ~TIM_CCER_CC3E;
             s_ch3_active             = 0;
             s_ax[AXIS_X].moving      = 0;
             s_ax[AXIS_X].steps_left  = 0;
-            GPIOE->BSRR = GPIO_PIN_15;       // EN_X HIGH = выключить
+            GPIOE->BSRR = GPIO_PIN_15; // EN_X HIGH = выключить
         }
     }
 }
@@ -236,6 +288,43 @@ void DRV_Stepper_SetContinuous(Axis_t axis, uint32_t speed_hz, int8_t dir) {
 
     if (axis == AXIS_Y) { s_ch1_active = 1; TIM1->CCER |= TIM_CCER_CC1E; }
     else                { s_ch3_active = 1; TIM1->CCER |= TIM_CCER_CC3E; }
+}
+
+// ============================================================
+// Конус: включить Bresenham-слейв X к Y
+// cs_div/cm_div из Cone_Info[Cone_Step], dir_x = +1 или -1
+// PE13 переключается из TIM1_CH3 AF в GPIO OUTPUT;
+// STEP-импульсы X генерируются вручную в ISR.
+// ============================================================
+void DRV_Stepper_SetConeRatio(uint8_t cs_div, int16_t cm_div, int8_t dir_x) {
+    if (cs_div == 0) cs_div = 1;
+
+    // DIR и EN для X
+    digitalWrite(PIN_DIR_X, (dir_x > 0) ? HIGH : LOW);
+    GPIOE->BSRR = (uint32_t)GPIO_PIN_15 << 16u; // EN_X LOW = включить
+
+    // PE13 → GPIO OUTPUT (не TIM1_CH3 AF)
+    TIM1->CCER &= ~TIM_CCER_CC3E; // выключить CH3 hardware output
+    _pe13_set_gpio_output();
+
+    s_cone_dir_x  = dir_x;
+    s_cone_cs_div = cs_div;
+    s_cone_cm_div = cm_div;
+    s_cone_cs_cnt = 0;
+    s_cone_cm_cnt = 0;
+    s_cone_x_pulse = 0;
+    s_ax[AXIS_X].dir    = dir_x;
+    s_ax[AXIS_X].moving = 1;
+    s_ch3_active  = 0;
+    s_cone_mode   = 1;
+}
+
+void DRV_Stepper_ClearCone(void) {
+    s_cone_mode = 0;
+    GPIOE->BSRR = (uint32_t)GPIO_PIN_13 << 16u; // PE13 LOW
+    _pe13_set_tim1_af();                          // восстановить TIM1_CH3 AF
+    s_ax[AXIS_X].moving = 0;
+    GPIOE->BSRR = GPIO_PIN_15;                   // EN_X HIGH = выключить
 }
 
 // ============================================================

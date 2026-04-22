@@ -25,6 +25,7 @@
 #include "els_control.h"
 #include "els_state.h"
 #include "els_config.h"
+#include "els_tables.h"
 #include "../Drivers/drv_stepper.h"
 #include "../Drivers/drv_encoder.h"
 #include "../Drivers/drv_display.h"
@@ -46,6 +47,11 @@
 
 // Гистерезис: пересчитывать speed_hz если изменилась более чем на N%
 #define SPEED_HYSTERESIS_PCT 3
+
+// Скорость подачи по джойстику (RAPID нажат):
+// hz = Feed_mm × STEPS_PER_MM / 100  (= Feed_mm/rev × 60rpm × steps/mm / 60)
+// Минимум 10 Гц чтобы мотор не стоял на месте
+#define JOY_FEED_HZ_MIN     10
 
 // ============================================================
 // Внутреннее состояние
@@ -143,6 +149,37 @@ static uint32_t _calc_afeed_hz(int32_t afeed_100, uint32_t steps_per_mm) {
 }
 
 // ============================================================
+// Вычисление Hz для ручного движения по джойстику
+// ============================================================
+
+// Быстрый ход Y (RAPID кнопка НЕ нажата)
+static inline uint32_t _joy_rapid_hz_y(void) {
+    return RAPID_TRAVERSE_HZ;
+}
+
+// Быстрый ход X
+static inline uint32_t _joy_rapid_hz_x(void) {
+    return RAPID_TRAVERSE_HZ;
+}
+
+// Подача Y (RAPID кнопка нажата): скорость пропорциональна Feed_mm
+// hz = Feed_mm × STEPS_PER_MM_Y / 100  (эквивалент подачи при 60 об/мин)
+static uint32_t _joy_feed_hz_y(void) {
+    int64_t hz = (int64_t)els.Feed_mm * (int64_t)STEPS_PER_MM_Y / 100LL;
+    if (hz < JOY_FEED_HZ_MIN) hz = JOY_FEED_HZ_MIN;
+    if (hz > 50000)            hz = 50000;
+    return (uint32_t)hz;
+}
+
+// Подача X
+static uint32_t _joy_feed_hz_x(void) {
+    int64_t hz = (int64_t)els.Feed_mm * (int64_t)STEPS_PER_MM_X / 100LL;
+    if (hz < JOY_FEED_HZ_MIN) hz = JOY_FEED_HZ_MIN;
+    if (hz > 50000)            hz = 50000;
+    return (uint32_t)hz;
+}
+
+// ============================================================
 // Публичный API
 // ============================================================
 void ELS_Control_Init(void) {
@@ -158,6 +195,7 @@ void ELS_Control_Start(void) {
 
 void ELS_Control_Stop(void) {
     els.running = 0;
+    DRV_Stepper_ClearCone();
     DRV_Stepper_StopAll();
     s_last_speed_y = 0;
     s_last_speed_x = 0;
@@ -172,6 +210,42 @@ void ELS_Control_Update(void) {
     // Проверить лимиты
     _check_limits();
 
+    // ── Управление джойстиком (Manual submode) ──────────────────────────────
+    // Обрабатывается ДО els.running: джойстик работает независимо от цикла.
+    // Только для ручного подрежима; в Ext/Int джойстик запускает циклы (TODO).
+    if (els.submode == SUBMODE_MANUAL && (els.joy_y != 0 || els.joy_x != 0)) {
+        // Остановить любой активный автоцикл
+        if (els.running) {
+            els.running = 0;
+        }
+
+        // Ось Y
+        if (els.joy_y != 0) {
+            uint32_t hz = (els.joy_rapid == 0) ? _joy_rapid_hz_y() : _joy_feed_hz_y();
+            _apply_speed(AXIS_Y, hz, els.joy_y, &s_last_speed_y, &s_last_dir_y);
+        } else {
+            if (DRV_Stepper_IsMoving(AXIS_Y)) {
+                DRV_Stepper_Stop(AXIS_Y);
+                s_last_speed_y = 0;
+            }
+        }
+
+        // Ось X
+        if (els.joy_x != 0) {
+            uint32_t hz = (els.joy_rapid == 0) ? _joy_rapid_hz_x() : _joy_feed_hz_x();
+            _apply_speed(AXIS_X, hz, els.joy_x, &s_last_speed_x, &s_last_dir_x);
+        } else {
+            if (DRV_Stepper_IsMoving(AXIS_X)) {
+                DRV_Stepper_Stop(AXIS_X);
+                s_last_speed_x = 0;
+            }
+        }
+
+        return; // Не продолжать в автоматический режим пока джойстик активен
+    }
+
+    // Джойстик нейтрален — остановить моторы если двигались от джойстика
+    // (els.running == 0 → нет активного цикла → стоп)
     if (!els.running) {
         // Остановить моторы если были активны
         if (DRV_Stepper_IsMoving(AXIS_Y) || DRV_Stepper_IsMoving(AXIS_X)) {
@@ -182,13 +256,10 @@ void ELS_Control_Update(void) {
         return;
     }
 
-    // Направление движения: +1 = к задней бабке (стандарт), -1 = обратно
-    // Управляется переключателем submode или джойстиком (TODO: джойстик)
+    // Направление движения в автоцикле: +1 = к задней бабке (стандарт), -1 = обратно
     int8_t dir_y = (els.submode == SUBMODE_EXTERNAL) ? +1 : -1;
-    int8_t dir_x = +1;
 
     uint32_t hz_y = 0;
-    uint32_t hz_x = 0;
 
     switch (els.mode) {
 
@@ -220,16 +291,29 @@ void ELS_Control_Update(void) {
         break;
 
     case MODE_CONE_L:
-    case MODE_CONE_R:
-        // Конус: Y + X одновременно
-        // TODO Этап 12: правильный расчёт угла конуса из Cone_Info[els.Cone_Step]
+    case MODE_CONE_R: {
+        // Конус: Y движется со скоростью подачи, X следует по Bresenham
+        // (Cs_Div, Cm_Div из таблицы конусов)
         if (rpm >= MIN_RPM_FOR_SYNC) {
             hz_y = _calc_sync_hz(rpm, els.feed * 10L, STEPS_PER_MM_Y);
-            hz_x = hz_y / 2; // TODO: реальное соотношение Cs_Div/Cm_Div
         }
-        _apply_speed(AXIS_Y, hz_y, dir_y, &s_last_speed_y, &s_last_dir_y);
-        _apply_speed(AXIS_X, hz_x, dir_x, &s_last_speed_x, &s_last_dir_x);
+        if (hz_y > 0) {
+            // Если конус ещё не инициализирован — установить Bresenham-параметры
+            if (!DRV_Stepper_IsMoving(AXIS_Y)) {
+                const cone_info_t& ci = Cone_Info[els.Cone_Step];
+                int8_t cx = (els.mode == MODE_CONE_L) ? +1 : -1;
+                DRV_Stepper_SetConeRatio(ci.Cs_Div, ci.Cm_Div, cx);
+            }
+            _apply_speed(AXIS_Y, hz_y, dir_y, &s_last_speed_y, &s_last_dir_y);
+        } else {
+            if (DRV_Stepper_IsMoving(AXIS_Y)) {
+                DRV_Stepper_Stop(AXIS_Y);
+                DRV_Stepper_ClearCone();
+                s_last_speed_y = 0;
+            }
+        }
         break;
+    }
 
     case MODE_DIVIDER:
     case MODE_SPHERE:
@@ -239,12 +323,4 @@ void ELS_Control_Update(void) {
         break;
     }
 
-    // Отправить RPM на дисплей при изменении
-    static int32_t s_last_rpm = -1;
-    if (rpm != s_last_rpm) {
-        s_last_rpm = rpm;
-#if USE_ESP32_DISPLAY
-        DRV_Display_SendRpm(rpm);
-#endif
-    }
 }
