@@ -17,6 +17,7 @@
 #include "els_control.h"
 #include "els_config.h"
 #include "els_tables.h"
+#include "els_settings.h"
 #include "../Drivers/drv_display.h"
 #include "../Drivers/drv_beeper.h"
 #include "../Drivers/drv_inputs.h"
@@ -58,6 +59,19 @@ static void _set_mode(ELS_Mode_t mode) {
     DRV_Display_SendSelectMenu(els.select_menu);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", 0);
+    if (mode == MODE_THREAD) {
+        uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
+        DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+        DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+        DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+        int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+        DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+        int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+        DRV_Display_SendInt("THREAD_CYCL",  cycl);
+    } else if (mode == MODE_SPHERE) {
+        DRV_Display_SendInt("SPHERE", els.Sph_R_mm);
+        DRV_Display_SendInt("BAR",    els.Bar_R_mm);
+    }
 #endif
     DRV_Beeper_Tone(1000, 30);  // короткий звук при смене режима
 }
@@ -123,7 +137,14 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             if (els.mode == MODE_THREAD) {
                 if (els.Thread_Step > 0) {
                     els.Thread_Step--;
-                    DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+                    uint8_t ts = els.Thread_Step;
+                    DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+                    DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+                    DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+                    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+                    DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+                    int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+                    DRV_Display_SendInt("THREAD_CYCL",  cycl);
                 }
             } else if (els.mode == MODE_CONE_L || els.mode == MODE_CONE_R) {
                 if (els.Cone_Step > 0) els.Cone_Step--;
@@ -134,7 +155,14 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
                 extern const uint8_t TOTAL_THREADS;
                 if (els.Thread_Step < TOTAL_THREADS - 1) {
                     els.Thread_Step++;
-                    DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+                    uint8_t ts = els.Thread_Step;
+                    DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+                    DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+                    DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+                    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+                    DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+                    int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+                    DRV_Display_SendInt("THREAD_CYCL",  cycl);
                 }
             } else if (els.mode == MODE_CONE_L || els.mode == MODE_CONE_R) {
                 extern const uint8_t TOTAL_CONE;
@@ -202,9 +230,22 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
                 DRV_Display_SendInt("CONE",       cs);
                 DRV_Display_SendInt("CONE_ANGLE", Cone_Angle_x10[cs]);
             }
+        } else if (strcmp(rx->cmd, "BAR") == 0) {
+            int32_t v = rx->value;
+            if (v >= 0 && v <= 9900) {
+                els.Bar_R_mm = v;
+                DRV_Display_SendInt("BAR", v);
+            }
+        } else if (strcmp(rx->cmd, "SPHERE") == 0) {
+            int32_t v = rx->value;
+            if (v >= 50 && v <= 9999) {
+                els.Sph_R_mm = v;
+                DRV_Display_SendInt("SPHERE", v);
+            }
         } else if (strcmp(rx->cmd, "PASSES") == 0) {
             if (rx->value > 0) els.Pass_Total = rx->value;
         }
+        ELS_Settings_MarkDirty();
     }
 }
 
@@ -244,6 +285,19 @@ static void _switch_mode_hw(ELS_Mode_t new_mode) {
     DRV_Display_SendSelectMenu(1);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", 0);
+    if (new_mode == MODE_THREAD) {
+        uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
+        DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+        DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+        DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+        int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+        DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+        int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+        DRV_Display_SendInt("THREAD_CYCL",  cycl);
+    } else if (new_mode == MODE_SPHERE) {
+        DRV_Display_SendInt("SPHERE", els.Sph_R_mm);
+        DRV_Display_SendInt("BAR",    els.Bar_R_mm);
+    }
 #endif
     DRV_Beeper_Tone(1000, 30);
 }
@@ -302,7 +356,6 @@ static void _key_up(void) {
             if (els.select_menu == 1) {
                 if (els.Thread_Step < (uint8_t)(TOTAL_THREADS - 1)) {
                     els.Thread_Step++;
-                    // пропустить шаги несовместимые с Ph
                     while (els.Thread_Step < (uint8_t)(TOTAL_THREADS - 1) &&
                            Thread_Info[els.Thread_Step].Ks_Div_Z / els.Ph == 0)
                         els.Thread_Step++;
@@ -311,12 +364,11 @@ static void _key_up(void) {
             } else if (els.select_menu == 2) {
                 if (!els.CThr_flag && els.Ph < 90) {
                     els.Ph++;
-                    // откатить если несовместимо
                     if (Thread_Info[els.Thread_Step].Ks_Div_Z / els.Ph == 0 && els.Ph > 1) els.Ph--;
                     DRV_Beeper_Tone(1000, 15);
                 }
             } else if (els.select_menu == 3) {
-                DRV_Beeper_Tone(1000, 15); // сброс X
+                DRV_Beeper_Tone(1000, 15);
             }
             break;
 
@@ -348,7 +400,18 @@ static void _key_up(void) {
 #if USE_ESP32_DISPLAY
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", els.Ap);
+    if (els.mode == MODE_THREAD) {
+        uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
+        DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+        DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+        DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+        int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+        DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+        int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+        DRV_Display_SendInt("THREAD_CYCL",  cycl);
+    }
 #endif
+    ELS_Settings_MarkDirty();
 }
 
 // ============================================================
@@ -420,7 +483,18 @@ static void _key_down(void) {
 #if USE_ESP32_DISPLAY
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", els.Ap);
+    if (els.mode == MODE_THREAD) {
+        uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
+        DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+        DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+        DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+        int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+        DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+        int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+        DRV_Display_SendInt("THREAD_CYCL",  cycl);
+    }
 #endif
+    ELS_Settings_MarkDirty();
 }
 
 // ============================================================
@@ -539,6 +613,12 @@ void ELS_Menu_Process(void) {
             els.joy_y     = s_touch_joy_y;
             els.joy_x     = s_touch_joy_x;
             els.joy_rapid = s_touch_rapid;
+        }
+
+        // err_0_flag: Arduino-совместимая проверка нейтрали джойстика при старте.
+        // Блокирует запуск пока джойстик не окажется в нейтральном положении.
+        if (els.err_0_flag && !phys_active && els.joy_y == 0 && els.joy_x == 0) {
+            els.err_0_flag = false;
         }
     }
 }
