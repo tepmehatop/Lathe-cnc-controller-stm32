@@ -29,8 +29,17 @@
 #include "../Drivers/drv_stepper.h"
 #include "../Drivers/drv_encoder.h"
 #include "../Drivers/drv_display.h"
+#include "../Drivers/drv_beeper.h"
 #include <Arduino.h>
 #include <stdlib.h>
+#include <math.h>
+
+// Шагов на 1 тик энкодера: STEP_PER_REV × MICROSTEP / SCREW (SCREW в 0.01мм)
+// Y: 200 × 4 / 200 = 4  (целое)
+// X: 200 × 4 / 125 = 6.4 → дробная часть компенсируется аккумулятором × 10
+#define HC_STEPS_PER_TICK_Y   ((MOTOR_Y_STEP_PER_REV * MICROSTEP_Y) / SCREW_Y)
+#define HC_STEPS10_PER_TICK_Y (HC_STEPS_PER_TICK_Y * 10)   // для X: ×10 фиксированная точка
+#define HC_STEPS10_PER_TICK_X ((MOTOR_X_STEP_PER_REV * MICROSTEP_X * 10) / SCREW_X)
 
 // ============================================================
 // Константы масштабирования
@@ -60,6 +69,11 @@ static uint32_t s_last_speed_y = 0;
 static uint32_t s_last_speed_x = 0;
 static int8_t   s_last_dir_y   = 0;
 static int8_t   s_last_dir_x   = 0;
+
+// Ручной энкодер: накопленные шаги (целые) + дробная часть для X (× 10)
+static int32_t s_hc_acc_y   = 0;
+static int32_t s_hc_acc_x   = 0;
+static int32_t s_hc_frac_x  = 0;  // дробный остаток × 10
 
 // ============================================================
 // Вспомогательные
@@ -180,6 +194,229 @@ static uint32_t _joy_feed_hz_x(void) {
 }
 
 // ============================================================
+// Ручной энкодер — обработка тиков, запуск мотора
+// ============================================================
+static void _update_hand_encoder(void) {
+    int32_t delta = DRV_Encoder_Hand_GetDelta();
+
+    if (delta != 0) {
+        bool scale_10 = (digitalRead(PD_3) == LOW);
+        int32_t scale  = scale_10 ? 10 : 1;
+
+        bool axis_z = (digitalRead(PD_0) == LOW);
+        bool axis_x = (digitalRead(PD_1) == LOW);
+
+        if (axis_z && !axis_x) {
+            s_hc_acc_y += delta * scale * HC_STEPS_PER_TICK_Y;
+        } else if (axis_x && !axis_z) {
+            s_hc_frac_x += delta * scale * HC_STEPS10_PER_TICK_X;
+            s_hc_acc_x  += s_hc_frac_x / 10;
+            s_hc_frac_x %= 10;
+        }
+    }
+
+    // Запустить Y если мотор свободен и есть накопленные шаги
+    if (s_hc_acc_y != 0 && !DRV_Stepper_IsMoving(AXIS_Y)) {
+        bool scale_10 = (digitalRead(PD_3) == LOW);
+        uint32_t hz = scale_10 ? HAND_HC_SPEED_10 : HAND_HC_SPEED_1;
+        int8_t  dir = (s_hc_acc_y > 0) ? +1 : -1;
+        int32_t steps = (s_hc_acc_y > 0) ? s_hc_acc_y : -s_hc_acc_y;
+        s_hc_acc_y = 0;
+        DRV_Stepper_MoveSteps(AXIS_Y, steps, hz, dir);
+    }
+
+    // Запустить X если мотор свободен и есть накопленные шаги
+    if (s_hc_acc_x != 0 && !DRV_Stepper_IsMoving(AXIS_X)) {
+        bool scale_10 = (digitalRead(PD_3) == LOW);
+        uint32_t hz = scale_10 ? HAND_HC_SPEED_10 : HAND_HC_SPEED_1;
+        int8_t  dir = (s_hc_acc_x > 0) ? +1 : -1;
+        int32_t steps = (s_hc_acc_x > 0) ? s_hc_acc_x : -s_hc_acc_x;
+        s_hc_acc_x = 0;
+        DRV_Stepper_MoveSteps(AXIS_X, steps, hz, dir);
+    }
+}
+
+// ============================================================
+// Sphere (шароточка) — state machine  [Этап 19]
+// ============================================================
+// Алгоритм: порт Sphere_Ext_Left из Arduino Sphere.ino
+// Режим: SUBMODE_EXTERNAL, движение от вершины шара к экватору (верхняя полусфера),
+//        затем от экватора к ножке (нижняя полусфера).
+// Z: dir -1 = к передней бабке (к вершине шара)
+// X: dir +1 = углубление в заготовку, dir -1 = отвод
+// ============================================================
+typedef enum {
+    SPH_IDLE         = 0,
+    SPH_INIT         = 1,
+    SPH_MOVE_Z       = 2,
+    SPH_WAIT_Z       = 3,
+    SPH_MOVE_X       = 4,
+    SPH_WAIT_X       = 5,
+    SPH_RETRACT      = 6,
+    SPH_WAIT_RETRACT = 7,
+    SPH_COMPLETE     = 8,
+} SphState_t;
+
+static SphState_t s_sph_state    = SPH_IDLE;
+static int32_t    s_sph_pass_nr  = 1;
+static int32_t    s_sph_pass_tot = 0;
+static int32_t    s_sph_cut_w    = 0;   // Cutting_Width в 0.01мм
+static int32_t    s_sph_cutr_w   = 0;   // Cutter_Width в 0.01мм
+static float      s_sph_r_steps  = 0.0f; // Sph_R в шагах X
+static float      s_sph_bar_steps= 0.0f; // SphBar = (Sph_R - Bar_R) в шагах X
+static int32_t    s_sph_z_cur    = 0;   // накопленных шагов Z от null (>0 = к вершине)
+static int32_t    s_sph_x_cur    = 0;   // текущая глубина X в шагах (0 = отведён)
+
+// Шагов на единицу 0.01мм для каждой оси
+#define SPH_SPM_Y   ((float)MOTOR_Y_STEP_PER_REV * MICROSTEP_Y / SCREW_Y)
+#define SPH_SPM_X   ((float)MOTOR_X_STEP_PER_REV * MICROSTEP_X / SCREW_X)
+
+static void _update_sphere(void) {
+    if (els.submode != SUBMODE_EXTERNAL) return;
+
+    uint32_t hz_y = _calc_afeed_hz(els.aFeed_mm, STEPS_PER_MM_Y);
+    uint32_t hz_x = _calc_afeed_hz(els.aFeed_mm, STEPS_PER_MM_X);
+    if (hz_y < 50) hz_y = 50;
+    if (hz_x < 50) hz_x = 50;
+
+    switch (s_sph_state) {
+
+    case SPH_IDLE:
+        s_sph_state = SPH_INIT;
+        /* fall-through */
+
+    case SPH_INIT: {
+        s_sph_cut_w  = Cutting_Width_array[els.Cutting_Step];
+        s_sph_cutr_w = Cutter_Width_array[els.Cutter_Step];
+        if (s_sph_cut_w < 1) s_sph_cut_w = 1;
+
+        s_sph_pass_tot = (els.Sph_R_mm * 2) / s_sph_cut_w;
+        if (s_sph_pass_tot < 2) s_sph_pass_tot = 2;
+        els.Pass_Total_Sphr = s_sph_pass_tot;
+
+        float R = (float)els.Sph_R_mm;
+        float B = (float)els.Bar_R_mm;
+        s_sph_r_steps   = R * SPH_SPM_X;
+        s_sph_bar_steps = (R - B) * SPH_SPM_X;
+        if (s_sph_bar_steps < 0.0f) s_sph_bar_steps = 0.0f;
+
+        s_sph_pass_nr = 1;
+        s_sph_z_cur   = 0;
+        s_sph_x_cur   = 0;
+
+        s_sph_state = SPH_MOVE_Z;
+        break;
+    }
+
+    case SPH_MOVE_Z: {
+        if (s_sph_pass_nr > s_sph_pass_tot + 1) {
+            s_sph_state = SPH_COMPLETE;
+            break;
+        }
+
+        int32_t nr  = s_sph_pass_nr;
+        int32_t tot = s_sph_pass_tot;
+        float   cw  = (float)s_sph_cut_w;
+        float   cwr = (float)s_sph_cutr_w;
+
+        float z_target_f;
+        if (nr <= tot / 2)
+            z_target_f = SPH_SPM_Y * cw * (float)nr + 0.5f;
+        else
+            z_target_f = SPH_SPM_Y * (cw * (float)(nr - 1) + cwr) + 0.5f;
+
+        int32_t z_target = (int32_t)z_target_f;
+        int32_t z_delta  = z_target - s_sph_z_cur;
+        s_sph_z_cur = z_target;
+
+        DRV_Beeper_Tone(1200, 30);
+
+        if (z_delta > 0) {
+            DRV_Stepper_MoveSteps(AXIS_Y, z_delta, hz_y, -1);
+            s_sph_state = SPH_WAIT_Z;
+        } else {
+            s_sph_state = SPH_MOVE_X;
+        }
+        break;
+    }
+
+    case SPH_WAIT_Z:
+        if (!DRV_Stepper_IsMoving(AXIS_Y))
+            s_sph_state = SPH_MOVE_X;
+        break;
+
+    case SPH_MOVE_X: {
+        int32_t nr  = s_sph_pass_nr;
+        int32_t tot = s_sph_pass_tot;
+        float   cw  = (float)s_sph_cut_w;
+        float   R   = (float)els.Sph_R_mm;
+
+        float x_depth_01mm;
+        if (nr <= tot / 2) {
+            float h  = R - cw * (float)nr;
+            float sq = R * R - h * h;
+            if (sq < 0.0f) sq = 0.0f;
+            x_depth_01mm = R - sqrtf(sq);
+        } else {
+            float past = (float)(nr - (tot / 2 + 1));
+            float h  = cw * past;
+            float sq = R * R - h * h;
+            if (sq < 0.0f) sq = 0.0f;
+            x_depth_01mm = R - sqrtf(sq);
+        }
+
+        int32_t x_target = (int32_t)(x_depth_01mm * SPH_SPM_X + 0.5f);
+        if (nr > tot / 2 && x_target > (int32_t)s_sph_bar_steps)
+            x_target = (int32_t)s_sph_bar_steps;
+
+        int32_t x_delta = x_target - s_sph_x_cur;
+        s_sph_x_cur = x_target;
+
+        if (x_delta > 0) {
+            DRV_Stepper_MoveSteps(AXIS_X, x_delta, hz_x, +1);
+            s_sph_state = SPH_WAIT_X;
+        } else if (x_delta < 0) {
+            DRV_Stepper_MoveSteps(AXIS_X, -x_delta, hz_x, -1);
+            s_sph_state = SPH_WAIT_X;
+        } else {
+            s_sph_state = SPH_RETRACT;
+        }
+        break;
+    }
+
+    case SPH_WAIT_X:
+        if (!DRV_Stepper_IsMoving(AXIS_X))
+            s_sph_state = SPH_RETRACT;
+        break;
+
+    case SPH_RETRACT: {
+        s_sph_pass_nr++;
+        if (s_sph_x_cur > 0) {
+            DRV_Stepper_MoveSteps(AXIS_X, s_sph_x_cur, RAPID_TRAVERSE_HZ, -1);
+            s_sph_x_cur = 0;
+            s_sph_state = SPH_WAIT_RETRACT;
+        } else {
+            s_sph_state = SPH_MOVE_Z;
+        }
+        break;
+    }
+
+    case SPH_WAIT_RETRACT:
+        if (!DRV_Stepper_IsMoving(AXIS_X))
+            s_sph_state = SPH_MOVE_Z;
+        break;
+
+    case SPH_COMPLETE:
+        els.Complete_flag = true;
+        els.running = 0;
+        DRV_Stepper_StopAll();
+        DRV_Beeper_Tone(800, 500);
+        s_sph_state = SPH_IDLE;
+        break;
+    }
+}
+
+// ============================================================
 // Публичный API
 // ============================================================
 void ELS_Control_Init(void) {
@@ -187,6 +424,9 @@ void ELS_Control_Init(void) {
     s_last_speed_x = 0;
     s_last_dir_y   = 0;
     s_last_dir_x   = 0;
+    s_hc_acc_y     = 0;
+    s_hc_acc_x     = 0;
+    s_hc_frac_x    = 0;
 }
 
 void ELS_Control_Start(void) {
@@ -199,9 +439,16 @@ void ELS_Control_Stop(void) {
     DRV_Stepper_StopAll();
     s_last_speed_y = 0;
     s_last_speed_x = 0;
+    s_sph_state    = SPH_IDLE;
 }
 
 void ELS_Control_Update(void) {
+    // Блокировка пока джойстик не в нейтрали при старте (как в Arduino)
+    if (els.err_0_flag) {
+        if (els.running) ELS_Control_Stop();
+        return;
+    }
+
     // Обновляем RPM из энкодера шпинделя
     int32_t rpm = DRV_Encoder_Spindle_GetRPM();
     if (rpm < 0) rpm = -rpm;  // Используем абсолютное значение RPM
@@ -244,15 +491,19 @@ void ELS_Control_Update(void) {
         return; // Не продолжать в автоматический режим пока джойстик активен
     }
 
-    // Джойстик нейтрален — остановить моторы если двигались от джойстика
-    // (els.running == 0 → нет активного цикла → стоп)
+    // Джойстик нейтрален — остановить только непрерывные (joystick) движения.
+    // Конечные движения от ручного энкодера (steps_left != INT32_MAX) не трогаем.
     if (!els.running) {
-        // Остановить моторы если были активны
-        if (DRV_Stepper_IsMoving(AXIS_Y) || DRV_Stepper_IsMoving(AXIS_X)) {
-            DRV_Stepper_StopAll();
+        if (DRV_Stepper_IsContinuous(AXIS_Y)) {
+            DRV_Stepper_Stop(AXIS_Y);
             s_last_speed_y = 0;
+        }
+        if (DRV_Stepper_IsContinuous(AXIS_X)) {
+            DRV_Stepper_Stop(AXIS_X);
             s_last_speed_x = 0;
         }
+        // Обработать ручной энкодер: добавить тики и запустить мотор
+        _update_hand_encoder();
         return;
     }
 
@@ -282,10 +533,13 @@ void ELS_Control_Update(void) {
 
     case MODE_THREAD:
         // Нарезка резьбы (ось Y)
+        // При многозаходной резьбе (Ph > 1) эффективный шаг = pitch × Ph:
+        // за 1 оборот шпинделя мотор должен пройти Ph × pitch_mm.
         if (rpm < MIN_RPM_FOR_SYNC) {
             hz_y = 0;
         } else {
-            hz_y = _calc_sync_hz(rpm, els.thread_pitch, STEPS_PER_MM_Y);
+            int32_t ph = (els.Ph > 0) ? (int32_t)els.Ph : 1;
+            hz_y = _calc_sync_hz(rpm, els.thread_pitch * ph, STEPS_PER_MM_Y);
         }
         _apply_speed(AXIS_Y, hz_y, dir_y, &s_last_speed_y, &s_last_dir_y);
         break;
@@ -315,11 +569,13 @@ void ELS_Control_Update(void) {
         break;
     }
 
-    case MODE_DIVIDER:
     case MODE_SPHERE:
+        _update_sphere();
+        break;
+
+    case MODE_DIVIDER:
     case MODE_RESERVE:
     default:
-        // Нет движения мотора
         break;
     }
 

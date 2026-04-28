@@ -42,6 +42,12 @@ static void _set_mode(ELS_Mode_t mode) {
     if (els.mode == mode) return;
     ELS_Control_Stop();
     els.mode = mode;
+    // Сброс счётчиков цикла при смене режима
+    els.select_menu   = 1;
+    els.Ap            = 0;
+    els.Pass_Nr       = 1;
+    els.Thr_Pass_Summ = 0;
+    els.Pass_Fin      = 0;
     // Синхронизируем generic submode с sub текущего режима
     switch (mode) {
         case MODE_FEED:    els.submode = (ELS_Submode_t)els.sub_feed;   break;
@@ -52,13 +58,12 @@ static void _set_mode(ELS_Mode_t mode) {
         case MODE_SPHERE:  els.submode = (ELS_Submode_t)els.sub_sphere; break;
         default: break;
     }
-    els.select_menu = 1;
-    els.Ap = 0;
 #if USE_ESP32_DISPLAY
     DRV_Display_SendMode(els.mode, els.submode);
     DRV_Display_SendSelectMenu(els.select_menu);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", 0);
+    DRV_Display_SendInt2("PASS", els.Pass_Nr, els.Pass_Total);
     if (mode == MODE_THREAD) {
         uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
         DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
@@ -68,6 +73,10 @@ static void _set_mode(ELS_Mode_t mode) {
         DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
         int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
         DRV_Display_SendInt("THREAD_CYCL",  cycl);
+        DRV_Display_SendInt("PASS_FIN",     (int32_t)PASS_FINISH + els.Pass_Fin);
+    } else if (mode == MODE_AFEED) {
+        DRV_Display_SendInt("DIVN", (int32_t)els.Total_Tooth);
+        DRV_Display_SendInt("DIVM", (int32_t)els.Current_Tooth);
     } else if (mode == MODE_SPHERE) {
         DRV_Display_SendInt("SPHERE", els.Sph_R_mm);
         DRV_Display_SendInt("BAR",    els.Bar_R_mm);
@@ -264,13 +273,12 @@ void ELS_Menu_Init(void) {
 static void _switch_mode_hw(ELS_Mode_t new_mode) {
     if (els.mode == new_mode) return;
     ELS_Control_Stop();
-    els.mode        = new_mode;
-    els.select_menu = 1;
-    els.Ap          = 0;
-    // сбросить счётчики прохода при смене режима
-    els.Pass_Nr     = 1;
+    els.mode          = new_mode;
+    els.select_menu   = 1;
+    els.Ap            = 0;
+    els.Pass_Nr       = 1;
     els.Thr_Pass_Summ = 0;
-    els.Pass_Fin    = 0;
+    els.Pass_Fin      = 0;
     switch (new_mode) {
         case MODE_FEED:    els.submode = (ELS_Submode_t)els.sub_feed;   break;
         case MODE_AFEED:   els.submode = (ELS_Submode_t)els.sub_afeed;  break;
@@ -285,6 +293,7 @@ static void _switch_mode_hw(ELS_Mode_t new_mode) {
     DRV_Display_SendSelectMenu(1);
     DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
     DRV_Display_SendInt("AP", 0);
+    DRV_Display_SendInt2("PASS", els.Pass_Nr, els.Pass_Total);
     if (new_mode == MODE_THREAD) {
         uint8_t ts = els.Thread_Step < TOTAL_THREADS ? els.Thread_Step : 0;
         DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
@@ -294,6 +303,10 @@ static void _switch_mode_hw(ELS_Mode_t new_mode) {
         DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
         int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
         DRV_Display_SendInt("THREAD_CYCL",  cycl);
+        DRV_Display_SendInt("PASS_FIN",     (int32_t)PASS_FINISH + els.Pass_Fin);
+    } else if (new_mode == MODE_AFEED) {
+        DRV_Display_SendInt("DIVN", (int32_t)els.Total_Tooth);
+        DRV_Display_SendInt("DIVM", (int32_t)els.Current_Tooth);
     } else if (new_mode == MODE_SPHERE) {
         DRV_Display_SendInt("SPHERE", els.Sph_R_mm);
         DRV_Display_SendInt("BAR",    els.Bar_R_mm);

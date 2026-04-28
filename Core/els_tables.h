@@ -30,3 +30,9 @@ extern const cone_info_t   Cone_Info[];
 extern const thread_info_t Thread_Info[];
 extern const uint8_t       TOTAL_CONE;
 extern const uint8_t       TOTAL_THREADS;
+
+// Угол конуса × 10 для каждого индекса Cone_Info[] (63 записи).
+// Единицы: 0.1° (дециградусы). Например, 450 = 45.0°, 10 = 1.0°.
+// Используется ESP32 для отображения угла.
+extern const int16_t Cone_Angle_x10[];
+extern const uint8_t TOTAL_CONE_ANGLES;

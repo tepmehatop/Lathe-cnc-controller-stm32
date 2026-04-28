@@ -107,9 +107,9 @@ static void _apply(const ELS_FlashSettings_t* cfg) {
     els.feed            = cfg->Feed_mm;
     els.afeed           = els.aFeed_mm;
     els.Thread_Step     = cfg->Thread_Step;
-    els.Ph              = cfg->Ph;
-    els.thread_starts   = (uint8_t)cfg->Ph;
-    els.Pass_Fin        = cfg->Pass_Fin;
+    els.Ph              = (cfg->Ph > 0) ? cfg->Ph : 1;  // минимум 1 заход
+    els.thread_starts   = (uint8_t)els.Ph;
+    els.Pass_Fin        = (cfg->Pass_Fin >= 0) ? cfg->Pass_Fin : 0; // не может быть отрицательным
     els.Cone_Step       = cfg->Cone_Step;
     els.Pass_Total      = cfg->Pass_Total;
     els.Ap              = cfg->Ap;

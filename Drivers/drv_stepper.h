@@ -39,3 +39,8 @@ void DRV_Stepper_SetSpeed(Axis_t axis, uint32_t speed_hz);
 // Конус: Bresenham-слейв X к Y (cs_div/cm_div из Cone_Info[], dir_x = ±1)
 void DRV_Stepper_SetConeRatio(uint8_t cs_div, int16_t cm_div, int8_t dir_x);
 void DRV_Stepper_ClearCone(void);
+
+// Ручной энкодер: движение ровно N шагов
+void    DRV_Stepper_MoveSteps(Axis_t axis, int32_t steps, uint32_t hz, int8_t dir);
+// Движение непрерывное (steps_left = INT32_MAX)?
+uint8_t DRV_Stepper_IsContinuous(Axis_t axis);

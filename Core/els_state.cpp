@@ -71,8 +71,9 @@ void ELS_State_Init(void) {
     els.limit_x_rear    =  1073741824L;
     els.limits_enabled  = 0;
 
-    // Флаги ошибок (err_0 в Arduino стартует = true, но у нас нет проверки джойстика)
-    els.err_0_flag   = false;
+    // err_0_flag: как в Arduino — блокировка пока джойстик не в нейтрали при старте.
+    // Устанавливается в true здесь; сбрасывается в ELS_Menu_Process когда джойстик нейтрален.
+    els.err_0_flag   = true;
     els.err_1_flag   = false;
     els.err_2_flag   = false;
     els.Complete_flag = false;

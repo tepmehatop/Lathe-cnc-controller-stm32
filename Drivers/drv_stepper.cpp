@@ -328,6 +328,41 @@ void DRV_Stepper_ClearCone(void) {
 }
 
 // ============================================================
+// Движение ровно N шагов — для ручного энкодера
+// ============================================================
+void DRV_Stepper_MoveSteps(Axis_t axis, int32_t steps, uint32_t hz, int8_t dir) {
+    if (steps <= 0 || hz == 0) return;
+
+    AxisState* ax = &s_ax[axis];
+    ax->dir        = dir;
+    ax->steps_left = steps;
+    ax->moving     = 1;
+
+    if (axis == AXIS_Y) {
+        digitalWrite(PIN_DIR_Y, (dir > 0) ? HIGH : LOW);
+        GPIOE->BSRR = (uint32_t)GPIO_PIN_11 << 16u;
+    } else {
+        digitalWrite(PIN_DIR_X, (dir > 0) ? HIGH : LOW);
+        GPIOE->BSRR = (uint32_t)GPIO_PIN_15 << 16u;
+    }
+
+    if (!s_ch1_active && !s_ch3_active) {
+        s_htim1->setOverflow(hz, HERTZ_FORMAT);
+        uint32_t period_us = 1000000UL / hz;
+        uint32_t duty = (period_us >= 20u) ? 1u : 5u;
+        s_htim1->setCaptureCompare(1, duty, PERCENT_COMPARE_FORMAT);
+        s_htim1->setCaptureCompare(3, duty, PERCENT_COMPARE_FORMAT);
+    }
+
+    if (axis == AXIS_Y) { s_ch1_active = 1; TIM1->CCER |= TIM_CCER_CC1E; }
+    else                { s_ch3_active = 1; TIM1->CCER |= TIM_CCER_CC3E; }
+}
+
+uint8_t DRV_Stepper_IsContinuous(Axis_t axis) {
+    return (s_ax[axis].steps_left == 0x7FFFFFFF) ? 1u : 0u;
+}
+
+// ============================================================
 // Изменить частоту текущего движения (ISR-safe: только ARR)
 // ============================================================
 void DRV_Stepper_SetSpeed(Axis_t axis, uint32_t speed_hz) {

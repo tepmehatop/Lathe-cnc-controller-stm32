@@ -101,6 +101,12 @@ void DRV_Inputs_Init(void) {
     pinMode(PG_14, INPUT_PULLUP);
     pinMode(PG_15, INPUT_PULLUP);
 
+    // Ручной энкодер: выбор оси PD0/PD1, масштаб PD2/PD3 — INPUT_PULLUP
+    pinMode(PD_0, INPUT_PULLUP);
+    pinMode(PD_1, INPUT_PULLUP);
+    pinMode(PD_2, INPUT_PULLUP);
+    pinMode(PD_3, INPUT_PULLUP);
+
     s_last_sample = millis();
 }
 
@@ -167,6 +173,12 @@ void DRV_Inputs_Process(void) {
     // --- Mode PG8-PG15: читаем IDR напрямую ---
     // Active LOW: нажатый контакт = 0 в IDR → бит = 1 в mode
     s_mode = (uint8_t)(~(GPIOG->IDR >> 8) & 0xFFu);
+
+    // --- Лимитные LED: зеркалят состояние выключателей ---
+    digitalWrite(PF_1, (s_lim & LIM_LEFT)  ? HIGH : LOW);
+    digitalWrite(PF_3, (s_lim & LIM_RIGHT) ? HIGH : LOW);
+    digitalWrite(PF_5, (s_lim & LIM_FRONT) ? HIGH : LOW);
+    digitalWrite(PF_7, (s_lim & LIM_REAR)  ? HIGH : LOW);
 }
 
 // ============================================================

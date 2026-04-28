@@ -14,6 +14,7 @@
 #include "../Drivers/drv_stepper.h"
 #include "../Drivers/drv_encoder.h"
 #include "../Drivers/drv_display.h"
+#include "../Drivers/drv_dro.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +75,9 @@ static void _cmd_help(void) {
     _println("  START / STOP");
     _println("  ZERO:Y / ZERO:X   Zero axis");
     _println("  LIMIT:ON / OFF    Enable/disable limits");
+    _println("--- Диагностика ---");
+    _println("  DRO               DRO statistics (packets, errors, values)");
+    _println("  SENDALL           Force send all state to ESP32");
     _println("================================");
 }
 
@@ -108,6 +112,12 @@ static void _cmd_info(void) {
     _print_mm("  Pos Y:   ", els.pos_y);
     _print_mm("  Pos X:   ", els.pos_x);
     snprintf(buf, sizeof(buf), "  Limits:  %s", els.limits_enabled ? "ON" : "OFF");
+    _println(buf);
+    snprintf(buf, sizeof(buf), "  Ap:      %d (%.2f mm)", (int)els.Ap, (double)els.Ap / 100.0);
+    _println(buf);
+    snprintf(buf, sizeof(buf), "  DRO pkt: %lu ok / %lu err",
+        (unsigned long)DRV_DRO_GetPacketCount(),
+        (unsigned long)DRV_DRO_GetErrorCount());
     _println(buf);
     _println("-----------------");
 }
@@ -147,6 +157,39 @@ static void _dispatch(char* line) {
 
     } else if (strcmp(cmd, "INFO") == 0) {
         _cmd_info();
+
+    } else if (strcmp(cmd, "DRO") == 0) {
+        // Диагностика DRO: показать статистику пакетов и текущие значения
+        char buf[64];
+        snprintf(buf, sizeof(buf), "--- DRO HS800-2 ---");
+        _println(buf);
+        snprintf(buf, sizeof(buf), "  Packets OK:  %lu", (unsigned long)DRV_DRO_GetPacketCount());
+        _println(buf);
+        snprintf(buf, sizeof(buf), "  Errors:      %lu", (unsigned long)DRV_DRO_GetErrorCount());
+        _println(buf);
+        int32_t rx = DRV_DRO_GetX();
+        int32_t ry = DRV_DRO_GetY();
+        snprintf(buf, sizeof(buf), "  Raw X:       %ld (%.3f mm)", (long)rx, (double)rx / 1000.0);
+        _println(buf);
+        snprintf(buf, sizeof(buf), "  Raw Y:       %ld (%.3f mm)", (long)ry, (double)ry / 1000.0);
+        _println(buf);
+        snprintf(buf, sizeof(buf), "  els.pos_y:   %ld  els.pos_x: %ld", (long)els.pos_y, (long)els.pos_x);
+        _println(buf);
+        if (DRV_DRO_GetPacketCount() == 0) {
+            _println("  [!] Нет пакетов! Проверьте:");
+            _println("      Arduino TX1(pin18) -> STM32 PA3");
+            _println("      GND -> GND, уровень 3.3В!");
+        }
+        _println("-------------------");
+
+    } else if (strcmp(cmd, "SENDALL") == 0) {
+        // Принудительно отправить всё состояние на ESP32
+#if USE_ESP32_DISPLAY
+        DRV_Display_SendAll();
+        _println("[ELS] SendAll -> ESP32");
+#else
+        _println("[ELS] ESP32 display disabled");
+#endif
 
     } else if (strcmp(cmd, "START") == 0) {
         ELS_Control_Start();

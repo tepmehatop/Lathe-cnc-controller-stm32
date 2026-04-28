@@ -496,7 +496,8 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
             }
             // Строка 3 правая: ход резьбы или об/мин
             if (s->Ph > 1) {
-                int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * s->Ph);
+                int ph_s1 = (s->Ph > 0) ? (int)s->Ph : 1;
+                int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * ph_s1);
                 LCD_SET(8,3); LCD_P(" Ход: ");
                 snprintf(LCD_BUF, 5, "%1d.%02d", thstep_mm/100, thstep_mm%100);
                 LCD_P(LCD_BUF); LCD_P("мм");
@@ -506,7 +507,8 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
                 LCD_P(LCD_BUF);
             }
         } else if (s->select_menu == 2) {
-            int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * s->Ph);
+            int ph_safe = (s->Ph > 0) ? (int)s->Ph : 1;
+            int thstep_mm = (int)(Thread_Info[s->Thread_Step].Step * 100.0f * ph_safe);
             LCD_SET(0,0); LCD_P("Чист проходов: \x01\x02 ");
             snprintf(LCD_BUF, 3, "%2d", (int)(PASS_FINISH + s->Pass_Fin));
             LCD_P(LCD_BUF);

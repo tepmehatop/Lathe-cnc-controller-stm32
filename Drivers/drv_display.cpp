@@ -347,9 +347,10 @@ void DRV_Display_SendAll(void) {
 void DRV_Display_Init(void) {
     DispSerial.begin(DISP_UART_BAUD);
     s_rxlen = 0;
-    // SendAll убран из Init: ESP32 пришлёт <READY> сам когда загрузится,
-    // тогда _parse_rx вызовет DRV_Display_SendAll() через callback.
-    // Отправка всего блока здесь блокирует UART если ESP32 ещё не слушает.
+    // При перезагрузке STM32 ESP32 может быть уже запущен и не пришлёт READY повторно.
+    // Флаг s_need_sendall гарантирует отправку полного состояния при старте STM32
+    // вне зависимости от того, перезагружался ли ESP32.
+    s_need_sendall = 1;
 }
 
 void DRV_Display_Process(void) {
