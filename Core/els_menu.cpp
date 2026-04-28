@@ -39,7 +39,17 @@ static uint8_t s_touch_rapid   = 0; // 0=быстро (RAPID_ON), 1=подача
 // Применить режим и обновить ESP32
 // ============================================================
 static void _set_mode(ELS_Mode_t mode) {
-    if (els.mode == mode) return;
+    if (els.mode == mode) {
+        // Режим уже верный — ресинхронизируем ESP32 (он мог дрейфовать после инжекции)
+#if USE_ESP32_DISPLAY
+        DRV_Display_SendMode(els.mode, els.submode);
+        DRV_Display_SendSelectMenu(els.select_menu);
+        DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+        DRV_Display_SendInt("AP", els.Ap);
+        DRV_Display_SendInt2("PASS", els.Pass_Nr, els.Pass_Total);
+#endif
+        return;
+    }
     ELS_Control_Stop();
     els.mode = mode;
     // Сброс счётчиков цикла при смене режима
