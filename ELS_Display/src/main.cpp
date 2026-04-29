@@ -2945,16 +2945,24 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_t* scr = lv_scr_act();
 
     // Полупрозрачный фон — только левая область (правые кнопки x=418..474 остаются доступными)
+    // CLICKABLE: тап мимо панели — подтверждение если значение изменено, иначе отмена
     g_feed_roller.backdrop = lv_obj_create(scr);
     lv_obj_set_size(g_feed_roller.backdrop, 416, 272);
     lv_obj_set_pos(g_feed_roller.backdrop, 0, 0);
     lv_obj_set_style_bg_color(g_feed_roller.backdrop, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(g_feed_roller.backdrop, 140, 0);
     lv_obj_set_style_border_width(g_feed_roller.backdrop, 0, 0);
-    lv_obj_clear_flag(g_feed_roller.backdrop, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(g_feed_roller.backdrop, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(g_feed_roller.backdrop, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(g_feed_roller.backdrop, [](lv_event_t* e) {
+        if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+        bool changed = (g_feed_roller.pending_val != g_feed_roller.entry_val);
+        close_feed_roller(changed);   // confirm если скроллили, иначе cancel
+        exit_edit_mode();
+    }, LV_EVENT_ALL, nullptr);
 
-    // Центральная панель барабана
-    const int PW = 200, PH = 200;
+    // Центральная панель барабана — 30% крупнее (200→260)
+    const int PW = 260, PH = 260;
     const int PX = (416 - PW) / 2, PY = (272 - PH) / 2;
     g_feed_roller.panel = lv_obj_create(scr);
     lv_obj_set_size(g_feed_roller.panel, PW, PH);
@@ -2974,16 +2982,18 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_label_set_text(title,
         "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0");  // Подача
-    lv_obj_set_pos(title, 0, 6);
+    lv_obj_set_pos(title, 0, 8);
     lv_obj_set_width(title, PW);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_clear_flag(title, LV_OBJ_FLAG_CLICKABLE);
 
-    // Выделение центральной строки
-    const int ROW_H = 30, ROWS_Y = 36;
+    // 5 строк барабана: ROW_H=40, ROWS_Y=40
+    // Выделение центральной строки (i=2): точно на сетке строк
+    const int ROW_H = 40, ROWS_Y = 40;
+    const int OUTER_FONT_H = 28;  // реальная высота font_tahoma_bold_28
     lv_obj_t* sel_rect = lv_obj_create(g_feed_roller.panel);
-    lv_obj_set_size(sel_rect, PW - 8, ROW_H + 4);
-    lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 2);
+    lv_obj_set_size(sel_rect, PW - 8, ROW_H + 2);
+    lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 1);
     lv_obj_set_style_bg_color(sel_rect, lv_color_hex(0x003a5a), 0);
     lv_obj_set_style_bg_opa(sel_rect, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(sel_rect, lv_color_hex(0x00d4ff), 0);
@@ -2992,15 +3002,20 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_clear_flag(sel_rect, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     // 5 строк барабана (сверху вниз: val-2, val-1, CURRENT, val+1, val+2)
+    // Внешние строки: tahoma_bold_28, центральная: tahoma_bold_40
     const lv_font_t* row_fonts[] = {
-        &font_tahoma_bold_22, &font_tahoma_bold_22,
-        &font_tahoma_bold_28,
-        &font_tahoma_bold_22, &font_tahoma_bold_22,
+        &font_tahoma_bold_28, &font_tahoma_bold_28,
+        &font_tahoma_bold_40,
+        &font_tahoma_bold_28, &font_tahoma_bold_28,
     };
     for (int i = 0; i < 5; i++) {
         g_feed_roller.labels[i] = lv_label_create(g_feed_roller.panel);
         lv_obj_set_style_text_font(g_feed_roller.labels[i], row_fonts[i], 0);
-        lv_obj_set_pos(g_feed_roller.labels[i], 0, ROWS_Y + i * ROW_H + (i == 2 ? 2 : 4));
+        // Центральная строка (i=2) — шрифт 40px заполняет ROW_H, без смещения
+        // Внешние строки (28px) — центрируем вертикально внутри слота ROW_H
+        int label_y = ROWS_Y + i * ROW_H;
+        if (i != 2) label_y += (ROW_H - OUTER_FONT_H) / 2;
+        lv_obj_set_pos(g_feed_roller.labels[i], 0, label_y);
         lv_obj_set_width(g_feed_roller.labels[i], PW);
         lv_obj_set_style_text_align(g_feed_roller.labels[i], LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_text(g_feed_roller.labels[i], "0.00");
