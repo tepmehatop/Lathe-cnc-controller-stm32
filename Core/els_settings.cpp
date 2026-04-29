@@ -117,7 +117,7 @@ static void _apply(const ELS_FlashSettings_t* cfg) {
     els.Cone_Step       = cfg->Cone_Step;
     els.Pass_Total      = cfg->Pass_Total;
     // Validate Ap — corrupted flash can store out-of-range values
-    if (cfg->Ap >= 0 && cfg->Ap <= 9900)
+    if (cfg->Ap >= 0 && cfg->Ap <= 990)
         els.Ap          = cfg->Ap;
     else
         els.Ap          = 0;

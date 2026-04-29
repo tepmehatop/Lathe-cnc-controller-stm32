@@ -245,7 +245,8 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
                 DRV_Display_SendInt("AFEED", (int32_t)v);
             }
         } else if (strcmp(rx->cmd, "AP") == 0) {
-            els.Ap = (int16_t)rx->value;
+            int16_t v = (int16_t)rx->value;
+            if (v >= 0 && v <= 990) els.Ap = v;
             DRV_Display_SendInt("AP", (int32_t)els.Ap);
         } else if (strcmp(rx->cmd, "THREAD_STEP") == 0) {
             int n = (int)rx->value;
@@ -379,7 +380,7 @@ static void _key_up(void) {
         case MODE_FEED:
             if (els.select_menu == 1) {
                 int16_t step = rapid ? 10 : 2;
-                if (els.Ap + step <= 9900) { els.Ap += step; DRV_Beeper_Tone(1000, 15); }
+                if (els.Ap + step <= 990) { els.Ap += step; DRV_Beeper_Tone(1000, 15); }
             } else if (els.select_menu == 2) {
                 // сброс X (диаметр вводился) — через меню
                 DRV_Beeper_Tone(1000, 15);
@@ -391,7 +392,7 @@ static void _key_up(void) {
         case MODE_AFEED:
             if (els.select_menu == 1) {
                 int16_t step = rapid ? 5 : 1;
-                if (els.Ap + step <= 9900) { els.Ap += step; DRV_Beeper_Tone(1000, 15); }
+                if (els.Ap + step <= 990) { els.Ap += step; DRV_Beeper_Tone(1000, 15); }
             } else if (els.select_menu == 2) {
                 if (els.Total_Tooth < 255) { els.Total_Tooth++; els.Current_Tooth = 1; DRV_Beeper_Tone(1000, 15); }
             } else if (els.select_menu == 3) {
@@ -424,7 +425,7 @@ static void _key_up(void) {
             if (els.select_menu == 1) {
                 if (els.Cone_Step < (uint8_t)(TOTAL_CONE - 1)) { els.Cone_Step++; DRV_Beeper_Tone(1000, 15); }
             } else if (els.select_menu == 2) {
-                if (els.Ap < 9900) { els.Ap += rapid ? 10 : 2; DRV_Beeper_Tone(1000, 15); }
+                if (els.Ap < 990) { els.Ap += rapid ? 10 : 2; DRV_Beeper_Tone(1000, 15); }
             } else if (els.select_menu == 3) {
                 DRV_Beeper_Tone(1000, 15);
             }
