@@ -539,7 +539,7 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
             LCD_P(LCD_BUF);
             LCD_SET(8,2); LCD_P(" Циклов:  ");
             LCD_SET(8,3); LCD_P(" Съём \x06:");
-            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            snprintf(LCD_BUF, 6, "%d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
             LCD_P(LCD_BUF);
             switch (s->sub_feed) {
                 case Sub_Mode_Feed_Int:
@@ -583,7 +583,7 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
             LCD_P(LCD_BUF);
             LCD_SET(8,2); LCD_P(" Циклов:  ");
             LCD_SET(8,3); LCD_P(" Съём R:");
-            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            snprintf(LCD_BUF, 6, "%d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
             LCD_P(LCD_BUF);
             switch (s->sub_afeed) {
                 case Sub_Mode_aFeed_Int:
@@ -635,7 +635,7 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
             LCD_P(LCD_BUF);
             LCD_SET(8,2); LCD_P(" Циклов:  ");
             LCD_SET(8,3); LCD_P(" Съём \x06:");
-            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            snprintf(LCD_BUF, 6, "%d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
             LCD_P(LCD_BUF);
             switch (s->sub_cone) {
                 case Sub_Mode_Cone_Int:
@@ -683,7 +683,7 @@ void DRV_LCD2004_PrintELS(const ELS_State_t* s) {
             LCD_P(LCD_BUF);
             LCD_SET(8,2); LCD_P(" Циклов:  ");
             LCD_SET(8,3); LCD_P(" Съём \x06:");
-            snprintf(LCD_BUF, 5, "%1d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
+            snprintf(LCD_BUF, 6, "%d.%02d", (int)(s->Ap/100), (int)(s->Ap%100));
             LCD_P(LCD_BUF);
             switch (s->sub_cone) {
                 case Sub_Mode_Cone_Int:

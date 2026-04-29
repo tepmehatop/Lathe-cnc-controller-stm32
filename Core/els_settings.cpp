@@ -97,7 +97,11 @@ static void _flash_write(const ELS_FlashSettings_t* cfg) {
 
 // ── Чтение из Flash → ELS_State ─────────────────────────────────────────────
 static void _apply(const ELS_FlashSettings_t* cfg) {
-    els.Feed_mm         = cfg->Feed_mm;
+    // Validate Feed_mm — corrupted flash can store out-of-range values
+    if (cfg->Feed_mm >= 1 && cfg->Feed_mm <= 2500)
+        els.Feed_mm     = cfg->Feed_mm;
+    else
+        els.Feed_mm     = 10;    // default 0.10 мм/об
     // Validate aFeed_mm — corrupted flash can store out-of-range values (e.g. 33024)
     // which overflow int16_t in the display protocol and appear as -32512 on screen.
     if (cfg->aFeed_mm >= MIN_AFEED && cfg->aFeed_mm <= MAX_AFEED)
@@ -112,7 +116,11 @@ static void _apply(const ELS_FlashSettings_t* cfg) {
     els.Pass_Fin        = (cfg->Pass_Fin >= 0) ? cfg->Pass_Fin : 0; // не может быть отрицательным
     els.Cone_Step       = cfg->Cone_Step;
     els.Pass_Total      = cfg->Pass_Total;
-    els.Ap              = cfg->Ap;
+    // Validate Ap — corrupted flash can store out-of-range values
+    if (cfg->Ap >= 0 && cfg->Ap <= 9900)
+        els.Ap          = cfg->Ap;
+    else
+        els.Ap          = 0;
     els.Sph_R_mm        = cfg->Sph_R_mm;
     els.Bar_R_mm        = cfg->Bar_R_mm;
     els.Pass_Total_Sphr = cfg->Pass_Total_Sphr;
