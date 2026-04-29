@@ -342,6 +342,31 @@ void DRV_Display_SendAll(void) {
 }
 
 // ============================================================
+// Дублирование состояния LCD2004 через ESP32 Serial
+// ============================================================
+void DRV_Display_SendLCD2004State(void) {
+    char buf[80];
+    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+    uint8_t ts = (els.Thread_Step < TOTAL_THREADS) ? els.Thread_Step : 0;
+    snprintf(buf, sizeof(buf), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+        (int)els.mode,
+        (int)els.submode,
+        (int)els.select_menu,
+        (int)els.Feed_mm,
+        (int)els.aFeed_mm,
+        (int)els.Ap,
+        (int)els.Pass_Nr,
+        (int)els.Pass_Total,
+        (int)ph,
+        (int)((int32_t)PASS_FINISH + els.Pass_Fin),
+        (int)ts,
+        (int)els.Total_Tooth,
+        (int)els.Current_Tooth
+    );
+    DRV_Display_SendCmd("LCD2004", buf);
+}
+
+// ============================================================
 // Инициализация и обработка
 // ============================================================
 void DRV_Display_Init(void) {
@@ -396,5 +421,6 @@ void DRV_Display_SendAlert(int32_t t) { (void)t; }
 void DRV_Display_SendSelectMenu(uint8_t m) { (void)m; }
 void DRV_Display_SendAngle(int32_t a) { (void)a; }
 void DRV_Display_SendAll(void) {}
+void DRV_Display_SendLCD2004State(void) {}
 
 #endif

@@ -67,11 +67,12 @@ def inject_state(ser, mode=0, sub=0, sm=1, feed=25, afeed=100,
     time.sleep(0.15)
 
 def read_last_state(ser, window=1.0):
-    """Drain ESP32 USB CDC for `window` seconds, return LAST [STATE] line found.
+    """Drain ESP32 USB CDC for `window` seconds.
 
-    STM32 sends POS_Z/RPM every 250ms (triggers [STATE]) but MODE/FEED/AFEED/AP/
-    LIMITS only on change.  After inject_state completes, multiple [STATE] lines
-    accumulate.  We want the LAST one so all 11 injected fields are captured.
+    Returns (state_line, lcd_line, raw_text):
+      state_line — last [STATE] line (None if not found)
+      lcd_line   — last [LCD2004] line (None if not found)
+      raw_text   — full raw output for logging
     """
     buf = b''
     deadline = time.time() + window
@@ -83,14 +84,19 @@ def read_last_state(ser, window=1.0):
             time.sleep(0.01)
     text = buf.decode('utf-8', errors='replace')
     last_state = None
+    last_lcd   = None
     for ln in text.split('\n'):
-        if '[STATE]' in ln:
-            last_state = ln.strip()
-    return last_state, text
+        s = ln.strip()
+        if '[STATE]' in s:
+            last_state = s
+        if '[LCD2004]' in s:
+            last_lcd = s
+    return last_state, last_lcd, text
 
 def read_until_state(ser, timeout=2.5):
-    """Compatibility wrapper — returns last [STATE] line within timeout."""
-    return read_last_state(ser, window=timeout)
+    """Compatibility wrapper."""
+    state, lcd, raw = read_last_state(ser, window=timeout)
+    return state, raw
 
 def parse_state(line):
     """Parse [STATE] line into dict. Returns None if not a state line.
@@ -123,6 +129,55 @@ def parse_state(line):
         'lim_re':     int(m.group(13)),
         'running':    int(m.group(14)),
     }
+
+def parse_lcd2004(line):
+    """Parse [LCD2004] line into dict. Returns None if not a LCD2004 line.
+
+    Format: [LCD2004] mode=N sub=N sm=N feed=N afeed=N ap=N pass=N/N ph=N fin=N thr=N tooth=N/N
+    mode/sub are 0-based (sent directly from STM32 els struct).
+    """
+    if not line or '[LCD2004]' not in line:
+        return None
+    m = re.search(
+        r'mode=(\d+) sub=(\d+) sm=(\d+) feed=(-?\d+) afeed=(-?\d+) ap=(-?\d+) '
+        r'pass=(\d+)/(\d+) ph=(\d+) fin=(\d+) thr=(\d+) tooth=(\d+)/(\d+)',
+        line)
+    if not m:
+        return None
+    return {
+        'mode':       int(m.group(1)),
+        'sub':        int(m.group(2)),
+        'sm':         int(m.group(3)),
+        'feed':       int(m.group(4)),
+        'afeed':      int(m.group(5)),
+        'ap':         int(m.group(6)),
+        'pass_nr':    int(m.group(7)),
+        'pass_total': int(m.group(8)),
+        'ph':         int(m.group(9)),
+        'pass_fin':   int(m.group(10)),
+        'thr':        int(m.group(11)),
+        'tooth_n':    int(m.group(12)),
+        'tooth_c':    int(m.group(13)),
+    }
+
+def verify_lcd_vs_state(lcd, state, issues):
+    """Cross-verify that LCD2004 and ESP32 [STATE] show the same values.
+
+    Called for Cat B/C tests where both displays are updated via STM32.
+    Checks the key fields that must always match between old and new display.
+    """
+    if lcd is None:
+        issues.append("LCD2004: no [LCD2004] line received (STM32 not sending LCD state)")
+        return False
+    ok = True
+    checks = ['mode', 'sub', 'sm', 'feed', 'afeed', 'ap', 'pass_nr', 'pass_total']
+    for k in checks:
+        if k not in state or k not in lcd:
+            continue
+        if state[k] != lcd[k]:
+            issues.append(f"LCD≠ESP32 [{k}]: LCD={lcd[k]}, ESP32={state[k]}")
+            ok = False
+    return ok
 
 def take_screenshot(ser, name):
     flush(ser)
@@ -770,7 +825,7 @@ def run_cat_a(ser, filter_id=None):
         # The FIRST [STATE] only reflects the MODE command; the LAST reflects all 11.
         # STM32 sends POS_Z/RPM every 250ms but MODE/FEED/AFEED/AP/LIMITS only on
         # change, so injected values persist in the final [STATE].
-        state_line, raw = read_last_state(ser, window=1.0)
+        state_line, _lcd_line, raw = read_last_state(ser, window=1.0)
         state = parse_state(state_line)
         issues = []
         verify(state, exp, issues)
@@ -798,20 +853,21 @@ def run_cat_b(ser, filter_id=None):
             btn(ser, b)
             time.sleep(0.25)
         time.sleep(0.7)
-        # Use last [STATE] — after BTN sequence, STM32 responds and sends several
-        # state updates.  We want the final settled state, not an intermediate one.
-        state_line, raw = read_last_state(ser, window=1.5)
+        # Wait extra for LCD2004 state (STM32 sends it every 500ms)
+        state_line, lcd_line, raw = read_last_state(ser, window=1.5)
         state = parse_state(state_line)
+        lcd   = parse_lcd2004(lcd_line)
         issues = []
-        # B tests: main check is that we got a state update and screenshot works
         if state is None:
             issues.append("No [STATE] response from STM32 after BTN sequence")
-        # Check for the -32512 bug in aFeed-related tests
-        if state and state.get('mode') == 1:  # MODE_AFEED (0-based)
+        if state and state.get('mode') == 1:
             if state.get('afeed', 0) == -32512:
                 issues.append("aFeed BUG: got -32512!")
             if state.get('afeed', 0) <= 0:
                 issues.append(f"aFeed invalid: {state.get('afeed')}")
+        # Cross-verify: LCD2004 must match ESP32 display
+        if state is not None:
+            verify_lcd_vs_state(lcd, state, issues)
         shot = take_screenshot(ser, tc_id)
         if shot is None:
             issues.append("Screenshot failed")
@@ -836,13 +892,16 @@ def run_cat_c(ser, filter_id=None):
             btn(ser, b)
             time.sleep(0.28)
         time.sleep(0.8)
-        state_line, raw = read_last_state(ser, window=1.5)
+        state_line, lcd_line, raw = read_last_state(ser, window=1.5)
         state = parse_state(state_line)
+        lcd   = parse_lcd2004(lcd_line)
         issues = []
         if state is None:
             issues.append("No [STATE] after UI sequence")
         if state and state.get('mode') == 1 and state.get('afeed', 0) == -32512:
             issues.append("aFeed BUG: -32512 detected!")
+        if state is not None:
+            verify_lcd_vs_state(lcd, state, issues)
         shot = take_screenshot(ser, tc_id)
         if shot is None:
             issues.append("Screenshot failed")

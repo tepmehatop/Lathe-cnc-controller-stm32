@@ -68,3 +68,8 @@ void DRV_Display_SendInt2(const char* cmd, int32_t a, int32_t b);
 // Заполняется снаружи через колбэк или вручную из els_main
 void DRV_Display_SendAll(void);
 int  DRV_Display_TxFree(void);
+
+// ---- Дублирование состояния LCD2004 через ESP32 Serial (для тестирования) ----
+// Отправляет <LCD2004:mode,sub,sm,feed,afeed,ap,pass_nr,pass_total,ph,pass_fin,thr,tooth_n,tooth_c>
+// ESP32 печатает [LCD2004] ... в USB CDC — читается тест-раннером для cross-verify
+void DRV_Display_SendLCD2004State(void);

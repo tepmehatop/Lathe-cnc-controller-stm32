@@ -36,17 +36,27 @@ static int8_t  s_touch_joy_x   = 0;
 static uint8_t s_touch_rapid   = 0; // 0=быстро (RAPID_ON), 1=подача (RAPID_OFF)
 
 // ============================================================
+// Отправить базовое состояние (mode/sub/sm/feed/afeed/ap/pass) на ESP32
+// Вызывается при любом изменении состояния, чтобы ESP32 не расходился
+// ============================================================
+#if USE_ESP32_DISPLAY
+static void _send_basic_state(void) {
+    DRV_Display_SendMode(els.mode, els.submode);
+    DRV_Display_SendSelectMenu(els.select_menu);
+    DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
+    DRV_Display_SendInt("AP", els.Ap);
+    DRV_Display_SendInt2("PASS", els.Pass_Nr, els.Pass_Total);
+}
+#endif
+
+// ============================================================
 // Применить режим и обновить ESP32
 // ============================================================
 static void _set_mode(ELS_Mode_t mode) {
     if (els.mode == mode) {
         // Режим уже верный — ресинхронизируем ESP32 (он мог дрейфовать после инжекции)
 #if USE_ESP32_DISPLAY
-        DRV_Display_SendMode(els.mode, els.submode);
-        DRV_Display_SendSelectMenu(els.select_menu);
-        DRV_Display_SendFeed(els.Feed_mm, els.aFeed_mm);
-        DRV_Display_SendInt("AP", els.Ap);
-        DRV_Display_SendInt2("PASS", els.Pass_Nr, els.Pass_Total);
+        _send_basic_state();
 #endif
         return;
     }
@@ -107,7 +117,7 @@ static void _set_submode(uint8_t sub) {
     }
     els.submode = (ELS_Submode_t)sub;
 #if USE_ESP32_DISPLAY
-    DRV_Display_SendMode(els.mode, els.submode);
+    _send_basic_state();
 #endif
 }
 
@@ -116,7 +126,7 @@ static void _set_select_menu(uint8_t sm) {
     if (sm > 3) sm = 3;
     els.select_menu = sm;
 #if USE_ESP32_DISPLAY
-    DRV_Display_SendSelectMenu(sm);
+    _send_basic_state();
 #endif
 }
 
@@ -146,6 +156,11 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
         // Навигация по меню (SelectMenu)
         case TOUCH_KEY_LEFT:
             if (els.select_menu > 1) _set_select_menu(els.select_menu - 1);
+            else {
+#if USE_ESP32_DISPLAY
+                _send_basic_state();
+#endif
+            }
             return;
         case TOUCH_KEY_RIGHT:
             _set_select_menu(els.select_menu + 1);
@@ -168,6 +183,9 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             } else if (els.mode == MODE_CONE_L || els.mode == MODE_CONE_R) {
                 if (els.Cone_Step > 0) els.Cone_Step--;
             }
+#if USE_ESP32_DISPLAY
+            _send_basic_state();
+#endif
             return;
         case TOUCH_KEY_DN:
             if (els.mode == MODE_THREAD) {
@@ -187,6 +205,9 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
                 extern const uint8_t TOTAL_CONE;
                 if (els.Cone_Step < TOTAL_CONE - 1) els.Cone_Step++;
             }
+#if USE_ESP32_DISPLAY
+            _send_basic_state();
+#endif
             return;
 
         // Джойстик — управление движением через тачскрин
@@ -265,6 +286,9 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             if (rx->value > 0) els.Pass_Total = rx->value;
         }
         ELS_Settings_MarkDirty();
+#if USE_ESP32_DISPLAY
+        _send_basic_state();
+#endif
     }
 }
 

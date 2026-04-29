@@ -94,8 +94,9 @@ void ELS_Init(void) {
 
 // ============================================================
 void ELS_Loop(void) {
-    static uint32_t s_lcd_t  = 0;
-    static uint32_t s_disp_t = 0;
+    static uint32_t s_lcd_t   = 0;
+    static uint32_t s_disp_t  = 0;
+    static uint32_t s_lcd2004_t = 0;
 
     ELS_Settings_Process();
 #if USE_ADC_FEED
@@ -139,6 +140,14 @@ void ELS_Loop(void) {
         s_lcd_t = millis();
         DRV_LCD2004_PrintELS(&els);
     }
+
+    // ── LCD2004→ESP32: дублирование состояния каждые 500мс ───────────────
+#if USE_ESP32_DISPLAY
+    if ((millis() - s_lcd2004_t) >= 500) {
+        s_lcd2004_t = millis();
+        DRV_Display_SendLCD2004State();
+    }
+#endif
 
     // ── ESP32: отправка позиции и RPM каждые 250мс ────────────────────────
     // Отправляем всегда (как в оригинале Arduino), не только при изменении.
