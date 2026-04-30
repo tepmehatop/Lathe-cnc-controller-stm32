@@ -691,24 +691,33 @@ struct JoystickOverlayState {
 static JoystickOverlayState g_joystick = {false, 0, false};
 
 // ============================================================================
-// Барабан выбора подачи (pilot: MODE_FEED)
-// 5 меток + swipe gesture вместо lv_roller — высокая производительность.
-// UART отправляется только при OK. Правые кнопки всегда доступны.
+// Универсальный барабан выбора параметра
+// 5 меток + swipe + инерция. UART только при OK. Правые кнопки всегда доступны.
 // ============================================================================
-struct FeedRollerState {
+enum RollerTarget : uint8_t {
+    RT_FEED, RT_AFEED, RT_THREAD,        // primary edit (g_edit_param)
+    RT_AP, RT_CONE, RT_SPH_R, RT_BAR_R,  // sub-edit (g_sub_edit)
+    RT_TOOTH_TOTAL, RT_TOOTH_CUR,         // divider sub-edit
+};
+struct RollerCfg {
+    RollerTarget target;
+    int32_t      val_min, val_max, val_step;
+    const char*  title;
+};
+struct RollerState {
     bool        active;
+    RollerCfg   cfg;
     lv_obj_t*   backdrop;
     lv_obj_t*   panel;
     lv_obj_t*   labels[5];
     int32_t     pending_val;
     int32_t     entry_val;
     int32_t     touch_accum;
-    // Инерция
-    lv_timer_t* inertia_timer;  // nullptr = не активен
-    float       velocity;       // px/тик, сглаженная (>0 = вверх = больше значение)
-    float       vel_accum;      // дробный аккумулятор px для инерции
+    lv_timer_t* inertia_timer;
+    float       velocity;
+    float       vel_accum;
 };
-static FeedRollerState g_feed_roller = {};
+static RollerState g_roller = {};
 
 // ============================================================================
 // Демо-режим — тройное нажатие OK → 30-секундная демонстрация всех режимов
@@ -751,9 +760,9 @@ static void update_limit_indicators(const LimitStatus& lim);
 static void enter_sub_edit(int row);
 static void exit_sub_edit();
 static void highlight_sub_edit_row(int row, bool on);
-static void open_feed_roller(int32_t cur_val);
-static void close_feed_roller(bool confirm);
-static void feed_roller_update_labels();
+static void open_roller(int32_t cur_val, const RollerCfg& cfg);
+static void close_roller(bool confirm);
+static void roller_update_labels();
 static void sub_edit_step(bool up);
 static uint8_t get_editable_rows(LatheMode mode);
 static void apply_afeed_sm2_layout();
@@ -788,6 +797,15 @@ static void handle_up_btn_click()
         s_dn_rapid_ms = now;
         if (++s_dn_rapid_cnt >= 5) { s_dn_rapid_cnt = 0; test_start(); return; }
     }
+    // Roller активен — UP двигает барабан (все режимы и sub-edit)
+    if (g_roller.active) {
+        if (g_roller.inertia_timer) { lv_timer_del(g_roller.inertia_timer); g_roller.inertia_timer = nullptr; }
+        g_roller.velocity    = 0.0f;
+        g_roller.pending_val = constrain(g_roller.pending_val + g_roller.cfg.val_step,
+                                          g_roller.cfg.val_min, g_roller.cfg.val_max);
+        roller_update_labels();
+        return;
+    }
     if (g_sub_edit.active) {
         sub_edit_step(true);
     } else if (g_edit_param.active) {
@@ -815,7 +833,6 @@ static void handle_up_btn_click()
                 lv_label_set_text(g_ui.primary_unit, "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x9C\xD0\x9C");
             update_thread_type_indicators(lbl);
         } else if (s_last_mode == MODE_AFEED) {
-            // aFeed_mm — целое мм/мин, шаг 5
             g_edit_param.local_val = constrain(g_edit_param.local_val + 5, 1, 9999);
             snprintf(buf, sizeof(buf), "%ld", g_edit_param.local_val);
             lv_label_set_text(g_ui.primary_val, buf);
@@ -828,21 +845,14 @@ static void handle_up_btn_click()
                      g_edit_param.local_val / 100, g_edit_param.local_val % 100);
             lv_label_set_text(g_ui.primary_val, buf);
             if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            if (g_feed_roller.active && s_last_mode == MODE_FEED) {
-                g_feed_roller.pending_val = constrain(g_edit_param.local_val, 5, 2500);
-                feed_roller_update_labels();
-            }
         }
-        // Отправить целевую команду по режиму
         if (s_last_mode == MODE_THREAD) {
             char ts[24]; snprintf(ts, sizeof(ts), "THREAD_STEP:%d", (int)g_edit_param.local_step);
             uart_protocol.sendButtonPress(ts);
         } else if (s_last_mode == MODE_FEED || s_last_mode == MODE_SPHERE ||
                    s_last_mode == MODE_CONE_L || s_last_mode == MODE_CONE_R) {
-            if (!g_feed_roller.active) {
-                char fs[24]; snprintf(fs, sizeof(fs), "FEED:%d", (int)g_edit_param.local_val);
-                uart_protocol.sendButtonPress(fs);
-            }
+            char fs[24]; snprintf(fs, sizeof(fs), "FEED:%d", (int)g_edit_param.local_val);
+            uart_protocol.sendButtonPress(fs);
         } else if (s_last_mode == MODE_AFEED) {
             char fs[24]; snprintf(fs, sizeof(fs), "AFEED:%d", (int)g_edit_param.local_val);
             uart_protocol.sendButtonPress(fs);
@@ -857,6 +867,15 @@ static void handle_dn_btn_click()
     if (g_test_active) {
         g_test_idx = (g_test_idx - 1 + TEST_SCENARIO_COUNT) % TEST_SCENARIO_COUNT;
         test_apply(g_test_idx);
+        return;
+    }
+    // Roller активен — DN двигает барабан
+    if (g_roller.active) {
+        if (g_roller.inertia_timer) { lv_timer_del(g_roller.inertia_timer); g_roller.inertia_timer = nullptr; }
+        g_roller.velocity    = 0.0f;
+        g_roller.pending_val = constrain(g_roller.pending_val - g_roller.cfg.val_step,
+                                          g_roller.cfg.val_min, g_roller.cfg.val_max);
+        roller_update_labels();
         return;
     }
     if (g_sub_edit.active) {
@@ -886,7 +905,6 @@ static void handle_dn_btn_click()
                 lv_label_set_text(g_ui.primary_unit, "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x9C\xD0\x9C");
             update_thread_type_indicators(lbl);
         } else if (s_last_mode == MODE_AFEED) {
-            // aFeed_mm — целое мм/мин, шаг 5
             g_edit_param.local_val = constrain(g_edit_param.local_val - 5, 1, 9999);
             snprintf(buf, sizeof(buf), "%ld", g_edit_param.local_val);
             lv_label_set_text(g_ui.primary_val, buf);
@@ -899,21 +917,14 @@ static void handle_dn_btn_click()
                      g_edit_param.local_val / 100, g_edit_param.local_val % 100);
             lv_label_set_text(g_ui.primary_val, buf);
             if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            if (g_feed_roller.active && s_last_mode == MODE_FEED) {
-                g_feed_roller.pending_val = constrain(g_edit_param.local_val, 5, 2500);
-                feed_roller_update_labels();
-            }
         }
-        // Отправить целевую команду по режиму
         if (s_last_mode == MODE_THREAD) {
             char ts[24]; snprintf(ts, sizeof(ts), "THREAD_STEP:%d", (int)g_edit_param.local_step);
             uart_protocol.sendButtonPress(ts);
         } else if (s_last_mode == MODE_FEED || s_last_mode == MODE_SPHERE ||
                    s_last_mode == MODE_CONE_L || s_last_mode == MODE_CONE_R) {
-            if (!g_feed_roller.active) {
-                char fs[24]; snprintf(fs, sizeof(fs), "FEED:%d", (int)g_edit_param.local_val);
-                uart_protocol.sendButtonPress(fs);
-            }
+            char fs[24]; snprintf(fs, sizeof(fs), "FEED:%d", (int)g_edit_param.local_val);
+            uart_protocol.sendButtonPress(fs);
         } else if (s_last_mode == MODE_AFEED) {
             char fs[24]; snprintf(fs, sizeof(fs), "AFEED:%d", (int)g_edit_param.local_val);
             uart_protocol.sendButtonPress(fs);
@@ -934,12 +945,16 @@ static void handle_ok_btn_click()
     s_ok_last_tap_ms = now;
     if (s_ok_tap_count >= 3) { s_ok_tap_count = 0; demo_start(); return; }
 
+    if (g_roller.active) {
+        RollerTarget tgt = g_roller.cfg.target;
+        close_roller(true);
+        bool is_primary = (tgt == RT_FEED || tgt == RT_AFEED || tgt == RT_THREAD);
+        if (is_primary) exit_edit_mode(); else g_sub_edit.active = false;
+        return;
+    }
     if (g_sub_edit.active) {
         exit_sub_edit();
     } else if (g_edit_param.active) {
-        if (s_last_mode == MODE_FEED && g_feed_roller.active) {
-            close_feed_roller(true);  // отправляет FEED:val, обновляет local_val
-        }
         exit_edit_mode();
     } else if (s_last_mode == MODE_DIVIDER) {
         uart_protocol.sendButtonPress("PARAM_OK");
@@ -1919,6 +1934,7 @@ lv_obj_t* create_dark_pro_ui()
                 int mode_num = (intptr_t)lv_obj_get_user_data(lv_event_get_target(e));
                 lv_obj_add_flag(g_ui.mode_menu, LV_OBJ_FLAG_HIDDEN);
                 // Сбросить режимы редактирования при смене режима
+                if (g_roller.active)     close_roller(false);
                 if (g_edit_param.active) exit_edit_mode();
                 if (g_sub_edit.active)   exit_sub_edit();
 
@@ -2785,11 +2801,43 @@ static void enter_edit_mode()
             break;
     }
 
-    // Для MODE_FEED — открыть roller вместо простой подсветки
-    if (s_last_mode == MODE_FEED) {
-        open_feed_roller(g_edit_param.local_val);
-        Serial.println("Edit mode: ON (feed roller)");
-        return;
+    // Для режимов с числовым параметром — открыть roller вместо простой подсветки
+    {
+        RollerCfg rc = {};
+        bool use_roller = true;
+        switch (s_last_mode) {
+            case MODE_FEED:
+                rc = { RT_FEED, 5, 2500, 5,
+                    "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0 \xD0\xBC\xD0\xBC/\xD0\xBE\xD0\xB1" };
+                break;
+            case MODE_AFEED:
+                rc = { RT_AFEED, 10, 2500, 10,
+                    "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0 \xD0\xBC\xD0\xBC/\xD0\xBC\xD0\xB8\xD0\xBD" };
+                break;
+            case MODE_THREAD:
+                rc = { RT_THREAD, 0, (int32_t)(THREAD_TABLE_SIZE - 1), 1, "\xD0\xA0\xD0\xB5\xD0\xB7\xD1\x8C\xD0\xB1\xD0\xB0" };
+                break;
+            case MODE_CONE_L:
+            case MODE_CONE_R:
+                rc = { RT_FEED, 5, 2500, 5,
+                    "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0 \xD0\xBC\xD0\xBC/\xD0\xBE\xD0\xB1" };
+                break;
+            case MODE_SPHERE:
+                rc = { RT_FEED, 5, 2500, 5,
+                    "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0 \xD0\xBC\xD0\xBC/\xD0\xBE\xD0\xB1" };
+                break;
+            default:
+                use_roller = false;
+                break;
+        }
+        if (use_roller) {
+            int32_t init_val = (s_last_mode == MODE_THREAD)
+                ? g_edit_param.local_step
+                : g_edit_param.local_val;
+            open_roller(init_val, rc);
+            Serial.println("Edit mode: ON (roller)");
+            return;
+        }
     }
 
     // Основное значение → жёлтый
@@ -2815,7 +2863,7 @@ static void exit_edit_mode()
     if (!g_ui.primary_val) return;
 
     // Закрыть roller без подтверждения если он ещё открыт (например при auto-exit)
-    if (g_feed_roller.active) close_feed_roller(false);
+    if (g_roller.active) close_roller(false);
 
     // M3: немедленно зафиксировать локальный label до прихода подтверждения от Arduino
     // (иначе update_ui_values() покажет старый data.thread_name на долю секунды)
@@ -2889,149 +2937,310 @@ static void exit_edit_mode()
 }
 
 // ============================================================================
-// Барабан выбора подачи — реализация (кастомные метки + swipe gesture)
+// Универсальный барабан — реализация (кастомные метки + swipe + инерция)
 // ============================================================================
 
-static void feed_roller_update_labels() {
-    const int32_t STEP = 5;
+// Форматировать метку для строки барабана
+static void roller_label_text(char* buf, size_t len, int32_t val, RollerTarget tgt) {
+    switch (tgt) {
+        case RT_FEED:
+            snprintf(buf, len, "%d.%02d", (int)(val / 100), (int)(val % 100));
+            break;
+        case RT_AFEED:
+            snprintf(buf, len, "%d", (int)val);
+            break;
+        case RT_THREAD:
+            if (val >= 0 && val < THREAD_TABLE_SIZE) {
+                // Только ASCII-безопасные символы
+                const char* lbl = s_thread_table[val].label;
+                char* dst = buf;
+                for (const char* src = lbl; *src && dst < buf + len - 1; src++) {
+                    uint8_t fc = (uint8_t)*src;
+                    if (fc == 0x2B || (fc >= 0x2D && fc <= 0x3A)) *dst++ = *src;
+                }
+                *dst = '\0';
+                if (buf[0] == '\0') snprintf(buf, len, "%d", (int)val);
+            } else {
+                snprintf(buf, len, "%d", (int)val);
+            }
+            break;
+        case RT_AP:
+            snprintf(buf, len, "%d.%02d", (int)(val / 100), (int)(val % 100));
+            break;
+        case RT_CONE:
+            if (val >= 0 && val < CONE_COUNT)
+                snprintf(buf, len, "%s", CONE_NAMES[val]);
+            else
+                snprintf(buf, len, "%d", (int)val);
+            break;
+        case RT_SPH_R: {
+            // sphere_r в мм*100 (радиус), показываем диаметр XX.X
+            int32_t diam = val * 2;
+            snprintf(buf, len, "%d.%01d", (int)(diam / 100), (int)(abs(diam % 100) / 10));
+            break;
+        }
+        case RT_BAR_R: {
+            // bar_r в мм*100 (радиус), показываем диаметр XX.XX
+            int32_t diam = val * 2;
+            snprintf(buf, len, "%d.%02d", (int)(diam / 100), (int)(diam % 100));
+            break;
+        }
+        case RT_TOOTH_TOTAL:
+        case RT_TOOTH_CUR:
+            snprintf(buf, len, "%d", (int)val);
+            break;
+        default:
+            snprintf(buf, len, "%d", (int)val);
+            break;
+    }
+}
+
+static void roller_update_labels() {
     const lv_color_t colors[] = {
-        lv_color_hex(0x283848),  // val-2: очень тёмный
-        lv_color_hex(0x607880),  // val-1: серый
-        lv_color_hex(0x00d4ff),  // текущий: ярко-голубой
-        lv_color_hex(0x607880),  // val+1: серый
-        lv_color_hex(0x283848),  // val+2: очень тёмный
+        lv_color_hex(0x283848),
+        lv_color_hex(0x607880),
+        lv_color_hex(0x00d4ff),
+        lv_color_hex(0x607880),
+        lv_color_hex(0x283848),
     };
+    const RollerCfg& c = g_roller.cfg;
     for (int i = 0; i < 5; i++) {
-        if (!g_feed_roller.labels[i]) continue;
-        int32_t v = g_feed_roller.pending_val + (i - 2) * STEP;
-        v = constrain(v, 5, 2500);
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%d.%02d", (int)(v / 100), (int)(v % 100));
-        lv_label_set_text(g_feed_roller.labels[i], buf);
-        lv_obj_set_style_text_color(g_feed_roller.labels[i], colors[i], 0);
+        if (!g_roller.labels[i]) continue;
+        int32_t v = constrain(g_roller.pending_val + (i - 2) * c.val_step, c.val_min, c.val_max);
+        char buf[24];
+        roller_label_text(buf, sizeof(buf), v, c.target);
+        lv_label_set_text(g_roller.labels[i], buf);
+        lv_obj_set_style_text_color(g_roller.labels[i], colors[i], 0);
     }
-    g_edit_param.local_val = g_feed_roller.pending_val;
-    g_edit_param.last_ms   = millis();
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%ld.%02ld",
-             (long)(g_feed_roller.pending_val / 100), (long)(g_feed_roller.pending_val % 100));
-    if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, buf);
-    if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
+    // Синхронизировать primary/sub значения на фоновом UI
+    char cur[24];
+    roller_label_text(cur, sizeof(cur), g_roller.pending_val, c.target);
+    switch (c.target) {
+        case RT_FEED:
+            g_edit_param.local_val = g_roller.pending_val;
+            g_edit_param.last_ms   = millis();
+            if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, cur);
+            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, cur);
+            break;
+        case RT_AFEED:
+            g_edit_param.local_val = g_roller.pending_val;
+            g_edit_param.last_ms   = millis();
+            if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, cur);
+            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, cur);
+            break;
+        case RT_THREAD:
+            g_edit_param.local_step = (int)g_roller.pending_val;
+            g_edit_param.last_ms    = millis();
+            if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, cur);
+            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, cur);
+            break;
+        case RT_AP:
+            g_sub_edit.ap = (int16_t)g_roller.pending_val;
+            if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, cur);
+            break;
+        case RT_CONE:
+            g_sub_edit.cone_idx = (uint8_t)g_roller.pending_val;
+            if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, cur);
+            break;
+        case RT_SPH_R:
+            g_sub_edit.sphere_r = (int16_t)g_roller.pending_val;
+            if (g_ui.thr_type_val) lv_label_set_text(g_ui.thr_type_val, cur);
+            break;
+        case RT_BAR_R:
+            g_sub_edit.bar_r = (int16_t)g_roller.pending_val;
+            if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, cur);
+            break;
+        case RT_TOOTH_TOTAL:
+            g_sub_edit.total_tooth = (uint8_t)g_roller.pending_val;
+            if (g_ui.row1_val) lv_label_set_text(g_ui.row1_val, cur);
+            break;
+        case RT_TOOTH_CUR:
+            g_sub_edit.current_tooth = (uint8_t)g_roller.pending_val;
+            if (g_ui.row2_val) lv_label_set_text(g_ui.row2_val, cur);
+            break;
+    }
 }
 
-static void close_feed_roller(bool confirm) {
-    if (!g_feed_roller.active) return;
-    g_feed_roller.active = false;
-    // Остановить инерцию если активна
-    if (g_feed_roller.inertia_timer) {
-        lv_timer_del(g_feed_roller.inertia_timer);
-        g_feed_roller.inertia_timer = nullptr;
+static void close_roller(bool confirm) {
+    if (!g_roller.active) return;
+    g_roller.active = false;
+    if (g_roller.inertia_timer) {
+        lv_timer_del(g_roller.inertia_timer);
+        g_roller.inertia_timer = nullptr;
     }
-    if (g_feed_roller.backdrop) { lv_obj_del(g_feed_roller.backdrop); g_feed_roller.backdrop = nullptr; }
-    if (g_feed_roller.panel)    { lv_obj_del(g_feed_roller.panel);    g_feed_roller.panel    = nullptr; }
-    memset(g_feed_roller.labels, 0, sizeof(g_feed_roller.labels));
+    if (g_roller.backdrop) { lv_obj_del(g_roller.backdrop); g_roller.backdrop = nullptr; }
+    if (g_roller.panel)    { lv_obj_del(g_roller.panel);    g_roller.panel    = nullptr; }
+    memset(g_roller.labels, 0, sizeof(g_roller.labels));
 
+    const RollerCfg& c = g_roller.cfg;
     if (confirm) {
-        g_edit_param.local_val = g_feed_roller.pending_val;
-        char fs[24]; snprintf(fs, sizeof(fs), "FEED:%d", (int)g_feed_roller.pending_val);
-        uart_protocol.sendButtonPress(fs);
-        Serial.printf("Feed roller: confirmed FEED=%d\n", (int)g_feed_roller.pending_val);
+        int32_t val = g_roller.pending_val;
+        char cmd[32];
+        switch (c.target) {
+            case RT_FEED:
+                snprintf(cmd, sizeof(cmd), "FEED:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_AFEED:
+                snprintf(cmd, sizeof(cmd), "AFEED:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_THREAD:
+                if (val >= 0 && val < THREAD_TABLE_SIZE) {
+                    snprintf(cmd, sizeof(cmd), "THREAD_STEP:%d", (int)val);
+                    uart_protocol.sendButtonPress(cmd);
+                }
+                break;
+            case RT_AP:
+                snprintf(cmd, sizeof(cmd), "AP:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_CONE:
+                snprintf(cmd, sizeof(cmd), "CONE:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_SPH_R:
+                snprintf(cmd, sizeof(cmd), "SPHERE:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_BAR_R:
+                snprintf(cmd, sizeof(cmd), "BAR:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_TOOTH_TOTAL:
+                snprintf(cmd, sizeof(cmd), "DIVN:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+            case RT_TOOTH_CUR:
+                snprintf(cmd, sizeof(cmd), "DIVM:%d", (int)val);
+                uart_protocol.sendButtonPress(cmd);
+                break;
+        }
+        Serial.printf("Roller confirmed: target=%d val=%d\n", (int)c.target, (int)val);
     } else {
-        // Отмена — восстановить исходное значение на дисплее
-        g_edit_param.local_val = g_feed_roller.entry_val;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%ld.%02ld",
-                 (long)(g_feed_roller.entry_val / 100), (long)(g_feed_roller.entry_val % 100));
-        if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, buf);
-        if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-        Serial.printf("Feed roller: cancelled, restored to %d\n", (int)g_feed_roller.entry_val);
+        // Отмена — восстановить исходное значение на фоновом UI
+        int32_t ev = g_roller.entry_val;
+        char buf[24];
+        roller_label_text(buf, sizeof(buf), ev, c.target);
+        switch (c.target) {
+            case RT_FEED:
+            case RT_AFEED:
+                g_edit_param.local_val = ev;
+                if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, buf);
+                if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
+                break;
+            case RT_THREAD:
+                g_edit_param.local_step = (int)ev;
+                if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, buf);
+                if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
+                break;
+            case RT_AP:
+                g_sub_edit.ap = (int16_t)ev;
+                if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, buf);
+                break;
+            case RT_CONE:
+                g_sub_edit.cone_idx = (uint8_t)ev;
+                if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, buf);
+                break;
+            case RT_SPH_R:
+                g_sub_edit.sphere_r = (int16_t)ev;
+                if (g_ui.thr_type_val) lv_label_set_text(g_ui.thr_type_val, buf);
+                break;
+            case RT_BAR_R:
+                g_sub_edit.bar_r = (int16_t)ev;
+                if (g_ui.row3_val) lv_label_set_text(g_ui.row3_val, buf);
+                break;
+            case RT_TOOTH_TOTAL:
+                g_sub_edit.total_tooth = (uint8_t)ev;
+                if (g_ui.row1_val) lv_label_set_text(g_ui.row1_val, buf);
+                break;
+            case RT_TOOTH_CUR:
+                g_sub_edit.current_tooth = (uint8_t)ev;
+                if (g_ui.row2_val) lv_label_set_text(g_ui.row2_val, buf);
+                break;
+        }
+        Serial.printf("Roller cancelled: target=%d restored=%d\n", (int)c.target, (int)ev);
     }
 }
 
-// Таймер инерции: вызывается ~60fps пока барабан "летит"
-static void _feed_roller_inertia_cb(lv_timer_t* t) {
-    const float DECAY   = 0.92f;   // затухание за тик (16мс)
-    const float MIN_VEL = 0.35f;   // порог остановки px/тик
+static void _roller_inertia_cb(lv_timer_t* t) {
+    const float DECAY   = 0.92f;
+    const float MIN_VEL = 0.35f;
     const int   STEP_PX = 15;
 
-    g_feed_roller.velocity *= DECAY;
-
-    if (fabsf(g_feed_roller.velocity) < MIN_VEL) {
+    g_roller.velocity *= DECAY;
+    if (fabsf(g_roller.velocity) < MIN_VEL) {
         lv_timer_del(t);
-        g_feed_roller.inertia_timer = nullptr;
-        g_feed_roller.velocity      = 0.0f;
+        g_roller.inertia_timer = nullptr;
+        g_roller.velocity      = 0.0f;
         return;
     }
 
-    g_feed_roller.vel_accum += g_feed_roller.velocity;
-    while (g_feed_roller.vel_accum >= STEP_PX) {
-        g_feed_roller.vel_accum -= STEP_PX;
-        g_feed_roller.pending_val = constrain(g_feed_roller.pending_val + 5, 5, 2500);
-        feed_roller_update_labels();
+    g_roller.vel_accum += g_roller.velocity;
+    const RollerCfg& c = g_roller.cfg;
+    while (g_roller.vel_accum >= STEP_PX) {
+        g_roller.vel_accum -= STEP_PX;
+        g_roller.pending_val = constrain(g_roller.pending_val + c.val_step, c.val_min, c.val_max);
+        roller_update_labels();
     }
-    while (g_feed_roller.vel_accum <= -STEP_PX) {
-        g_feed_roller.vel_accum += STEP_PX;
-        g_feed_roller.pending_val = constrain(g_feed_roller.pending_val - 5, 5, 2500);
-        feed_roller_update_labels();
+    while (g_roller.vel_accum <= -STEP_PX) {
+        g_roller.vel_accum += STEP_PX;
+        g_roller.pending_val = constrain(g_roller.pending_val - c.val_step, c.val_min, c.val_max);
+        roller_update_labels();
     }
 }
 
-static void open_feed_roller(int32_t cur_val) {
-    if (g_feed_roller.active) return;
+static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
+    if (g_roller.active) close_roller(false);
 
+    g_roller.cfg = cfg;
     lv_obj_t* scr = lv_scr_act();
 
-    // Полупрозрачный фон — только левая область (правые кнопки x=418..474 остаются доступными)
-    // CLICKABLE: тап мимо панели — подтверждение если значение изменено, иначе отмена
-    g_feed_roller.backdrop = lv_obj_create(scr);
-    lv_obj_set_size(g_feed_roller.backdrop, 416, 272);
-    lv_obj_set_pos(g_feed_roller.backdrop, 0, 0);
-    lv_obj_set_style_bg_color(g_feed_roller.backdrop, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(g_feed_roller.backdrop, 140, 0);
-    lv_obj_set_style_border_width(g_feed_roller.backdrop, 0, 0);
-    lv_obj_clear_flag(g_feed_roller.backdrop, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(g_feed_roller.backdrop, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(g_feed_roller.backdrop, [](lv_event_t* e) {
+    // Полупрозрачный фон — левая область (правые кнопки x=418..474 остаются доступными)
+    g_roller.backdrop = lv_obj_create(scr);
+    lv_obj_set_size(g_roller.backdrop, 416, 272);
+    lv_obj_set_pos(g_roller.backdrop, 0, 0);
+    lv_obj_set_style_bg_color(g_roller.backdrop, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(g_roller.backdrop, 140, 0);
+    lv_obj_set_style_border_width(g_roller.backdrop, 0, 0);
+    lv_obj_clear_flag(g_roller.backdrop, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(g_roller.backdrop, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(g_roller.backdrop, [](lv_event_t* e) {
         if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-        bool changed = (g_feed_roller.pending_val != g_feed_roller.entry_val);
-        close_feed_roller(changed);   // confirm если скроллили, иначе cancel
-        exit_edit_mode();
+        bool changed = (g_roller.pending_val != g_roller.entry_val);
+        RollerTarget tgt = g_roller.cfg.target;
+        close_roller(changed);
+        bool is_primary = (tgt == RT_FEED || tgt == RT_AFEED || tgt == RT_THREAD);
+        if (is_primary) exit_edit_mode(); else g_sub_edit.active = false;
     }, LV_EVENT_ALL, nullptr);
 
-    // Центральная панель барабана — 30% крупнее (200→260)
+    // Центральная панель барабана
     const int PW = 260, PH = 260;
     const int PX = (416 - PW) / 2, PY = (272 - PH) / 2;
-    g_feed_roller.panel = lv_obj_create(scr);
-    lv_obj_set_size(g_feed_roller.panel, PW, PH);
-    lv_obj_set_pos(g_feed_roller.panel, PX, PY);
-    lv_obj_set_style_bg_color(g_feed_roller.panel, lv_color_hex(0x0d1e2e), 0);
-    lv_obj_set_style_bg_opa(g_feed_roller.panel, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(g_feed_roller.panel, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(g_feed_roller.panel, 2, 0);
-    lv_obj_set_style_radius(g_feed_roller.panel, 8, 0);
-    lv_obj_set_style_pad_all(g_feed_roller.panel, 0, 0);
-    lv_obj_clear_flag(g_feed_roller.panel, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(g_feed_roller.panel, LV_OBJ_FLAG_CLICKABLE);
+    g_roller.panel = lv_obj_create(scr);
+    lv_obj_set_size(g_roller.panel, PW, PH);
+    lv_obj_set_pos(g_roller.panel, PX, PY);
+    lv_obj_set_style_bg_color(g_roller.panel, lv_color_hex(0x0d1e2e), 0);
+    lv_obj_set_style_bg_opa(g_roller.panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(g_roller.panel, lv_color_hex(0x00d4ff), 0);
+    lv_obj_set_style_border_width(g_roller.panel, 2, 0);
+    lv_obj_set_style_radius(g_roller.panel, 8, 0);
+    lv_obj_set_style_pad_all(g_roller.panel, 0, 0);
+    lv_obj_clear_flag(g_roller.panel, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(g_roller.panel, LV_OBJ_FLAG_CLICKABLE);
 
-    // Заголовок "Подача мм/об"
-    lv_obj_t* title = lv_label_create(g_feed_roller.panel);
+    // Заголовок
+    lv_obj_t* title = lv_label_create(g_roller.panel);
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
-    lv_label_set_text(title,
-        "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0");  // Подача
+    lv_label_set_text(title, cfg.title ? cfg.title : "");
     lv_obj_set_pos(title, 0, 8);
     lv_obj_set_width(title, PW);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_clear_flag(title, LV_OBJ_FLAG_CLICKABLE);
 
-    // 5 строк барабана: ROW_H=40, ROWS_Y=40
-    // sel_rect: по данным шрифта (line_height=39, base_line=8)
-    //   глиф цифр от label_y+3 до label_y+31 (высота 28px)
-    //   для 7px отступа: sel_rect_y = label_y+3-7 = label_y-4, height = 28+14 = 42
-    //   label_y центр. строки = ROWS_Y + 2*ROW_H = 120 → sel_rect_y = 116
-    // sel_rect width: content area = PW-4=256, margin 4px each → width = 248 = PW-12
     const int ROW_H = 40, ROWS_Y = 40;
-    lv_obj_t* sel_rect = lv_obj_create(g_feed_roller.panel);
+    lv_obj_t* sel_rect = lv_obj_create(g_roller.panel);
     lv_obj_set_size(sel_rect, PW - 12, 42);
     lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 4);
     lv_obj_set_style_bg_color(sel_rect, lv_color_hex(0x003a5a), 0);
@@ -3041,93 +3250,83 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_set_style_radius(sel_rect, 4, 0);
     lv_obj_clear_flag(sel_rect, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
-    // 5 строк барабана (сверху вниз: val-2, val-1, CURRENT, val+1, val+2)
-    // Внешние строки: tahoma_bold_28 (line_height=35, base_line=6)
-    //   глиф от ~y+8 до ~y+29 (21px), центр на y+18; слот-центр на y+20 → сдвиг +2px
-    // Центральная строка: tahoma_bold_40, без смещения (label_y = ROWS_Y+2*ROW_H)
-    const lv_font_t* row_fonts[] = {
-        &font_tahoma_bold_28, &font_tahoma_bold_28,
-        &font_tahoma_bold_40,
-        &font_tahoma_bold_28, &font_tahoma_bold_28,
-    };
+    // Центральная строка — font_40, внешние — font_28 (текст) или font_22 (строковые)
+    bool text_target = (cfg.target == RT_THREAD || cfg.target == RT_CONE);
+    const lv_font_t* font_center = text_target ? &font_tahoma_bold_22 : &font_tahoma_bold_40;
+    const lv_font_t* font_outer  = text_target ? &font_tahoma_bold_16 : &font_tahoma_bold_28;
+    const lv_font_t* row_fonts[] = { font_outer, font_outer, font_center, font_outer, font_outer };
+
     for (int i = 0; i < 5; i++) {
-        g_feed_roller.labels[i] = lv_label_create(g_feed_roller.panel);
-        lv_obj_set_style_text_font(g_feed_roller.labels[i], row_fonts[i], 0);
+        g_roller.labels[i] = lv_label_create(g_roller.panel);
+        lv_obj_set_style_text_font(g_roller.labels[i], row_fonts[i], 0);
         int label_y = ROWS_Y + i * ROW_H;
-        if (i != 2) label_y += 2;  // центрируем 28px глиф (центр на 18px) в 40px слоте (центр на 20px)
-        lv_obj_set_pos(g_feed_roller.labels[i], 0, label_y);
-        lv_obj_set_width(g_feed_roller.labels[i], lv_pct(100));  // fit content area (PW-4=256px)
-        lv_obj_set_style_text_align(g_feed_roller.labels[i], LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_text(g_feed_roller.labels[i], "0.00");
-        lv_obj_clear_flag(g_feed_roller.labels[i], LV_OBJ_FLAG_CLICKABLE);
+        if (i != 2) label_y += 2;
+        lv_obj_set_pos(g_roller.labels[i], 0, label_y);
+        lv_obj_set_width(g_roller.labels[i], lv_pct(100));
+        lv_obj_set_style_text_align(g_roller.labels[i], LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(g_roller.labels[i], "");
+        lv_obj_clear_flag(g_roller.labels[i], LV_OBJ_FLAG_CLICKABLE);
     }
 
-    // Swipe + инерция: PRESSED сбрасывает инерцию, PRESSING двигает и трекает скорость,
-    // RELEASED запускает свободный ход барабана по набранной скорости
-    lv_obj_add_event_cb(g_feed_roller.panel, [](lv_event_t* e) {
+    // Swipe + инерция
+    lv_obj_add_event_cb(g_roller.panel, [](lv_event_t* e) {
         lv_event_code_t code = lv_event_get_code(e);
-
         if (code == LV_EVENT_PRESSED) {
-            // Новое касание — остановить летящий барабан
-            if (g_feed_roller.inertia_timer) {
-                lv_timer_del(g_feed_roller.inertia_timer);
-                g_feed_roller.inertia_timer = nullptr;
+            if (g_roller.inertia_timer) {
+                lv_timer_del(g_roller.inertia_timer);
+                g_roller.inertia_timer = nullptr;
             }
-            g_feed_roller.velocity    = 0.0f;
-            g_feed_roller.vel_accum   = 0.0f;
-            g_feed_roller.touch_accum = 0;
-
+            g_roller.velocity    = 0.0f;
+            g_roller.vel_accum   = 0.0f;
+            g_roller.touch_accum = 0;
         } else if (code == LV_EVENT_PRESSING) {
             lv_indev_t* indev = lv_indev_get_act();
             if (!indev) return;
             lv_point_t vect;
             lv_indev_get_vect(indev, &vect);
             const int STEP_PX = 15;
-            // Сглаженная скорость: >0 = вверх = больше значение
-            g_feed_roller.velocity = g_feed_roller.velocity * 0.7f + (-vect.y) * 0.3f;
-            // Движение пальцем
-            g_feed_roller.touch_accum -= vect.y;
-            while (g_feed_roller.touch_accum >= STEP_PX) {
-                g_feed_roller.touch_accum -= STEP_PX;
-                g_feed_roller.pending_val = constrain(g_feed_roller.pending_val + 5, 5, 2500);
-                feed_roller_update_labels();
+            g_roller.velocity = g_roller.velocity * 0.7f + (-vect.y) * 0.3f;
+            g_roller.touch_accum -= vect.y;
+            const RollerCfg& c = g_roller.cfg;
+            while (g_roller.touch_accum >= STEP_PX) {
+                g_roller.touch_accum -= STEP_PX;
+                g_roller.pending_val = constrain(g_roller.pending_val + c.val_step, c.val_min, c.val_max);
+                roller_update_labels();
             }
-            while (g_feed_roller.touch_accum <= -STEP_PX) {
-                g_feed_roller.touch_accum += STEP_PX;
-                g_feed_roller.pending_val = constrain(g_feed_roller.pending_val - 5, 5, 2500);
-                feed_roller_update_labels();
+            while (g_roller.touch_accum <= -STEP_PX) {
+                g_roller.touch_accum += STEP_PX;
+                g_roller.pending_val = constrain(g_roller.pending_val - c.val_step, c.val_min, c.val_max);
+                roller_update_labels();
             }
-
         } else if (code == LV_EVENT_RELEASED) {
-            g_feed_roller.touch_accum = 0;
-            // Запустить инерцию если скорость достаточная
-            if (fabsf(g_feed_roller.velocity) >= 2.0f && !g_feed_roller.inertia_timer) {
-                g_feed_roller.vel_accum   = 0.0f;
-                g_feed_roller.inertia_timer = lv_timer_create(_feed_roller_inertia_cb, 16, nullptr);
+            g_roller.touch_accum = 0;
+            if (fabsf(g_roller.velocity) >= 2.0f && !g_roller.inertia_timer) {
+                g_roller.vel_accum    = 0.0f;
+                g_roller.inertia_timer = lv_timer_create(_roller_inertia_cb, 16, nullptr);
             } else {
-                g_feed_roller.velocity = 0.0f;
+                g_roller.velocity = 0.0f;
             }
-
         } else if (code == LV_EVENT_PRESS_LOST) {
-            g_feed_roller.touch_accum = 0;
-            g_feed_roller.velocity    = 0.0f;
+            g_roller.touch_accum = 0;
+            g_roller.velocity    = 0.0f;
         }
     }, LV_EVENT_ALL, nullptr);
 
-    // Начальное значение
-    int32_t v = constrain(cur_val, 5, 2500);
-    v = ((v + 2) / 5) * 5;
-    if (v < 5) v = 5;
-    g_feed_roller.entry_val     = v;
-    g_feed_roller.pending_val   = v;
-    g_feed_roller.touch_accum   = 0;
-    g_feed_roller.inertia_timer = nullptr;
-    g_feed_roller.velocity      = 0.0f;
-    g_feed_roller.vel_accum     = 0.0f;
+    // Начальное значение — выровнять по шагу
+    int32_t v = constrain(cur_val, cfg.val_min, cfg.val_max);
+    if (cfg.val_step > 1) v = ((v + cfg.val_step / 2) / cfg.val_step) * cfg.val_step;
+    v = constrain(v, cfg.val_min, cfg.val_max);
 
-    g_feed_roller.active = true;
-    feed_roller_update_labels();
-    Serial.printf("Feed roller: OPEN at %d.%02d mm/ob\n", (int)(v / 100), (int)(v % 100));
+    g_roller.entry_val     = v;
+    g_roller.pending_val   = v;
+    g_roller.touch_accum   = 0;
+    g_roller.inertia_timer = nullptr;
+    g_roller.velocity      = 0.0f;
+    g_roller.vel_accum     = 0.0f;
+    g_roller.active        = true;
+
+    roller_update_labels();
+    Serial.printf("Roller OPEN: target=%d val=%d\n", (int)cfg.target, (int)v);
 }
 
 // ============================================================================
@@ -3297,6 +3496,63 @@ static void enter_sub_edit(int row)
     g_sub_edit.pass_total   = d.pass_total > 0 ? d.pass_total : 1;
 
     highlight_sub_edit_row(row, true);
+
+    // Для числовых sub-параметров открыть roller
+    {
+        RollerCfg rc = {};
+        int32_t init_val = 0;
+        bool use_roller = true;
+        switch (s_last_mode) {
+            case MODE_FEED:
+            case MODE_AFEED:
+                // row2/3 = Ap (съём), диапазон 0..990, шаг 5
+                rc = { RT_AP, 0, 990, 5,
+                    "\xD0\xA1\xD1\x8A\xD1\x91\xD0\xBC \xD0\xBC\xD0\xBC" };
+                init_val = g_sub_edit.ap;
+                break;
+            case MODE_CONE_L:
+            case MODE_CONE_R:
+                if (row == 2) {
+                    rc = { RT_CONE, 0, (int32_t)(CONE_COUNT - 1), 1,
+                        "\xD0\x9A\xD0\xBE\xD0\xBD\xD1\x83\xD1\x81" };
+                    init_val = g_sub_edit.cone_idx;
+                } else if (row == 3) {
+                    rc = { RT_AP, 0, 990, 5,
+                        "\xD0\xA1\xD1\x8A\xD1\x91\xD0\xBC \xD0\xBC\xD0\xBC" };
+                    init_val = g_sub_edit.ap;
+                } else { use_roller = false; }
+                break;
+            case MODE_SPHERE:
+                if (row == 2) {
+                    rc = { RT_BAR_R, 0, 9900, 25,
+                        "\xD0\x9D\xD0\xBE\xD0\xB6\xD0\xBA\xD0\xB0 \xD0\xBC\xD0\xBC" };
+                    init_val = g_sub_edit.bar_r;
+                } else if (row == 3) {
+                    rc = { RT_SPH_R, 50, 9999, 50,
+                        "\xD0\xA8\xD0\xB0\xD1\x80 \xD0\xBC\xD0\xBC" };
+                    init_val = g_sub_edit.sphere_r;
+                } else { use_roller = false; }
+                break;
+            case MODE_DIVIDER:
+                if (row == 0) {
+                    rc = { RT_TOOTH_TOTAL, 2, 360, 1,
+                        "\xD0\x94\xD0\xB5\xD0\xBB\xD0\xB5\xD0\xBD\xD0\xB8\xD0\xB9" };
+                    init_val = g_sub_edit.total_tooth;
+                } else if (row == 1) {
+                    rc = { RT_TOOTH_CUR, 1, (int32_t)g_sub_edit.total_tooth, 1,
+                        "\xD0\x9C\xD0\xB5\xD1\x82\xD0\xBA\xD0\xB0" };
+                    init_val = g_sub_edit.current_tooth;
+                } else { use_roller = false; }
+                break;
+            default:
+                use_roller = false;
+                break;
+        }
+        if (use_roller) {
+            open_roller(init_val, rc);
+            Serial.printf("SubEdit roller: row=%d mode=%d\n", row, (int)s_last_mode);
+        }
+    }
 
     // Сообщить Arduino какой параметр редактируем
     // row==4 (Pass_Total) управляется KEY:LEFT/RIGHT — SUBSEL не нужен
