@@ -1227,6 +1227,11 @@ static void create_k_content(lv_obj_t* screen)
         // Кликабельный — для M4/M5: sub-edit row 3 = СЪЁМ (Ap)
         lv_obj_add_flag(r.box, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(r.box, [](lv_event_t*) {
+            if (s_last_mode == MODE_THREAD) {
+                if (g_edit_param.active) exit_edit_mode();
+                show_thr_type_menu();
+                return;
+            }
             if (g_sub_edit.active && g_sub_edit.row == 3) exit_sub_edit();
             else { exit_sub_edit(); enter_sub_edit(3); }
         }, LV_EVENT_CLICKED, nullptr);
@@ -3094,26 +3099,32 @@ static void close_roller(bool confirm) {
             case RT_AP:
                 snprintf(cmd, sizeof(cmd), "AP:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setApOptimistic((int16_t)val);
                 break;
             case RT_CONE:
                 snprintf(cmd, sizeof(cmd), "CONE:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setConeOptimistic((uint8_t)val);
                 break;
             case RT_SPH_R:
                 snprintf(cmd, sizeof(cmd), "SPHERE:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setSphereOptimistic((int16_t)val);
                 break;
             case RT_BAR_R:
                 snprintf(cmd, sizeof(cmd), "BAR:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setBarOptimistic((int16_t)val);
                 break;
             case RT_TOOTH_TOTAL:
                 snprintf(cmd, sizeof(cmd), "DIVN:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setTotalToothOptimistic((uint16_t)val);
                 break;
             case RT_TOOTH_CUR:
                 snprintf(cmd, sizeof(cmd), "DIVM:%d", (int)val);
                 uart_protocol.sendButtonPress(cmd);
+                uart_protocol.setCurrentToothOptimistic((uint16_t)val);
                 break;
         }
         Serial.printf("Roller confirmed: target=%d val=%d\n", (int)c.target, (int)val);
@@ -3251,7 +3262,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
     lv_obj_clear_flag(sel_rect, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     // Центральная строка — font_40, внешние — font_28 (текст) или font_22 (строковые)
-    bool text_target = (cfg.target == RT_THREAD || cfg.target == RT_CONE);
+    bool text_target = (cfg.target == RT_CONE);
     const lv_font_t* font_center = text_target ? &font_tahoma_bold_22 : &font_tahoma_bold_40;
     const lv_font_t* font_outer  = text_target ? &font_tahoma_bold_16 : &font_tahoma_bold_28;
     const lv_font_t* row_fonts[] = { font_outer, font_outer, font_center, font_outer, font_outer };
@@ -3507,7 +3518,7 @@ static void enter_sub_edit(int row)
             case MODE_AFEED:
                 // row2/3 = Ap (съём), диапазон 0..990, шаг 5
                 rc = { RT_AP, 0, 990, 5,
-                    "\xD0\xA1\xD1\x8A\xD1\x91\xD0\xBC \xD0\xBC\xD0\xBC" };
+                    "\xD0\xA1\xD1\x8A\xD0\xB5\xD0\xBC \xD0\xBC\xD0\xBC" };
                 init_val = g_sub_edit.ap;
                 break;
             case MODE_CONE_L:
@@ -3518,7 +3529,7 @@ static void enter_sub_edit(int row)
                     init_val = g_sub_edit.cone_idx;
                 } else if (row == 3) {
                     rc = { RT_AP, 0, 990, 5,
-                        "\xD0\xA1\xD1\x8A\xD1\x91\xD0\xBC \xD0\xBC\xD0\xBC" };
+                        "\xD0\xA1\xD1\x8A\xD0\xB5\xD0\xBC \xD0\xBC\xD0\xBC" };
                     init_val = g_sub_edit.ap;
                 } else { use_roller = false; }
                 break;

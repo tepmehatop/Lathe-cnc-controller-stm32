@@ -164,6 +164,8 @@ public:
     void setApOptimistic(int16_t v) { data_.ap = v; }
     void setBarOptimistic(int16_t v) { data_.bar_r = v; }
     void setSphereOptimistic(int16_t v) { data_.sphere_radius = v; }
+    void setTotalToothOptimistic(uint16_t v) { data_.total_tooth = v; }
+    void setCurrentToothOptimistic(uint16_t v) { data_.current_tooth = v; }
     void setThreadOptimistic(int16_t mm_x100, const char* name) {
         data_.thread_mm = mm_x100;
         strncpy(data_.thread_name, name, sizeof(data_.thread_name) - 1);
