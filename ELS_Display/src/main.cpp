@@ -2988,12 +2988,15 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_clear_flag(title, LV_OBJ_FLAG_CLICKABLE);
 
     // 5 строк барабана: ROW_H=40, ROWS_Y=40
-    // Выделение центральной строки (i=2): точно на сетке строк
+    // sel_rect: по данным шрифта (line_height=39, base_line=8)
+    //   глиф цифр от label_y+3 до label_y+31 (высота 28px)
+    //   для 7px отступа: sel_rect_y = label_y+3-7 = label_y-4, height = 28+14 = 42
+    //   label_y центр. строки = ROWS_Y + 2*ROW_H = 120 → sel_rect_y = 116
+    // sel_rect width: content area = PW-4=256, margin 4px each → width = 248 = PW-12
     const int ROW_H = 40, ROWS_Y = 40;
-    const int OUTER_FONT_H = 28;  // реальная высота font_tahoma_bold_28
     lv_obj_t* sel_rect = lv_obj_create(g_feed_roller.panel);
-    lv_obj_set_size(sel_rect, PW - 8, ROW_H + 2);
-    lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 1);
+    lv_obj_set_size(sel_rect, PW - 12, 42);
+    lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 4);
     lv_obj_set_style_bg_color(sel_rect, lv_color_hex(0x003a5a), 0);
     lv_obj_set_style_bg_opa(sel_rect, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(sel_rect, lv_color_hex(0x00d4ff), 0);
@@ -3002,7 +3005,9 @@ static void open_feed_roller(int32_t cur_val) {
     lv_obj_clear_flag(sel_rect, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     // 5 строк барабана (сверху вниз: val-2, val-1, CURRENT, val+1, val+2)
-    // Внешние строки: tahoma_bold_28, центральная: tahoma_bold_40
+    // Внешние строки: tahoma_bold_28 (line_height=35, base_line=6)
+    //   глиф от ~y+8 до ~y+29 (21px), центр на y+18; слот-центр на y+20 → сдвиг +2px
+    // Центральная строка: tahoma_bold_40, без смещения (label_y = ROWS_Y+2*ROW_H)
     const lv_font_t* row_fonts[] = {
         &font_tahoma_bold_28, &font_tahoma_bold_28,
         &font_tahoma_bold_40,
@@ -3011,12 +3016,10 @@ static void open_feed_roller(int32_t cur_val) {
     for (int i = 0; i < 5; i++) {
         g_feed_roller.labels[i] = lv_label_create(g_feed_roller.panel);
         lv_obj_set_style_text_font(g_feed_roller.labels[i], row_fonts[i], 0);
-        // Центральная строка (i=2) — шрифт 40px заполняет ROW_H, без смещения
-        // Внешние строки (28px) — центрируем вертикально внутри слота ROW_H
         int label_y = ROWS_Y + i * ROW_H;
-        if (i != 2) label_y += (ROW_H - OUTER_FONT_H) / 2;
+        if (i != 2) label_y += 2;  // центрируем 28px глиф (центр на 18px) в 40px слоте (центр на 20px)
         lv_obj_set_pos(g_feed_roller.labels[i], 0, label_y);
-        lv_obj_set_width(g_feed_roller.labels[i], PW);
+        lv_obj_set_width(g_feed_roller.labels[i], lv_pct(100));  // fit content area (PW-4=256px)
         lv_obj_set_style_text_align(g_feed_roller.labels[i], LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_text(g_feed_roller.labels[i], "0.00");
         lv_obj_clear_flag(g_feed_roller.labels[i], LV_OBJ_FLAG_CLICKABLE);
