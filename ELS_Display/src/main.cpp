@@ -696,13 +696,17 @@ static JoystickOverlayState g_joystick = {false, 0, false};
 // UART отправляется только при OK. Правые кнопки всегда доступны.
 // ============================================================================
 struct FeedRollerState {
-    bool      active;
-    lv_obj_t* backdrop;       // полупрозрачный фон (только левая область)
-    lv_obj_t* panel;          // центральная панель
-    lv_obj_t* labels[5];      // 5 строк барабана
-    int32_t   pending_val;    // выбранное значение мм*100
-    int32_t   entry_val;      // значение при входе (для отмены)
-    int32_t   touch_accum;    // накопленный сдвиг px
+    bool        active;
+    lv_obj_t*   backdrop;
+    lv_obj_t*   panel;
+    lv_obj_t*   labels[5];
+    int32_t     pending_val;
+    int32_t     entry_val;
+    int32_t     touch_accum;
+    // Инерция
+    lv_timer_t* inertia_timer;  // nullptr = не активен
+    float       velocity;       // px/тик, сглаженная (>0 = вверх = больше значение)
+    float       vel_accum;      // дробный аккумулятор px для инерции
 };
 static FeedRollerState g_feed_roller = {};
 
@@ -2918,6 +2922,11 @@ static void feed_roller_update_labels() {
 static void close_feed_roller(bool confirm) {
     if (!g_feed_roller.active) return;
     g_feed_roller.active = false;
+    // Остановить инерцию если активна
+    if (g_feed_roller.inertia_timer) {
+        lv_timer_del(g_feed_roller.inertia_timer);
+        g_feed_roller.inertia_timer = nullptr;
+    }
     if (g_feed_roller.backdrop) { lv_obj_del(g_feed_roller.backdrop); g_feed_roller.backdrop = nullptr; }
     if (g_feed_roller.panel)    { lv_obj_del(g_feed_roller.panel);    g_feed_roller.panel    = nullptr; }
     memset(g_feed_roller.labels, 0, sizeof(g_feed_roller.labels));
@@ -2936,6 +2945,34 @@ static void close_feed_roller(bool confirm) {
         if (g_ui.primary_val)      lv_label_set_text(g_ui.primary_val, buf);
         if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
         Serial.printf("Feed roller: cancelled, restored to %d\n", (int)g_feed_roller.entry_val);
+    }
+}
+
+// Таймер инерции: вызывается ~60fps пока барабан "летит"
+static void _feed_roller_inertia_cb(lv_timer_t* t) {
+    const float DECAY   = 0.92f;   // затухание за тик (16мс)
+    const float MIN_VEL = 0.35f;   // порог остановки px/тик
+    const int   STEP_PX = 15;
+
+    g_feed_roller.velocity *= DECAY;
+
+    if (fabsf(g_feed_roller.velocity) < MIN_VEL) {
+        lv_timer_del(t);
+        g_feed_roller.inertia_timer = nullptr;
+        g_feed_roller.velocity      = 0.0f;
+        return;
+    }
+
+    g_feed_roller.vel_accum += g_feed_roller.velocity;
+    while (g_feed_roller.vel_accum >= STEP_PX) {
+        g_feed_roller.vel_accum -= STEP_PX;
+        g_feed_roller.pending_val = constrain(g_feed_roller.pending_val + 5, 5, 2500);
+        feed_roller_update_labels();
+    }
+    while (g_feed_roller.vel_accum <= -STEP_PX) {
+        g_feed_roller.vel_accum += STEP_PX;
+        g_feed_roller.pending_val = constrain(g_feed_roller.pending_val - 5, 5, 2500);
+        feed_roller_update_labels();
     }
 }
 
@@ -3025,16 +3062,31 @@ static void open_feed_roller(int32_t cur_val) {
         lv_obj_clear_flag(g_feed_roller.labels[i], LV_OBJ_FLAG_CLICKABLE);
     }
 
-    // Swipe gesture: PRESSING на панели → прокрутка без UART
+    // Swipe + инерция: PRESSED сбрасывает инерцию, PRESSING двигает и трекает скорость,
+    // RELEASED запускает свободный ход барабана по набранной скорости
     lv_obj_add_event_cb(g_feed_roller.panel, [](lv_event_t* e) {
         lv_event_code_t code = lv_event_get_code(e);
-        if (code == LV_EVENT_PRESSING) {
+
+        if (code == LV_EVENT_PRESSED) {
+            // Новое касание — остановить летящий барабан
+            if (g_feed_roller.inertia_timer) {
+                lv_timer_del(g_feed_roller.inertia_timer);
+                g_feed_roller.inertia_timer = nullptr;
+            }
+            g_feed_roller.velocity    = 0.0f;
+            g_feed_roller.vel_accum   = 0.0f;
+            g_feed_roller.touch_accum = 0;
+
+        } else if (code == LV_EVENT_PRESSING) {
             lv_indev_t* indev = lv_indev_get_act();
             if (!indev) return;
             lv_point_t vect;
             lv_indev_get_vect(indev, &vect);
             const int STEP_PX = 15;
-            g_feed_roller.touch_accum -= vect.y; // вверх (vect.y<0) = больше значение
+            // Сглаженная скорость: >0 = вверх = больше значение
+            g_feed_roller.velocity = g_feed_roller.velocity * 0.7f + (-vect.y) * 0.3f;
+            // Движение пальцем
+            g_feed_roller.touch_accum -= vect.y;
             while (g_feed_roller.touch_accum >= STEP_PX) {
                 g_feed_roller.touch_accum -= STEP_PX;
                 g_feed_roller.pending_val = constrain(g_feed_roller.pending_val + 5, 5, 2500);
@@ -3045,8 +3097,20 @@ static void open_feed_roller(int32_t cur_val) {
                 g_feed_roller.pending_val = constrain(g_feed_roller.pending_val - 5, 5, 2500);
                 feed_roller_update_labels();
             }
-        } else if (code == LV_EVENT_PRESS_LOST || code == LV_EVENT_RELEASED) {
+
+        } else if (code == LV_EVENT_RELEASED) {
             g_feed_roller.touch_accum = 0;
+            // Запустить инерцию если скорость достаточная
+            if (fabsf(g_feed_roller.velocity) >= 2.0f && !g_feed_roller.inertia_timer) {
+                g_feed_roller.vel_accum   = 0.0f;
+                g_feed_roller.inertia_timer = lv_timer_create(_feed_roller_inertia_cb, 16, nullptr);
+            } else {
+                g_feed_roller.velocity = 0.0f;
+            }
+
+        } else if (code == LV_EVENT_PRESS_LOST) {
+            g_feed_roller.touch_accum = 0;
+            g_feed_roller.velocity    = 0.0f;
         }
     }, LV_EVENT_ALL, nullptr);
 
@@ -3054,9 +3118,12 @@ static void open_feed_roller(int32_t cur_val) {
     int32_t v = constrain(cur_val, 5, 2500);
     v = ((v + 2) / 5) * 5;
     if (v < 5) v = 5;
-    g_feed_roller.entry_val   = v;
-    g_feed_roller.pending_val = v;
-    g_feed_roller.touch_accum = 0;
+    g_feed_roller.entry_val     = v;
+    g_feed_roller.pending_val   = v;
+    g_feed_roller.touch_accum   = 0;
+    g_feed_roller.inertia_timer = nullptr;
+    g_feed_roller.velocity      = 0.0f;
+    g_feed_roller.vel_accum     = 0.0f;
 
     g_feed_roller.active = true;
     feed_roller_update_labels();
