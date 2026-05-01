@@ -406,6 +406,7 @@ struct UIHandles {
 
     // Настройки
     lv_obj_t* settings_menu;       // Меню настроек (оверлей)
+    lv_obj_t* wifi_ip_lbl;         // Строка WiFi IP в меню настроек
 
     // Блок для жёлтой рамки в режиме редактирования primary value
     // В K — featured cell box; в I — cell[0] box; nullptr → border на самом label (compat)
@@ -1623,6 +1624,26 @@ static void create_settings_menu(lv_obj_t* screen)
     lv_label_set_text(other_lbl,
         "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA7\xD0\x95\xD0\x95: "
         "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ПРОЧЕЕ: В РАЗРАБОТКЕ
+
+    // === WiFi секция ===
+    lv_obj_t* wifi_sect_lbl = lv_label_create(ov);
+    lv_obj_set_pos(wifi_sect_lbl, 20, 170);
+    lv_obj_set_style_text_color(wifi_sect_lbl, lv_color_hex(0x6a9fb5), 0);
+    lv_obj_set_style_text_font(wifi_sect_lbl, &font_dejavu_12, 0);
+    lv_label_set_text(wifi_sect_lbl, "WIFI:");
+
+    lv_obj_t* wifi_val = lv_label_create(ov);
+    lv_obj_set_pos(wifi_val, 60, 170);
+    lv_obj_set_style_text_color(wifi_val, lv_color_hex(0x4fc3f7), 0);
+    lv_obj_set_style_text_font(wifi_val, &font_dejavu_12, 0);
+    lv_label_set_text(wifi_val, "...");
+    g_ui.wifi_ip_lbl = wifi_val;
+
+    lv_obj_t* wifi_hint = lv_label_create(ov);
+    lv_obj_set_pos(wifi_hint, 20, 188);
+    lv_obj_set_style_text_color(wifi_hint, lv_color_hex(0x3a5568), 0);
+    lv_obj_set_style_text_font(wifi_hint, &font_dejavu_12, 0);
+    lv_label_set_text(wifi_hint, "http://<IP>  |  wifi_config.h");
 
     lv_obj_t* close_btn = lv_btn_create(ov);
     lv_obj_set_size(close_btn, 160, 36);
@@ -5121,6 +5142,15 @@ void setup()
     // === Create UI ===
     create_dark_pro_ui();
 
+    // Callback: когда WiFi подключится — показать IP в settings_menu и как алерт
+    GCodeWiFi_SetConnectedCallback([](const char* ip, bool is_ap) {
+        char msg[48];
+        snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "WiFi: %s", ip);
+        if (g_ui.wifi_ip_lbl)
+            lv_label_set_text(g_ui.wifi_ip_lbl, msg);
+        show_alert(msg);  // кратко показать IP поверх экрана
+    });
+
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
     Serial.println("===========================================\n");
@@ -5135,8 +5165,22 @@ void loop()
     // Process UART commands
     uart_protocol.process();
 
-    // GCode WiFi state machine (неблокирующее подключение / перезагрузка)
+    // GCode WiFi state machine (неблокирующее подключение)
     GCodeWiFi_Process();
+
+    // Периодически обновляем строку WiFi в settings_menu
+    if (g_ui.wifi_ip_lbl) {
+        static uint32_t wifi_upd_t = 0;
+        if (millis() - wifi_upd_t > 5000) {
+            wifi_upd_t = millis();
+            const char* ip = GCodeWiFi_GetIP();
+            if (ip && ip[0] != '\0') {
+                char buf[32];
+                snprintf(buf, sizeof(buf), GCodeWiFi_IsAP() ? "AP %s" : "STA %s", ip);
+                lv_label_set_text(g_ui.wifi_ip_lbl, buf);
+            }
+        }
+    }
 
     // Авто-выход из режима редактирования через 5 секунд бездействия
     if (g_edit_param.active && (millis() - g_edit_param.last_ms > 5000)) {

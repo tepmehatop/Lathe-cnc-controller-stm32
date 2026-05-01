@@ -1,38 +1,28 @@
 /**
  * @file gcode_wifi.cpp
- * @brief WiFi + LittleFS + AsyncWebServer для хранения и управления GCode файлами.
+ * @brief WiFi + LittleFS + AsyncWebServer для GCode файлового менеджера.
  *
- * Логика подключения:
- *   1. Читаем SSID/пароль из Preferences ("gcode_wifi" / "ssid" + "pass")
- *   2. Если есть — стартуем STA, ждём 12 сек (неблокирующе в GCodeWiFi_Process)
- *   3. Таймаут или нет настроек → AP "ELS-Setup" / "12345678"
- *   4. Как только сеть готова — стартуем AsyncWebServer на порту 80
- *
- * Конфигурация WiFi через веб: POST /api/wifi  (form: ssid=...&pass=...)
- * После сохранения ESP32 перезагружается.
+ * Логика подключения (настройки — в wifi_config.h):
+ *   STA: если WIFI_STA_SSID непустой → подключаемся к роутеру (неблокирующе)
+ *        таймаут WIFI_STA_TIMEOUT_MS → fallback в AP режим
+ *   AP:  ESP32 создаёт свою сеть WIFI_AP_SSID, IP = 192.168.4.1
  */
 
 #include "gcode_wifi.h"
+#include "wifi_config.h"
 #include <WiFi.h>
-#include <Preferences.h>
 #include <LittleFS.h>
 #include <ESPAsyncWebServer.h>
 
-// ─── Константы ───────────────────────────────────────────────────────────────
-static const char* AP_SSID       = "ELS-Setup";
-static const char* AP_PASS       = "12345678";
-static const char* PREFS_NS      = "gcode_wifi";
-static const char* GCODE_DIR     = "/gcode";
-static const uint32_t STA_TIMEOUT_MS = 12000;
-
 // ─── Состояние модуля ─────────────────────────────────────────────────────────
+static const char* GCODE_DIR = "/gcode";
+
 enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
-static GcWifiSt       s_state         = GCW_INIT;
-static uint32_t       s_connect_t     = 0;
-static AsyncWebServer s_srv(80);
-static bool           s_srv_started   = false;
-static bool           s_restart_req   = false;
-static uint32_t       s_restart_t     = 0;
+static GcWifiSt         s_state       = GCW_INIT;
+static uint32_t         s_connect_t   = 0;
+static AsyncWebServer   s_srv(80);
+static bool             s_srv_started = false;
+static GCWifiConnectedCb s_conn_cb    = nullptr;
 
 // ─── HTML веб-интерфейс (PROGMEM) ─────────────────────────────────────────────
 static const char HTML_PAGE[] PROGMEM = R"rawhtml(<!DOCTYPE html>
@@ -51,7 +41,7 @@ h2{color:#7986cb;font-size:13px;margin-bottom:8px;border-bottom:1px solid #2a3a5
 button{background:#1976d2;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px}
 button:hover{background:#1565c0}
 .del{background:#c62828}.del:hover{background:#b71c1c}
-input[type=text],input[type=password],input[type=file]{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:5px;border-radius:4px;font-family:monospace;font-size:12px}
+input[type=file]{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:5px;border-radius:4px;font-family:monospace;font-size:12px}
 ul{list-style:none}
 li{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #1e2e40}
 li:last-child{border-bottom:none}
@@ -82,14 +72,10 @@ li span{flex:1}
 </div>
 
 <div class="sec">
-<h2>WiFi настройки</h2>
-<div id="wi" style="font-size:12px;margin-bottom:8px;color:#aac"></div>
-<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-<input type="text" id="ss" placeholder="SSID" style="width:140px">
-<input type="password" id="pw" placeholder="Пароль" style="width:120px">
-<button onclick="svWifi()">Сохранить</button>
-</div>
-<div style="font-size:11px;color:#667;margin-top:6px">После сохранения ESP32 перезагрузится и подключится к новой сети.</div>
+<h2>Информация о подключении</h2>
+<div id="wi" style="font-size:12px;color:#aac;line-height:1.8"></div>
+<div style="font-size:11px;color:#557;margin-top:6px">
+Для смены WiFi сети — измените wifi_config.h и перепрошейте устройство.</div>
 </div>
 
 <script>
@@ -99,8 +85,11 @@ async function loadSt(){
     document.getElementById('st').innerHTML=
       'WiFi: <b>'+d.mode+'</b> | IP: <b>'+d.ip+'</b> | '+
       'Файлов: '+d.fc+' | Свободно: '+(d.fb/1024).toFixed(0)+' КБ';
-    document.getElementById('wi').textContent=
-      'Режим: '+d.mode+', SSID: '+d.ssid+', IP: '+d.ip;
+    document.getElementById('wi').innerHTML=
+      'Режим: <b>'+d.mode+'</b><br>'+
+      'SSID: <b>'+d.ssid+'</b><br>'+
+      'IP: <b>'+d.ip+'</b><br>'+
+      'Адрес веб-интерфейса: <b>http://'+d.ip+'</b>';
   }catch(e){document.getElementById('st').textContent='Ошибка связи';}
 }
 async function loadFiles(){
@@ -117,7 +106,7 @@ async function loadFiles(){
         '<button class="del" onclick="del(\''+f.name+'\')">Удалить</button>';
       ul.appendChild(li);
     });
-  }catch(e){document.getElementById('fl').innerHTML='<li><span>Ошибка загрузки списка</span></li>';}
+  }catch(e){document.getElementById('fl').innerHTML='<li><span>Ошибка загрузки</span></li>';}
 }
 async function view(n){
   try{
@@ -148,21 +137,6 @@ async function up(){
     if(d.ok){loadFiles();fi.value='';}
   }catch(e){pr.textContent='Ошибка сети при загрузке';}
 }
-async function svWifi(){
-  const ss=document.getElementById('ss').value.trim();
-  const pw=document.getElementById('pw').value;
-  if(!ss){alert('Введите SSID');return;}
-  if(!confirm('Сохранить WiFi SSID="'+ss+'" и перезагрузить ESP32?'))return;
-  try{
-    const r=await fetch('/api/wifi',{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'ssid='+encodeURIComponent(ss)+'&pass='+encodeURIComponent(pw)
-    });
-    const d=await r.json();
-    alert(d.ok?'Сохранено! ESP32 перезагружается...':'Ошибка: '+d.error);
-  }catch(e){alert('Нет ответа — вероятно ESP32 уже перезагружается');}
-}
 loadSt();
 loadFiles();
 setInterval(loadSt,8000);
@@ -172,7 +146,6 @@ setInterval(loadSt,8000);
 
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 
-// Считает файлы в GCODE_DIR
 static int _count_gcode_files() {
     File dir = LittleFS.open(GCODE_DIR);
     if (!dir || !dir.isDirectory()) return 0;
@@ -182,34 +155,36 @@ static int _count_gcode_files() {
     return n;
 }
 
-// Извлекает имя файла из полного пути (всё после последнего '/')
 static const char* _basename(const char* path) {
     const char* s = strrchr(path, '/');
     return s ? s + 1 : path;
 }
 
-// ─── Запуск AsyncWebServer ────────────────────────────────────────────────────
+static void _notify_connected() {
+    if (!s_conn_cb) return;
+    bool ap = (s_state == GCW_AP);
+    static char ip_buf[20];
+    if (ap)
+        WiFi.softAPIP().toString().toCharArray(ip_buf, sizeof(ip_buf));
+    else
+        WiFi.localIP().toString().toCharArray(ip_buf, sizeof(ip_buf));
+    s_conn_cb(ip_buf, ap);
+}
+
+// ─── AsyncWebServer endpoints ─────────────────────────────────────────────────
 
 static void _start_server() {
     if (s_srv_started) return;
     s_srv_started = true;
 
-    // GET / — HTML веб-интерфейс
     s_srv.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send(200, "text/html", HTML_PAGE);
     });
 
-    // GET /api/status
     s_srv.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
         bool ap = (s_state == GCW_AP);
         String ip = ap ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
-        String ssid_str;
-        {
-            Preferences p;
-            p.begin(PREFS_NS, true);
-            ssid_str = p.getString("ssid", ap ? String(AP_SSID) : "");
-            p.end();
-        }
+        const char* ssid_str = ap ? WIFI_AP_SSID : WIFI_STA_SSID;
         uint32_t total = LittleFS.totalBytes();
         uint32_t used  = LittleFS.usedBytes();
         int fc = _count_gcode_files();
@@ -218,12 +193,11 @@ static void _start_server() {
             "{\"mode\":\"%s\",\"ssid\":\"%s\",\"ip\":\"%s\","
             "\"fc\":%d,\"tb\":%lu,\"fb\":%lu}",
             ap ? "AP" : "STA",
-            ssid_str.c_str(), ip.c_str(),
+            ssid_str, ip.c_str(),
             fc, (unsigned long)total, (unsigned long)(total - used));
         req->send(200, "application/json", buf);
     });
 
-    // GET /api/files — список файлов в /gcode
     s_srv.on("/api/files", HTTP_GET, [](AsyncWebServerRequest* req) {
         String json = "[";
         bool first = true;
@@ -247,14 +221,12 @@ static void _start_server() {
         req->send(200, "application/json", json);
     });
 
-    // GET /api/file?name=... — содержимое файла
     s_srv.on("/api/file", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!req->hasParam("name")) {
             req->send(400, "application/json", "{\"error\":\"missing name\"}");
             return;
         }
-        String name = req->getParam("name")->value();
-        String path = String(GCODE_DIR) + "/" + name;
+        String path = String(GCODE_DIR) + "/" + req->getParam("name")->value();
         if (!LittleFS.exists(path)) {
             req->send(404, "application/json", "{\"error\":\"not found\"}");
             return;
@@ -262,30 +234,23 @@ static void _start_server() {
         req->send(LittleFS, path, "text/plain");
     });
 
-    // DELETE /api/file?name=... — удалить файл
     s_srv.on("/api/file", HTTP_DELETE, [](AsyncWebServerRequest* req) {
         if (!req->hasParam("name")) {
             req->send(400, "application/json", "{\"error\":\"missing name\"}");
             return;
         }
-        String name = req->getParam("name")->value();
-        String path = String(GCODE_DIR) + "/" + name;
-        if (LittleFS.remove(path)) {
-            req->send(200, "application/json", "{\"ok\":true}");
-        } else {
-            req->send(404, "application/json", "{\"error\":\"not found\"}");
-        }
+        String path = String(GCODE_DIR) + "/" + req->getParam("name")->value();
+        req->send(LittleFS.remove(path) ? 200 : 404,
+            "application/json",
+            LittleFS.remove(path) ? "{\"ok\":true}" : "{\"error\":\"not found\"}");
     });
 
-    // POST /api/upload — multipart upload GCode файла
     s_srv.on("/api/upload", HTTP_POST,
         [](AsyncWebServerRequest* req) {
-            // Финальный ответ после завершения upload handler-а
             if (req->_tempObject) {
-                // Имя файла сохранено в _tempObject
-                char* fname = (char*)req->_tempObject;
                 char buf[128];
-                snprintf(buf, sizeof(buf), "{\"ok\":true,\"name\":\"%s\"}", fname);
+                snprintf(buf, sizeof(buf), "{\"ok\":true,\"name\":\"%s\"}",
+                    (char*)req->_tempObject);
                 req->send(200, "application/json", buf);
                 free(req->_tempObject);
                 req->_tempObject = nullptr;
@@ -298,9 +263,8 @@ static void _start_server() {
             static File upload_file;
             if (index == 0) {
                 String path = String(GCODE_DIR) + "/" + filename;
-                Serial.printf("[gcode] Upload start: %s\n", path.c_str());
+                Serial.printf("[gcode] Upload: %s\n", path.c_str());
                 upload_file = LittleFS.open(path, "w");
-                // Сохраняем имя файла для финального ответа
                 if (!req->_tempObject) {
                     req->_tempObject = malloc(64);
                     if (req->_tempObject)
@@ -308,38 +272,13 @@ static void _start_server() {
                 }
             }
             if (upload_file) upload_file.write(data, len);
-            if (final) {
-                if (upload_file) {
-                    upload_file.close();
-                    Serial.printf("[gcode] Upload done: %s (%u bytes)\n",
-                        filename.c_str(), (unsigned)(index + len));
-                }
+            if (final && upload_file) {
+                upload_file.close();
+                Serial.printf("[gcode] Upload done: %s (%u B)\n",
+                    filename.c_str(), (unsigned)(index + len));
             }
         }
     );
-
-    // POST /api/wifi — сохранить SSID/пароль, перезагрузить
-    // Body: application/x-www-form-urlencoded: ssid=...&pass=...
-    s_srv.on("/api/wifi", HTTP_POST, [](AsyncWebServerRequest* req) {
-        if (!req->hasParam("ssid", true)) {
-            req->send(400, "application/json", "{\"error\":\"missing ssid\"}");
-            return;
-        }
-        String ssid_val = req->getParam("ssid", true)->value();
-        String pass_val = req->hasParam("pass", true)
-            ? req->getParam("pass", true)->value() : "";
-        {
-            Preferences p;
-            p.begin(PREFS_NS, false);
-            p.putString("ssid", ssid_val);
-            p.putString("pass", pass_val);
-            p.end();
-        }
-        req->send(200, "application/json", "{\"ok\":true}");
-        Serial.printf("[gcode] WiFi saved: ssid=%s, restarting...\n", ssid_val.c_str());
-        s_restart_req = true;
-        s_restart_t   = millis();
-    });
 
     s_srv.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
@@ -347,69 +286,64 @@ static void _start_server() {
 
     s_srv.begin();
     Serial.println("[gcode] Web server started on port 80");
+    _notify_connected();
 }
 
-// ─── Запуск AP режима ─────────────────────────────────────────────────────────
 static void _start_ap() {
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, AP_PASS);
+    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
     s_state = GCW_AP;
-    Serial.printf("[gcode] AP mode: SSID=%s, IP=%s\n",
-        AP_SSID, WiFi.softAPIP().toString().c_str());
-    Serial.printf("[gcode] Open browser: http://%s\n",
+    Serial.printf("[gcode] AP: SSID=%s  IP=%s\n",
+        WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
+    Serial.printf("[gcode] Browser: http://%s\n",
         WiFi.softAPIP().toString().c_str());
     _start_server();
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) {
+    s_conn_cb = cb;
+}
+
 void GCodeWiFi_Init() {
-    // Монтируем LittleFS (formatOnFail=true для первого запуска)
     if (!LittleFS.begin(true)) {
         Serial.println("[gcode] LittleFS FAILED");
     } else {
         if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
-        Serial.printf("[gcode] LittleFS OK: %lu/%lu bytes used\n",
+        Serial.printf("[gcode] LittleFS OK: %lu/%lu B\n",
             (unsigned long)LittleFS.usedBytes(),
             (unsigned long)LittleFS.totalBytes());
     }
 
-    // Читаем сохранённые credentials
-    Preferences p;
-    p.begin(PREFS_NS, true);
-    String ssid = p.getString("ssid", "");
-    String pass = p.getString("pass", "");
-    p.end();
+    const char* ssid = WIFI_STA_SSID;
+    const char* pass = WIFI_STA_PASS;
 
-    if (ssid.length() > 0) {
-        Serial.printf("[gcode] WiFi STA → %s\n", ssid.c_str());
+    if (ssid && ssid[0] != '\0') {
+        Serial.printf("[gcode] WiFi STA → %s\n", ssid);
         WiFi.mode(WIFI_STA);
         WiFi.setSleep(false);
-        WiFi.begin(ssid.c_str(), pass.c_str());
+        WiFi.begin(ssid, pass);
         s_state     = GCW_CONNECTING;
         s_connect_t = millis();
     } else {
+        Serial.println("[gcode] WIFI_STA_SSID empty → AP mode");
         _start_ap();
     }
 }
 
 void GCodeWiFi_Process() {
-    // Отложенная перезагрузка (после ответа /api/wifi)
-    if (s_restart_req && millis() - s_restart_t > 800) {
-        ESP.restart();
-    }
-
     if (s_state != GCW_CONNECTING) return;
 
     if (WiFi.status() == WL_CONNECTED) {
         s_state = GCW_CONNECTED;
-        Serial.printf("[gcode] WiFi connected, IP: %s\n",
+        Serial.printf("[gcode] STA connected  IP: %s\n",
             WiFi.localIP().toString().c_str());
-        Serial.printf("[gcode] Open browser: http://%s\n",
+        Serial.printf("[gcode] Browser: http://%s\n",
             WiFi.localIP().toString().c_str());
         _start_server();
-    } else if (millis() - s_connect_t > STA_TIMEOUT_MS) {
-        Serial.println("[gcode] WiFi STA timeout → AP mode");
+    } else if (millis() - s_connect_t > WIFI_STA_TIMEOUT_MS) {
+        Serial.println("[gcode] STA timeout → AP mode");
         WiFi.disconnect(true);
         delay(100);
         _start_ap();
