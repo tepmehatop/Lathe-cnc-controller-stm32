@@ -5037,9 +5037,6 @@ void setup()
         Serial.println("PSRAM framebuffer FAILED (no PSRAM?)");
     }
 
-    // === GCode WiFi (неблокирующее подключение + LittleFS + веб-интерфейс) ===
-    GCodeWiFi_Init();
-
     // Семафоры: httpd task ↔ capture task
     sem_requested = xSemaphoreCreateBinary();
     sem_done      = xSemaphoreCreateBinary();
@@ -5148,8 +5145,15 @@ void setup()
         snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "WiFi: %s", ip);
         if (g_ui.wifi_ip_lbl)
             lv_label_set_text(g_ui.wifi_ip_lbl, msg);
-        show_alert(msg);  // кратко показать IP поверх экрана
+        show_alert(msg);
     });
+
+    // Один тик LVGL — отрисовать UI на экране ДО старта WiFi/LittleFS
+    lv_tick_inc(5);
+    lv_timer_handler();
+
+    // === GCode WiFi — ПОСЛЕ UI, чтобы LittleFS-format и AP-старт не давали чёрный экран ===
+    GCodeWiFi_Init();
 
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
