@@ -16,15 +16,12 @@
 #ifdef DISPLAY_JC4827W543
 #include <WiFi.h>
 #include <esp_http_server.h>
+#include "gcode_wifi.h"
 
 // stb JPEG encoder (single-header)
 #define STBI_WRITE_NO_STDIO
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
-// WiFi подключение к роутеру
-static const char* WIFI_SSID = "VIRUS932";
-static const char* WIFI_PASS = "111111111";
 
 // PSRAM framebuffer — RGB565 (заполняется в my_disp_flush)
 static uint16_t* screen_fb = nullptr;
@@ -5019,22 +5016,8 @@ void setup()
         Serial.println("PSRAM framebuffer FAILED (no PSRAM?)");
     }
 
-    // Подключение к WiFi роутеру
-    Serial.printf("Connecting to WiFi: %s ...\n", WIFI_SSID);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    uint32_t t0 = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t0 < 15000) {
-        delay(500);
-        Serial.print(".");
-    }
-    if (WiFi.status() == WL_CONNECTED) {
-        WiFi.setSleep(false);  // КРИТИЧНО: отключаем modem-sleep → без этого пинг 100ms+!
-        Serial.printf("\nWiFi connected! IP: %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("Screenshot URL: http://%s/screenshot\n", WiFi.localIP().toString().c_str());
-    } else {
-        Serial.println("\nWiFi connection FAILED - screenshot server disabled");
-    }
+    // === GCode WiFi (неблокирующее подключение + LittleFS + веб-интерфейс) ===
+    GCodeWiFi_Init();
 
     // Семафоры: httpd task ↔ capture task
     sem_requested = xSemaphoreCreateBinary();
@@ -5058,11 +5041,12 @@ void setup()
     xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
     Serial.println("JPEG capture task started (32KB stack)");
 
-    // Запускаем ESP-IDF HTTP сервер
+    // Запускаем ESP-IDF HTTP сервер для скриншотов на порту 8081
+    // (порт 80 занят GCode веб-интерфейсом из gcode_wifi)
     httpd_config_t httpd_cfg = HTTPD_DEFAULT_CONFIG();
-    httpd_cfg.server_port      = 80;
-    httpd_cfg.stack_size       = 8192;
-    httpd_cfg.send_wait_timeout = 60;  // 60 секунд (по умолчанию 5 — слишком мало)
+    httpd_cfg.server_port       = 8081;
+    httpd_cfg.stack_size        = 8192;
+    httpd_cfg.send_wait_timeout = 60;
     httpd_handle_t httpd_server = nullptr;
     if (httpd_start(&httpd_server, &httpd_cfg) == ESP_OK) {
         httpd_uri_t uri = {
@@ -5072,8 +5056,7 @@ void setup()
             .user_ctx = nullptr
         };
         httpd_register_uri_handler(httpd_server, &uri);
-        Serial.printf("Screenshot server: http://%s/screenshot\n",
-                      WiFi.localIP().toString().c_str());
+        Serial.println("Screenshot server started on port 8081");
     } else {
         Serial.println("httpd_start FAILED");
     }
@@ -5151,6 +5134,9 @@ void loop()
 {
     // Process UART commands
     uart_protocol.process();
+
+    // GCode WiFi state machine (неблокирующее подключение / перезагрузка)
+    GCodeWiFi_Process();
 
     // Авто-выход из режима редактирования через 5 секунд бездействия
     if (g_edit_param.active && (millis() - g_edit_param.last_ms > 5000)) {
