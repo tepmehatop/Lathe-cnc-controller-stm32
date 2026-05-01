@@ -3410,11 +3410,17 @@ static void jump_to_thread_type(int first_idx)
 {
     if (first_idx < 0 || first_idx >= THREAD_TABLE_SIZE) return;
 
-    // Войти в edit mode (если не активен)
-    if (!g_edit_param.active) enter_edit_mode();
-
+    // Установить шаг ДО входа в edit_mode, чтобы roller открылся на правильной позиции
     g_edit_param.local_step = first_idx;
     g_edit_param.last_ms    = millis();
+
+    if (g_roller.active) {
+        // Roller уже открыт — переместить сразу без переоткрытия
+        g_roller.pending_val = first_idx;
+        roller_update_labels();
+    } else if (!g_edit_param.active) {
+        enter_edit_mode();
+    }
 
     const char* lbl = s_thread_table[first_idx].label;
 
