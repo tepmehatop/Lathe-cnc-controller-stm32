@@ -668,8 +668,9 @@ struct SubEdit {
     int16_t  bar_r;         // ШАР: ножка радиус (мм*100, 0..9900)
     int16_t  sphere_r;      // ШАР: радиус шара (мм*100) — редактируется в thr_type_box
     uint16_t pass_total;    // M1/M2/M4/M5: всего проходов (KEY:LEFT/RIGHT)
+    lv_timer_t* exit_timer; // Таймер отложенного выхода из sub_edit (grace period после confirm)
 };
-static SubEdit g_sub_edit = {false, -1, 0, 0, 1, 0, 1, 1, 0, 1000, 1};
+static SubEdit g_sub_edit = {false, -1, 0, 0, 1, 0, 1, 1, 0, 1000, 1, nullptr};
 
 // ============================================================================
 // Состояние алерта — всплывающее уведомление от Arduino
@@ -947,9 +948,9 @@ static void handle_ok_btn_click()
 
     if (g_roller.active) {
         RollerTarget tgt = g_roller.cfg.target;
-        close_roller(true);
+        close_roller(true);  // sub_edit grace period / cleanup handled inside close_roller
         bool is_primary = (tgt == RT_FEED || tgt == RT_AFEED || tgt == RT_THREAD);
-        if (is_primary) exit_edit_mode(); else g_sub_edit.active = false;
+        if (is_primary) exit_edit_mode();
         return;
     }
     if (g_sub_edit.active) {
@@ -3172,6 +3173,25 @@ static void close_roller(bool confirm) {
         }
         Serial.printf("Roller cancelled: target=%d restored=%d\n", (int)c.target, (int)ev);
     }
+
+    // Sub-edit state cleanup (primary targets управляются вызывающим кодом через exit_edit_mode)
+    bool _is_primary = (c.target == RT_FEED || c.target == RT_AFEED || c.target == RT_THREAD);
+    if (!_is_primary) {
+        if (confirm && g_sub_edit.active) {
+            // Grace period: визуально выходим сразу, g_sub_edit.active остаётся true на 800мс
+            // Это защищает update_ui_values от перезаписи старыми данными STM32
+            highlight_sub_edit_row(g_sub_edit.row, false);
+            if (g_sub_edit.exit_timer) { lv_timer_del(g_sub_edit.exit_timer); g_sub_edit.exit_timer = nullptr; }
+            g_sub_edit.exit_timer = lv_timer_create([](lv_timer_t* t) {
+                g_sub_edit.active     = false;
+                g_sub_edit.row        = -1;
+                g_sub_edit.exit_timer = nullptr;
+                lv_timer_del(t);
+            }, 800, nullptr);
+        } else {
+            exit_sub_edit();  // Отмена: немедленная очистка
+        }
+    }
 }
 
 static void _roller_inertia_cb(lv_timer_t* t) {
@@ -3220,9 +3240,9 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
         if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
         bool changed = (g_roller.pending_val != g_roller.entry_val);
         RollerTarget tgt = g_roller.cfg.target;
-        close_roller(changed);
+        close_roller(changed);  // sub_edit grace period / cleanup handled inside close_roller
         bool is_primary = (tgt == RT_FEED || tgt == RT_AFEED || tgt == RT_THREAD);
-        if (is_primary) exit_edit_mode(); else g_sub_edit.active = false;
+        if (is_primary) exit_edit_mode();
     }, LV_EVENT_ALL, nullptr);
 
     // Центральная панель барабана
@@ -3597,6 +3617,11 @@ static void enter_sub_edit(int row)
 
 static void exit_sub_edit()
 {
+    // Отменить таймер grace period если активен
+    if (g_sub_edit.exit_timer) {
+        lv_timer_del(g_sub_edit.exit_timer);
+        g_sub_edit.exit_timer = nullptr;
+    }
     if (!g_sub_edit.active) return;
     highlight_sub_edit_row(g_sub_edit.row, false);
     g_sub_edit.active = false;
