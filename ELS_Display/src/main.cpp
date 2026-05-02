@@ -5058,26 +5058,8 @@ void setup()
     // Задача кодирования JPEG с большим стеком (стек loop() = 8KB, stb нужно ~12KB)
     xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
     Serial.println("JPEG capture task started (32KB stack)");
-
-    // Запускаем ESP-IDF HTTP сервер для скриншотов на порту 8081
-    // (порт 80 занят GCode веб-интерфейсом из gcode_wifi)
-    httpd_config_t httpd_cfg = HTTPD_DEFAULT_CONFIG();
-    httpd_cfg.server_port       = 8081;
-    httpd_cfg.stack_size        = 8192;
-    httpd_cfg.send_wait_timeout = 60;
-    httpd_handle_t httpd_server = nullptr;
-    if (httpd_start(&httpd_server, &httpd_cfg) == ESP_OK) {
-        httpd_uri_t uri = {
-            .uri      = "/screenshot",
-            .method   = HTTP_GET,
-            .handler  = screenshot_handler,
-            .user_ctx = nullptr
-        };
-        httpd_register_uri_handler(httpd_server, &uri);
-        Serial.println("Screenshot server started on port 8081");
-    } else {
-        Serial.println("httpd_start FAILED");
-    }
+    // httpd screenshot сервер запускается ПОСЛЕ GCodeWiFi_Init() (ниже в setup)
+    // потому что httpd_start требует инициализированный WiFi стек
 
 #else
     // === ESP32-2432S024 Initialization ===
@@ -5154,6 +5136,29 @@ void setup()
 
     // === GCode WiFi — ПОСЛЕ UI, чтобы LittleFS-format и AP-старт не давали чёрный экран ===
     GCodeWiFi_Init();
+
+    // Screenshot сервер на порту 8081 — запускаем ПОСЛЕ WiFi init (нужен lwIP стек)
+#ifdef DISPLAY_JC4827W543
+    {
+        httpd_config_t httpd_cfg = HTTPD_DEFAULT_CONFIG();
+        httpd_cfg.server_port       = 8081;
+        httpd_cfg.stack_size        = 8192;
+        httpd_cfg.send_wait_timeout = 60;
+        httpd_handle_t httpd_server = nullptr;
+        if (httpd_start(&httpd_server, &httpd_cfg) == ESP_OK) {
+            httpd_uri_t uri = {
+                .uri      = "/screenshot",
+                .method   = HTTP_GET,
+                .handler  = screenshot_handler,
+                .user_ctx = nullptr
+            };
+            httpd_register_uri_handler(httpd_server, &uri);
+            Serial.println("Screenshot server started on port 8081");
+        } else {
+            Serial.println("httpd_start FAILED");
+        }
+    }
+#endif
 
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
