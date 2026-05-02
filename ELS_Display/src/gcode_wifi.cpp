@@ -20,7 +20,7 @@ static const char* GCODE_DIR = "/gcode";
 enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
 static GcWifiSt         s_state       = GCW_INIT;
 static uint32_t         s_connect_t   = 0;
-static AsyncWebServer   s_srv(80);
+static AsyncWebServer*  s_srv         = nullptr;
 static bool             s_srv_started = false;
 static GCWifiConnectedCb s_conn_cb    = nullptr;
 
@@ -177,11 +177,13 @@ static void _start_server() {
     if (s_srv_started) return;
     s_srv_started = true;
 
-    s_srv.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
+    if (!s_srv) s_srv = new AsyncWebServer(80);
+
+    s_srv->on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
         req->send(200, "text/html", HTML_PAGE);
     });
 
-    s_srv.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
+    s_srv->on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
         bool ap = (s_state == GCW_AP);
         String ip = ap ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
         const char* ssid_str = ap ? WIFI_AP_SSID : WIFI_STA_SSID;
@@ -198,7 +200,7 @@ static void _start_server() {
         req->send(200, "application/json", buf);
     });
 
-    s_srv.on("/api/files", HTTP_GET, [](AsyncWebServerRequest* req) {
+    s_srv->on("/api/files", HTTP_GET, [](AsyncWebServerRequest* req) {
         String json = "[";
         bool first = true;
         File dir = LittleFS.open(GCODE_DIR);
@@ -221,7 +223,7 @@ static void _start_server() {
         req->send(200, "application/json", json);
     });
 
-    s_srv.on("/api/file", HTTP_GET, [](AsyncWebServerRequest* req) {
+    s_srv->on("/api/file", HTTP_GET, [](AsyncWebServerRequest* req) {
         if (!req->hasParam("name")) {
             req->send(400, "application/json", "{\"error\":\"missing name\"}");
             return;
@@ -234,7 +236,7 @@ static void _start_server() {
         req->send(LittleFS, path, "text/plain");
     });
 
-    s_srv.on("/api/file", HTTP_DELETE, [](AsyncWebServerRequest* req) {
+    s_srv->on("/api/file", HTTP_DELETE, [](AsyncWebServerRequest* req) {
         if (!req->hasParam("name")) {
             req->send(400, "application/json", "{\"error\":\"missing name\"}");
             return;
@@ -245,7 +247,7 @@ static void _start_server() {
             LittleFS.remove(path) ? "{\"ok\":true}" : "{\"error\":\"not found\"}");
     });
 
-    s_srv.on("/api/upload", HTTP_POST,
+    s_srv->on("/api/upload", HTTP_POST,
         [](AsyncWebServerRequest* req) {
             if (req->_tempObject) {
                 char buf[128];
@@ -280,11 +282,11 @@ static void _start_server() {
         }
     );
 
-    s_srv.onNotFound([](AsyncWebServerRequest* req) {
+    s_srv->onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "Not found");
     });
 
-    s_srv.begin();
+    s_srv->begin();
     Serial.println("[gcode] Web server started on port 80");
     _notify_connected();
 }
@@ -307,7 +309,7 @@ void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) {
 }
 
 void GCodeWiFi_Init() {
-    if (!LittleFS.begin(true)) {
+    if (!LittleFS.begin(false)) {
         Serial.println("[gcode] LittleFS FAILED");
     } else {
         if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
