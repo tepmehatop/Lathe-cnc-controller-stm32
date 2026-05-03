@@ -12,16 +12,17 @@
 #include <Preferences.h>
 #include "display_config.h"
 #include "uart_protocol.h"
+#include "gcode_wifi.h"
 
 #ifdef DISPLAY_JC4827W543
 #include <WiFi.h>
 #include <esp_http_server.h>
-#include "gcode_wifi.h"
 
 // stb JPEG encoder (single-header)
 #define STBI_WRITE_NO_STDIO
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
 
 // PSRAM framebuffer — RGB565 (заполняется в my_disp_flush)
 static uint16_t* screen_fb = nullptr;
@@ -406,7 +407,6 @@ struct UIHandles {
 
     // Настройки
     lv_obj_t* settings_menu;       // Меню настроек (оверлей)
-    lv_obj_t* wifi_ip_lbl;         // Строка WiFi IP в меню настроек
 
     // Блок для жёлтой рамки в режиме редактирования primary value
     // В K — featured cell box; в I — cell[0] box; nullptr → border на самом label (compat)
@@ -1624,26 +1624,6 @@ static void create_settings_menu(lv_obj_t* screen)
     lv_label_set_text(other_lbl,
         "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA7\xD0\x95\xD0\x95: "
         "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ПРОЧЕЕ: В РАЗРАБОТКЕ
-
-    // === WiFi секция ===
-    lv_obj_t* wifi_sect_lbl = lv_label_create(ov);
-    lv_obj_set_pos(wifi_sect_lbl, 20, 170);
-    lv_obj_set_style_text_color(wifi_sect_lbl, lv_color_hex(0x6a9fb5), 0);
-    lv_obj_set_style_text_font(wifi_sect_lbl, &font_dejavu_12, 0);
-    lv_label_set_text(wifi_sect_lbl, "WIFI:");
-
-    lv_obj_t* wifi_val = lv_label_create(ov);
-    lv_obj_set_pos(wifi_val, 60, 170);
-    lv_obj_set_style_text_color(wifi_val, lv_color_hex(0x4fc3f7), 0);
-    lv_obj_set_style_text_font(wifi_val, &font_dejavu_12, 0);
-    lv_label_set_text(wifi_val, "...");
-    g_ui.wifi_ip_lbl = wifi_val;
-
-    lv_obj_t* wifi_hint = lv_label_create(ov);
-    lv_obj_set_pos(wifi_hint, 20, 188);
-    lv_obj_set_style_text_color(wifi_hint, lv_color_hex(0x3a5568), 0);
-    lv_obj_set_style_text_font(wifi_hint, &font_dejavu_12, 0);
-    lv_label_set_text(wifi_hint, "http://<IP>  |  wifi_config.h");
 
     lv_obj_t* close_btn = lv_btn_create(ov);
     lv_obj_set_size(close_btn, 160, 36);
@@ -5058,8 +5038,8 @@ void setup()
     // Задача кодирования JPEG с большим стеком (стек loop() = 8KB, stb нужно ~12KB)
     xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
     Serial.println("JPEG capture task started (32KB stack)");
-    // httpd screenshot сервер запускается ПОСЛЕ GCodeWiFi_Init() (ниже в setup)
-    // потому что httpd_start требует инициализированный WiFi стек
+
+    // Screenshot server запускается позже (после GCodeWiFi_Init) на порту 8081
 
 #else
     // === ESP32-2432S024 Initialization ===
@@ -5121,44 +5101,28 @@ void setup()
     // === Create UI ===
     create_dark_pro_ui();
 
-    // Callback: когда WiFi подключится — показать IP в settings_menu и как алерт
+    // GCode WiFi: AP/STA + LittleFS + HTTP файловый менеджер (порт 80)
     GCodeWiFi_SetConnectedCallback([](const char* ip, bool is_ap) {
         char msg[48];
-        snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "WiFi: %s", ip);
-        if (g_ui.wifi_ip_lbl)
-            lv_label_set_text(g_ui.wifi_ip_lbl, msg);
+        snprintf(msg, sizeof(msg), is_ap ? "AP: http://%s" : "WiFi: http://%s", ip);
         show_alert(msg);
     });
-
-    // Один тик LVGL — отрисовать UI на экране ДО старта WiFi/LittleFS
-    lv_tick_inc(5);
-    lv_timer_handler();
-
-    // === GCode WiFi — ПОСЛЕ UI, чтобы LittleFS-format и AP-старт не давали чёрный экран ===
     GCodeWiFi_Init();
 
-    // Screenshot сервер на порту 8081 — запускаем ПОСЛЕ WiFi init (нужен lwIP стек)
-#ifdef DISPLAY_JC4827W543
+    // Screenshot server на порту 8081 — регистрируем на том же httpd что и GCode
     {
-        httpd_config_t httpd_cfg = HTTPD_DEFAULT_CONFIG();
-        httpd_cfg.server_port       = 8081;
-        httpd_cfg.stack_size        = 8192;
-        httpd_cfg.send_wait_timeout = 60;
-        httpd_handle_t httpd_server = nullptr;
-        if (httpd_start(&httpd_server, &httpd_cfg) == ESP_OK) {
+        httpd_handle_t h = GCodeWiFi_GetHttpd();
+        if (h) {
             httpd_uri_t uri = {
                 .uri      = "/screenshot",
                 .method   = HTTP_GET,
                 .handler  = screenshot_handler,
                 .user_ctx = nullptr
             };
-            httpd_register_uri_handler(httpd_server, &uri);
-            Serial.println("Screenshot server started on port 8081");
-        } else {
-            Serial.println("httpd_start FAILED");
+            if (httpd_register_uri_handler(h, &uri) == ESP_OK)
+                Serial.printf("[main] Screenshot: http://%s/screenshot\n", GCodeWiFi_GetIP());
         }
     }
-#endif
 
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
@@ -5173,23 +5137,7 @@ void loop()
 {
     // Process UART commands
     uart_protocol.process();
-
-    // GCode WiFi state machine (неблокирующее подключение)
     GCodeWiFi_Process();
-
-    // Периодически обновляем строку WiFi в settings_menu
-    if (g_ui.wifi_ip_lbl) {
-        static uint32_t wifi_upd_t = 0;
-        if (millis() - wifi_upd_t > 5000) {
-            wifi_upd_t = millis();
-            const char* ip = GCodeWiFi_GetIP();
-            if (ip && ip[0] != '\0') {
-                char buf[32];
-                snprintf(buf, sizeof(buf), GCodeWiFi_IsAP() ? "AP %s" : "STA %s", ip);
-                lv_label_set_text(g_ui.wifi_ip_lbl, buf);
-            }
-        }
-    }
 
     // Авто-выход из режима редактирования через 5 секунд бездействия
     if (g_edit_param.active && (millis() - g_edit_param.last_ms > 5000)) {

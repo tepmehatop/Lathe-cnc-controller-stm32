@@ -1,31 +1,30 @@
 /**
- * @file gcode_wifi.cpp
- * @brief WiFi + LittleFS + AsyncWebServer для GCode файлового менеджера.
- *
- * Логика подключения (настройки — в wifi_config.h):
- *   STA: если WIFI_STA_SSID непустой → подключаемся к роутеру (неблокирующе)
- *        таймаут WIFI_STA_TIMEOUT_MS → fallback в AP режим
- *   AP:  ESP32 создаёт свою сеть WIFI_AP_SSID, IP = 192.168.4.1
+ * gcode_wifi.cpp
+ * WiFi (AP or STA) + LittleFS + ESP-IDF httpd для GCode файлового менеджера.
+ * Порт 80. Загрузка файлов через PUT /api/file?name=xxx (тело = сырой файл).
  */
 
 #include "gcode_wifi.h"
 #include "wifi_config.h"
+#include <Arduino.h>
 #include <WiFi.h>
 #include <LittleFS.h>
-#include <ESPAsyncWebServer.h>
+#include <esp_http_server.h>
 
-// ─── Состояние модуля ─────────────────────────────────────────────────────────
+// ─── Состояние ────────────────────────────────────────────────────────────────
+
 static const char* GCODE_DIR = "/gcode";
 
 enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
-static GcWifiSt         s_state       = GCW_INIT;
-static uint32_t         s_connect_t   = 0;
-static AsyncWebServer*  s_srv         = nullptr;
-static bool             s_srv_started = false;
-static GCWifiConnectedCb s_conn_cb    = nullptr;
+static GcWifiSt          s_state    = GCW_INIT;
+static uint32_t          s_conn_t   = 0;
+static httpd_handle_t    s_httpd    = nullptr;
+static GCWifiConnectedCb s_conn_cb  = nullptr;
+static char              s_ip[20]   = {};
 
-// ─── HTML веб-интерфейс (PROGMEM) ─────────────────────────────────────────────
-static const char HTML_PAGE[] PROGMEM = R"rawhtml(<!DOCTYPE html>
+// ─── HTML (встроен в flash) ───────────────────────────────────────────────────
+
+static const char HTML_PAGE[] = R"rawhtml(<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -67,15 +66,14 @@ li span{flex:1}
 
 <div class="sec" id="viewsec" style="display:none">
 <h2>Просмотр: <span id="vn" style="color:#e0e0f0"></span>
-<button onclick="document.getElementById('viewsec').style.display='none'" style="font-size:10px;padding:2px 6px;float:right">✕</button></h2>
+<button onclick="document.getElementById('viewsec').style.display='none'" style="font-size:10px;padding:2px 6px;float:right">&#x2715;</button></h2>
 <div id="viewer"></div>
 </div>
 
 <div class="sec">
-<h2>Информация о подключении</h2>
+<h2>Подключение</h2>
 <div id="wi" style="font-size:12px;color:#aac;line-height:1.8"></div>
-<div style="font-size:11px;color:#557;margin-top:6px">
-Для смены WiFi сети — измените wifi_config.h и перепрошейте устройство.</div>
+<div style="font-size:11px;color:#557;margin-top:6px">Для смены сети — измените wifi_config.h и перепрошейте.</div>
 </div>
 
 <script>
@@ -86,10 +84,8 @@ async function loadSt(){
       'WiFi: <b>'+d.mode+'</b> | IP: <b>'+d.ip+'</b> | '+
       'Файлов: '+d.fc+' | Свободно: '+(d.fb/1024).toFixed(0)+' КБ';
     document.getElementById('wi').innerHTML=
-      'Режим: <b>'+d.mode+'</b><br>'+
-      'SSID: <b>'+d.ssid+'</b><br>'+
-      'IP: <b>'+d.ip+'</b><br>'+
-      'Адрес веб-интерфейса: <b>http://'+d.ip+'</b>';
+      'Режим: <b>'+d.mode+'</b><br>SSID: <b>'+d.ssid+'</b><br>'+
+      'IP: <b>'+d.ip+'</b><br>Адрес: <b>http://'+d.ip+'</b>';
   }catch(e){document.getElementById('st').textContent='Ошибка связи';}
 }
 async function loadFiles(){
@@ -118,35 +114,62 @@ async function view(n){
   }catch(e){alert('Ошибка загрузки файла');}
 }
 async function del(n){
-  if(!confirm('Удалить файл "'+n+'"?'))return;
+  if(!confirm('Удалить "'+n+'"?'))return;
   try{
-    await fetch('/api/file?name='+encodeURIComponent(n),{method:'DELETE'});
-    loadFiles();
-  }catch(e){alert('Ошибка удаления');}
+    const r=await fetch('/api/file?name='+encodeURIComponent(n),{method:'DELETE'});
+    if(r.ok)loadFiles(); else alert('Ошибка удаления');
+  }catch(e){alert('Ошибка сети');}
 }
 async function up(){
   const fi=document.getElementById('fi');
   if(!fi.files.length){alert('Выберите .gcode файл');return;}
-  const fd=new FormData();
-  fd.append('file',fi.files[0]);
+  const file=fi.files[0];
   const pr=document.getElementById('prog');
   pr.textContent='Загрузка...';
   try{
-    const d=await(await fetch('/api/upload',{method:'POST',body:fd})).json();
+    const r=await fetch('/api/file?name='+encodeURIComponent(file.name),{method:'PUT',body:file});
+    const d=await r.json();
     pr.textContent=d.ok?'Загружено: '+d.name:'Ошибка: '+d.error;
     if(d.ok){loadFiles();fi.value='';}
   }catch(e){pr.textContent='Ошибка сети при загрузке';}
 }
-loadSt();
-loadFiles();
-setInterval(loadSt,8000);
+loadSt();loadFiles();setInterval(loadSt,8000);
 </script>
 </body>
 </html>)rawhtml";
 
-// ─── Вспомогательные функции ──────────────────────────────────────────────────
+// ─── Утилиты ──────────────────────────────────────────────────────────────────
 
-static int _count_gcode_files() {
+static bool get_query_param(httpd_req_t* req, const char* key, char* out, size_t out_len) {
+    char query[256];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) return false;
+    return httpd_query_key_value(query, key, out, out_len) == ESP_OK;
+}
+
+// Базовое URL-декодирование %xx → символ (in-place)
+static void url_decode(char* s) {
+    char* r = s;
+    char* w = s;
+    while (*r) {
+        if (*r == '%' && r[1] && r[2]) {
+            char h[3] = { r[1], r[2], 0 };
+            *w++ = (char)strtol(h, nullptr, 16);
+            r += 3;
+        } else if (*r == '+') {
+            *w++ = ' '; r++;
+        } else {
+            *w++ = *r++;
+        }
+    }
+    *w = '\0';
+}
+
+static const char* basename_of(const char* path) {
+    const char* s = strrchr(path, '/');
+    return s ? s + 1 : path;
+}
+
+static int count_gcode_files() {
     File dir = LittleFS.open(GCODE_DIR);
     if (!dir || !dir.isDirectory()) return 0;
     int n = 0;
@@ -155,218 +178,229 @@ static int _count_gcode_files() {
     return n;
 }
 
-static const char* _basename(const char* path) {
-    const char* s = strrchr(path, '/');
-    return s ? s + 1 : path;
-}
-
-static void _notify_connected() {
+static void notify_connected() {
     if (!s_conn_cb) return;
+    s_conn_cb(s_ip, s_state == GCW_AP);
+}
+
+// ─── HTTP handlers ────────────────────────────────────────────────────────────
+
+static esp_err_t h_root(httpd_req_t* req) {
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_send(req, HTML_PAGE, -1);
+    return ESP_OK;
+}
+
+static esp_err_t h_status(httpd_req_t* req) {
     bool ap = (s_state == GCW_AP);
-    static char ip_buf[20];
-    if (ap)
-        WiFi.softAPIP().toString().toCharArray(ip_buf, sizeof(ip_buf));
-    else
-        WiFi.localIP().toString().toCharArray(ip_buf, sizeof(ip_buf));
-    s_conn_cb(ip_buf, ap);
+    const char* ssid = ap ? WIFI_AP_SSID : WIFI_STA_SSID;
+    uint32_t total = LittleFS.totalBytes();
+    uint32_t used  = LittleFS.usedBytes();
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"mode\":\"%s\",\"ssid\":\"%s\",\"ip\":\"%s\","
+        "\"fc\":%d,\"tb\":%lu,\"fb\":%lu}",
+        ap ? "AP" : "STA", ssid, s_ip,
+        count_gcode_files(),
+        (unsigned long)total, (unsigned long)(total - used));
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, buf, -1);
+    return ESP_OK;
 }
 
-// ─── AsyncWebServer endpoints ─────────────────────────────────────────────────
-
-static void _start_server() {
-    if (s_srv_started) return;
-    s_srv_started = true;
-
-    if (!s_srv) s_srv = new AsyncWebServer(80);
-
-    s_srv->on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "text/html", HTML_PAGE);
-    });
-
-    s_srv->on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
-        bool ap = (s_state == GCW_AP);
-        String ip = ap ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
-        const char* ssid_str = ap ? WIFI_AP_SSID : WIFI_STA_SSID;
-        uint32_t total = LittleFS.totalBytes();
-        uint32_t used  = LittleFS.usedBytes();
-        int fc = _count_gcode_files();
-        char buf[300];
-        snprintf(buf, sizeof(buf),
-            "{\"mode\":\"%s\",\"ssid\":\"%s\",\"ip\":\"%s\","
-            "\"fc\":%d,\"tb\":%lu,\"fb\":%lu}",
-            ap ? "AP" : "STA",
-            ssid_str, ip.c_str(),
-            fc, (unsigned long)total, (unsigned long)(total - used));
-        req->send(200, "application/json", buf);
-    });
-
-    s_srv->on("/api/files", HTTP_GET, [](AsyncWebServerRequest* req) {
-        String json = "[";
-        bool first = true;
-        File dir = LittleFS.open(GCODE_DIR);
-        if (dir && dir.isDirectory()) {
-            File f = dir.openNextFile();
-            while (f) {
-                if (!f.isDirectory()) {
-                    if (!first) json += ",";
-                    first = false;
-                    char entry[128];
-                    snprintf(entry, sizeof(entry),
-                        "{\"name\":\"%s\",\"size\":%lu}",
-                        _basename(f.name()), (unsigned long)f.size());
-                    json += entry;
-                }
-                f = dir.openNextFile();
+static esp_err_t h_files(httpd_req_t* req) {
+    String json = "[";
+    bool first = true;
+    File dir = LittleFS.open(GCODE_DIR);
+    if (dir && dir.isDirectory()) {
+        File f = dir.openNextFile();
+        while (f) {
+            if (!f.isDirectory()) {
+                if (!first) json += ",";
+                first = false;
+                char entry[128];
+                snprintf(entry, sizeof(entry),
+                    "{\"name\":\"%s\",\"size\":%lu}",
+                    basename_of(f.name()), (unsigned long)f.size());
+                json += entry;
             }
+            f = dir.openNextFile();
         }
-        json += "]";
-        req->send(200, "application/json", json);
-    });
-
-    s_srv->on("/api/file", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!req->hasParam("name")) {
-            req->send(400, "application/json", "{\"error\":\"missing name\"}");
-            return;
-        }
-        String path = String(GCODE_DIR) + "/" + req->getParam("name")->value();
-        if (!LittleFS.exists(path)) {
-            req->send(404, "application/json", "{\"error\":\"not found\"}");
-            return;
-        }
-        req->send(LittleFS, path, "text/plain");
-    });
-
-    s_srv->on("/api/file", HTTP_DELETE, [](AsyncWebServerRequest* req) {
-        if (!req->hasParam("name")) {
-            req->send(400, "application/json", "{\"error\":\"missing name\"}");
-            return;
-        }
-        String path = String(GCODE_DIR) + "/" + req->getParam("name")->value();
-        req->send(LittleFS.remove(path) ? 200 : 404,
-            "application/json",
-            LittleFS.remove(path) ? "{\"ok\":true}" : "{\"error\":\"not found\"}");
-    });
-
-    s_srv->on("/api/upload", HTTP_POST,
-        [](AsyncWebServerRequest* req) {
-            if (req->_tempObject) {
-                char buf[128];
-                snprintf(buf, sizeof(buf), "{\"ok\":true,\"name\":\"%s\"}",
-                    (char*)req->_tempObject);
-                req->send(200, "application/json", buf);
-                free(req->_tempObject);
-                req->_tempObject = nullptr;
-            } else {
-                req->send(500, "application/json", "{\"error\":\"upload failed\"}");
-            }
-        },
-        [](AsyncWebServerRequest* req, const String& filename,
-           size_t index, uint8_t* data, size_t len, bool final) {
-            static File upload_file;
-            if (index == 0) {
-                String path = String(GCODE_DIR) + "/" + filename;
-                Serial.printf("[gcode] Upload: %s\n", path.c_str());
-                upload_file = LittleFS.open(path, "w");
-                if (!req->_tempObject) {
-                    req->_tempObject = malloc(64);
-                    if (req->_tempObject)
-                        strncpy((char*)req->_tempObject, filename.c_str(), 63);
-                }
-            }
-            if (upload_file) upload_file.write(data, len);
-            if (final && upload_file) {
-                upload_file.close();
-                Serial.printf("[gcode] Upload done: %s (%u B)\n",
-                    filename.c_str(), (unsigned)(index + len));
-            }
-        }
-    );
-
-    s_srv->onNotFound([](AsyncWebServerRequest* req) {
-        req->send(404, "text/plain", "Not found");
-    });
-
-    s_srv->begin();
-    Serial.println("[gcode] Web server started on port 80");
-    _notify_connected();
+    }
+    json += "]";
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json.c_str(), json.length());
+    return ESP_OK;
 }
 
-static void _start_ap() {
+static esp_err_t h_file_get(httpd_req_t* req) {
+    char name[64];
+    if (!get_query_param(req, "name", name, sizeof(name))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing name");
+        return ESP_FAIL;
+    }
+    url_decode(name);
+    char path[96];
+    snprintf(path, sizeof(path), "%s/%s", GCODE_DIR, name);
+    File f = LittleFS.open(path, "r");
+    if (!f) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "not found");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    char buf[512];
+    int n;
+    while ((n = f.read((uint8_t*)buf, sizeof(buf))) > 0)
+        httpd_resp_send_chunk(req, buf, n);
+    httpd_resp_send_chunk(req, nullptr, 0);
+    f.close();
+    return ESP_OK;
+}
+
+static esp_err_t h_file_delete(httpd_req_t* req) {
+    char name[64];
+    if (!get_query_param(req, "name", name, sizeof(name))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing name");
+        return ESP_FAIL;
+    }
+    url_decode(name);
+    char path[96];
+    snprintf(path, sizeof(path), "%s/%s", GCODE_DIR, name);
+    httpd_resp_set_type(req, "application/json");
+    if (LittleFS.remove(path)) {
+        httpd_resp_send(req, "{\"ok\":true}", -1);
+        Serial.printf("[gcode] Deleted: %s\n", path);
+    } else {
+        httpd_resp_send(req, "{\"error\":\"not found\"}", -1);
+    }
+    return ESP_OK;
+}
+
+static esp_err_t h_file_put(httpd_req_t* req) {
+    char name[64];
+    if (!get_query_param(req, "name", name, sizeof(name))) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing name");
+        return ESP_FAIL;
+    }
+    url_decode(name);
+    char path[96];
+    snprintf(path, sizeof(path), "%s/%s", GCODE_DIR, name);
+
+    File f = LittleFS.open(path, "w");
+    if (!f) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "open failed");
+        return ESP_FAIL;
+    }
+
+    char buf[512];
+    int remaining = req->content_len;
+    Serial.printf("[gcode] Upload: %s  (%d B)\n", path, remaining);
+    while (remaining > 0) {
+        int to_recv = (remaining < (int)sizeof(buf)) ? remaining : (int)sizeof(buf);
+        int got = httpd_req_recv(req, buf, to_recv);
+        if (got <= 0) {
+            f.close();
+            LittleFS.remove(path);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recv error");
+            return ESP_FAIL;
+        }
+        f.write((uint8_t*)buf, got);
+        remaining -= got;
+    }
+    f.close();
+    Serial.printf("[gcode] Upload done: %s\n", path);
+
+    char resp[80];
+    snprintf(resp, sizeof(resp), "{\"ok\":true,\"name\":\"%s\"}", name);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp, -1);
+    return ESP_OK;
+}
+
+// ─── Запуск сервера ───────────────────────────────────────────────────────────
+
+static void start_server() {
+    if (s_httpd) return;
+    httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
+    cfg.server_port        = 80;
+    cfg.stack_size         = 8192;
+    cfg.send_wait_timeout  = 30;
+    cfg.max_uri_handlers   = 10;
+    if (httpd_start(&s_httpd, &cfg) != ESP_OK) {
+        Serial.println("[gcode] httpd_start FAILED");
+        return;
+    }
+    const httpd_uri_t routes[] = {
+        { "/",          HTTP_GET,    h_root,        nullptr },
+        { "/api/status",HTTP_GET,    h_status,      nullptr },
+        { "/api/files", HTTP_GET,    h_files,       nullptr },
+        { "/api/file",  HTTP_GET,    h_file_get,    nullptr },
+        { "/api/file",  HTTP_DELETE, h_file_delete, nullptr },
+        { "/api/file",  HTTP_PUT,    h_file_put,    nullptr },
+    };
+    for (auto& r : routes) httpd_register_uri_handler(s_httpd, &r);
+    Serial.printf("[gcode] Web server: http://%s\n", s_ip);
+    notify_connected();
+}
+
+static void start_ap() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
     s_state = GCW_AP;
-    Serial.printf("[gcode] AP: SSID=%s  IP=%s\n",
-        WIFI_AP_SSID, WiFi.softAPIP().toString().c_str());
-    Serial.printf("[gcode] Browser: http://%s\n",
-        WiFi.softAPIP().toString().c_str());
-    _start_server();
+    WiFi.softAPIP().toString().toCharArray(s_ip, sizeof(s_ip));
+    Serial.printf("[gcode] AP: %s  IP: %s\n", WIFI_AP_SSID, s_ip);
+    start_server();
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) {
-    s_conn_cb = cb;
-}
+void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) { s_conn_cb = cb; }
 
 void GCodeWiFi_Init() {
     if (!LittleFS.begin(false)) {
-        Serial.println("[gcode] LittleFS FAILED");
+        // Первый запуск — форматируем один раз
+        Serial.println("[gcode] LittleFS mount failed, formatting...");
+        if (LittleFS.begin(true))
+            Serial.println("[gcode] LittleFS formatted OK");
+        else
+            Serial.println("[gcode] LittleFS FAILED");
     } else {
-        if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
-        Serial.printf("[gcode] LittleFS OK: %lu/%lu B\n",
+        Serial.printf("[gcode] LittleFS: %lu/%lu B\n",
             (unsigned long)LittleFS.usedBytes(),
             (unsigned long)LittleFS.totalBytes());
     }
+    if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
 
     const char* ssid = WIFI_STA_SSID;
-    const char* pass = WIFI_STA_PASS;
-
     if (ssid && ssid[0] != '\0') {
         Serial.printf("[gcode] WiFi STA → %s\n", ssid);
         WiFi.mode(WIFI_STA);
         WiFi.setSleep(false);
-        WiFi.begin(ssid, pass);
-        s_state     = GCW_CONNECTING;
-        s_connect_t = millis();
+        WiFi.begin(ssid, WIFI_STA_PASS);
+        s_state   = GCW_CONNECTING;
+        s_conn_t  = millis();
     } else {
-        Serial.println("[gcode] WIFI_STA_SSID empty → AP mode");
-        _start_ap();
+        start_ap();
     }
 }
 
 void GCodeWiFi_Process() {
     if (s_state != GCW_CONNECTING) return;
-
     if (WiFi.status() == WL_CONNECTED) {
         s_state = GCW_CONNECTED;
-        Serial.printf("[gcode] STA connected  IP: %s\n",
-            WiFi.localIP().toString().c_str());
-        Serial.printf("[gcode] Browser: http://%s\n",
-            WiFi.localIP().toString().c_str());
-        _start_server();
-    } else if (millis() - s_connect_t > WIFI_STA_TIMEOUT_MS) {
-        Serial.println("[gcode] STA timeout → AP mode");
+        WiFi.setSleep(false);
+        WiFi.localIP().toString().toCharArray(s_ip, sizeof(s_ip));
+        Serial.printf("[gcode] STA connected: %s\n", s_ip);
+        start_server();
+    } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
+        Serial.println("[gcode] STA timeout → AP");
         WiFi.disconnect(true);
         delay(100);
-        _start_ap();
+        start_ap();
     }
 }
 
-const char* GCodeWiFi_GetIP() {
-    static char buf[20];
-    if (s_state == GCW_CONNECTED)
-        WiFi.localIP().toString().toCharArray(buf, sizeof(buf));
-    else if (s_state == GCW_AP)
-        WiFi.softAPIP().toString().toCharArray(buf, sizeof(buf));
-    else
-        buf[0] = '\0';
-    return buf;
-}
-
-bool GCodeWiFi_IsConnected() {
-    return s_state == GCW_CONNECTED || s_state == GCW_AP;
-}
-
-bool GCodeWiFi_IsAP() {
-    return s_state == GCW_AP;
-}
+const char* GCodeWiFi_GetIP()      { return s_ip; }
+bool GCodeWiFi_IsConnected()       { return s_state == GCW_CONNECTED || s_state == GCW_AP; }
+bool GCodeWiFi_IsAP()              { return s_state == GCW_AP; }
+httpd_handle_t GCodeWiFi_GetHttpd(){ return s_httpd; }

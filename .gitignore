@@ -19,6 +19,7 @@ Thumbs.db
 
 # Secrets / personal data
 *.env
+ELS_Display/include/wifi_config.h
 
 # Файл договорённостей — не публикуется
 AGREEMENTS.md
