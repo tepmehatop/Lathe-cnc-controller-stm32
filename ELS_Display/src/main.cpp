@@ -5104,25 +5104,10 @@ void setup()
     // GCode WiFi: AP/STA + LittleFS + HTTP файловый менеджер (порт 80)
     GCodeWiFi_SetConnectedCallback([](const char* ip, bool is_ap) {
         char msg[48];
-        snprintf(msg, sizeof(msg), is_ap ? "AP: http://%s" : "WiFi: http://%s", ip);
+        snprintf(msg, sizeof(msg), is_ap ? "AP: http://%s:8080" : "WiFi: http://%s:8080", ip);
         show_alert(msg);
     });
     GCodeWiFi_Init();
-
-    // Screenshot server на порту 8081 — регистрируем на том же httpd что и GCode
-    {
-        httpd_handle_t h = GCodeWiFi_GetHttpd();
-        if (h) {
-            httpd_uri_t uri = {
-                .uri      = "/screenshot",
-                .method   = HTTP_GET,
-                .handler  = screenshot_handler,
-                .user_ctx = nullptr
-            };
-            if (httpd_register_uri_handler(h, &uri) == ESP_OK)
-                Serial.printf("[main] Screenshot: http://%s/screenshot\n", GCodeWiFi_GetIP());
-        }
-    }
 
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
