@@ -13,6 +13,7 @@
 #include "display_config.h"
 #include "uart_protocol.h"
 #include "gcode_wifi.h"
+#include "gcode_exec.h"
 
 #ifdef DISPLAY_JC4827W543
 #include <WiFi.h>
@@ -5109,6 +5110,14 @@ void setup()
     });
     GCodeWiFi_Init();
 
+    // GCode executor: отправляет строки в STM32 через UART
+    GCodeExec_Init([](const char* line) {
+        uart_protocol.sendGCodeLine(line);
+    });
+    uart_protocol.setGCodeResponseCallback([](bool ok, const char* err) {
+        GCodeExec_OnAck(ok, err);
+    });
+
     Serial.println("===========================================");
     Serial.println("Setup complete! System ready.");
     Serial.println("===========================================\n");
@@ -5123,6 +5132,7 @@ void loop()
     // Process UART commands
     uart_protocol.process();
     GCodeWiFi_Process();
+    GCodeExec_Process();
 
     // Авто-выход из режима редактирования через 5 секунд бездействия
     if (g_edit_param.active && (millis() - g_edit_param.last_ms > 5000)) {

@@ -18,6 +18,7 @@ UartProtocol::UartProtocol()
     , screen_change_callback_(nullptr)
     , alert_callback_(nullptr)
     , alert_dismiss_callback_(nullptr)
+    , gcode_response_callback_(nullptr)
 {
     memset(&data_, 0, sizeof(data_));
     memset(rx_buffer_, 0, sizeof(rx_buffer_));
@@ -82,9 +83,14 @@ void UartProtocol::parseCommand(const char* cmd)
     char* end = strchr(buffer, '>');
     if (end) *end = '\0';
 
-    // Разделить на команду и параметры
+    // Обработка команд без параметров (нет ':')
     char* colon = strchr(buffer, ':');
-    if (!colon) return;
+    if (!colon) {
+        if (strcmp(buffer, "OK") == 0) {
+            if (gcode_response_callback_) gcode_response_callback_(true, nullptr);
+        }
+        return;
+    }
 
     *colon = '\0';
     const char* command = buffer;
@@ -198,6 +204,9 @@ void UartProtocol::parseCommand(const char* cmd)
     }
     else if (strcmp(command, "CUTTING_W") == 0) {
         parseCuttingW(params);
+    }
+    else if (strcmp(command, "ERR") == 0) {
+        if (gcode_response_callback_) gcode_response_callback_(false, params);
     }
 }
 
@@ -321,6 +330,11 @@ void UartProtocol::sendError(const char* message)
 void UartProtocol::sendPong()
 {
     sendCommand("PONG");
+}
+
+void UartProtocol::sendGCodeLine(const char* line)
+{
+    sendCommand("GCODE", line);
 }
 
 void UartProtocol::parsePass(const char* params)

@@ -184,10 +184,14 @@ public:
     // Отправить PONG (ответ на PING)
     void sendPong();
 
+    // Отправить строку GCode в STM32: <GCODE:line>\n
+    void sendGCodeLine(const char* line);
+
     // Callback функции (устанавливаются пользователем)
     typedef void (*DataUpdateCallback)(const LatheData& data);
     typedef void (*ScreenChangeCallback)(uint8_t screen_num);
     typedef void (*AlertCallback)(const char* message);
+    typedef void (*GCodeResponseCallback)(bool ok, const char* err);
 
     void setDataUpdateCallback(DataUpdateCallback callback) {
         data_update_callback_ = callback;
@@ -206,6 +210,10 @@ public:
         alert_dismiss_callback_ = callback;
     }
 
+    void setGCodeResponseCallback(GCodeResponseCallback callback) {
+        gcode_response_callback_ = callback;
+    }
+
 private:
     HardwareSerial* serial_;
     LatheData data_;
@@ -217,6 +225,7 @@ private:
     ScreenChangeCallback screen_change_callback_;
     AlertCallback alert_callback_;
     AlertDismissCallback alert_dismiss_callback_;
+    GCodeResponseCallback gcode_response_callback_;
 
     bool data_dirty_;  // true when data_ changed but callback not yet fired
 

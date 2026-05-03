@@ -5,6 +5,7 @@
  */
 
 #include "gcode_wifi.h"
+#include "gcode_exec.h"
 #include "wifi_config.h"
 #include <Arduino.h>
 #include <WiFi.h>
@@ -42,7 +43,10 @@ h2{color:#7986cb;font-size:13px;margin-bottom:8px;border-bottom:1px solid #2a3a5
 button{background:#1976d2;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px}
 button:hover{background:#1565c0}
 .del{background:#c62828}.del:hover{background:#b71c1c}
+.grn{background:#2e7d32}.grn:hover{background:#1b5e20}
+.org{background:#e65100}.org:hover{background:#bf360c}
 input[type=file]{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:5px;border-radius:4px;font-family:monospace;font-size:12px}
+select{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:4px 6px;border-radius:4px;font-size:12px;flex:1;min-width:0}
 ul{list-style:none}
 li{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #1e2e40}
 li:last-child{border-bottom:none}
@@ -50,11 +54,29 @@ li span{flex:1}
 #viewer{background:#0a1628;padding:8px;border-radius:4px;white-space:pre;font-size:11px;max-height:280px;overflow:auto}
 #prog{font-size:12px;color:#aaa;margin-top:6px;min-height:16px}
 .tag{font-size:10px;color:#888;margin-left:4px}
+.pbg{background:#0d2137;border-radius:3px;height:8px;margin:6px 0}
+.pf{background:#4fc3f7;height:8px;border-radius:3px;width:0%;transition:width .3s}
+#traj{background:#0a1628;border-radius:4px;display:block;width:100%;height:180px}
+#exst{font-size:12px;min-height:18px;margin-bottom:4px}
 </style>
 </head>
 <body>
 <h1>ELS GCode Manager</h1>
 <div class="bar" id="st">...</div>
+
+<div class="sec">
+<h2>GCode Runner</h2>
+<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+<select id="rsel"><option value="">-- выберите файл --</option></select>
+<button class="grn" onclick="runGc()">&#9654; Старт</button>
+<button class="org" id="pbtn" onclick="pauseGc()">&#9646;&#9646; Пауза</button>
+<button class="del" onclick="stopGc()">&#9632; Стоп</button>
+</div>
+<div id="exst" style="color:#7986cb">IDLE</div>
+<div class="pbg"><div class="pf" id="pf"></div></div>
+<canvas id="traj" width="460" height="180"></canvas>
+</div>
+
 <div class="sec">
 <h2>Файлы GCode</h2>
 <ul id="fl"><li><span>Загрузка...</span></li></ul>
@@ -64,14 +86,18 @@ li span{flex:1}
 </div>
 <div id="prog"></div>
 </div>
+
 <div class="sec" id="viewsec" style="display:none">
 <h2>Просмотр: <span id="vn" style="color:#e0e0f0"></span>
 <button onclick="document.getElementById('viewsec').style.display='none'" style="font-size:10px;padding:2px 6px;float:right">&#x2715;</button></h2>
 <div id="viewer"></div>
 </div>
+
 <script>
 const PORT=8080;
 const BASE='http://'+location.hostname+':'+PORT;
+
+// ─── Статус WiFi ─────────────────────────────────────────────────────────────
 async function loadSt(){
   try{
     const d=await(await fetch(BASE+'/api/status')).json();
@@ -79,22 +105,34 @@ async function loadSt(){
       'WiFi: <b>'+d.mode+'</b> | IP: <b>'+d.ip+'</b> | Файлов: '+d.fc+' | Свободно: '+(d.fb/1024).toFixed(0)+' КБ';
   }catch(e){document.getElementById('st').textContent='Ошибка связи';}
 }
+
+// ─── Файлы ───────────────────────────────────────────────────────────────────
 async function loadFiles(){
   try{
     const files=await(await fetch(BASE+'/api/files')).json();
     const ul=document.getElementById('fl');
+    const sel=document.getElementById('rsel');
     ul.innerHTML='';
+    // rebuild runner dropdown, preserve selection
+    const prev=sel.value;
+    while(sel.options.length>1) sel.remove(1);
     if(!files.length){ul.innerHTML='<li><span style="color:#667">Нет файлов</span></li>';return;}
     files.forEach(f=>{
       const li=document.createElement('li');
       li.innerHTML='<span>'+f.name+'<span class="tag">('+
         (f.size>=1024?(f.size/1024).toFixed(1)+' КБ':f.size+' Б')+')</span></span>'+
+        '<button onclick="loadTraj(\''+f.name+'\')" style="font-size:11px;padding:3px 7px">График</button>'+
         '<button onclick="view(\''+f.name+'\')">Просмотр</button>'+
         '<button class="del" onclick="del(\''+f.name+'\')">Удалить</button>';
       ul.appendChild(li);
+      const opt=document.createElement('option');
+      opt.value=f.name; opt.textContent=f.name;
+      sel.appendChild(opt);
     });
+    if(prev) sel.value=prev;
   }catch(e){document.getElementById('fl').innerHTML='<li><span>Ошибка</span></li>';}
 }
+
 async function view(n){
   try{
     const t=await(await fetch(BASE+'/api/file?name='+encodeURIComponent(n))).text();
@@ -104,11 +142,13 @@ async function view(n){
     document.getElementById('viewsec').scrollIntoView({behavior:'smooth'});
   }catch(e){alert('Ошибка');}
 }
+
 async function del(n){
   if(!confirm('Удалить "'+n+'"?'))return;
   await fetch(BASE+'/api/file?name='+encodeURIComponent(n),{method:'DELETE'});
   loadFiles();
 }
+
 async function up(){
   const fi=document.getElementById('fi');
   if(!fi.files.length){alert('Выберите файл');return;}
@@ -122,7 +162,134 @@ async function up(){
     if(d.ok){loadFiles();fi.value='';}
   }catch(e){pr.textContent='Ошибка сети';}
 }
-loadSt();loadFiles();setInterval(loadSt,8000);
+
+// ─── GCode Runner ─────────────────────────────────────────────────────────────
+const ST_COLOR={IDLE:'#7986cb',RUNNING:'#4caf50',WAITING_ACK:'#4caf50',DWELL:'#26c6da',PAUSED:'#ff9800',DONE:'#4fc3f7',ERROR:'#ef5350'};
+
+async function runGc(){
+  const n=document.getElementById('rsel').value;
+  if(!n){alert('Выберите файл');return;}
+  await fetch(BASE+'/api/run?name='+encodeURIComponent(n),{method:'POST'});
+  loadTraj(n);
+}
+async function pauseGc(){await fetch(BASE+'/api/pause',{method:'POST'});}
+async function stopGc(){await fetch(BASE+'/api/stop',{method:'POST'});}
+
+let g_exec_line=0;
+async function pollExec(){
+  try{
+    const d=await(await fetch(BASE+'/api/exec')).json();
+    const st=d.state||'IDLE';
+    const col=ST_COLOR[st]||'#aaa';
+    let msg=st;
+    if(d.file) msg+=' | '+d.file;
+    if(d.line) msg+=' | Строка: '+d.line;
+    if(d.pct!=null) msg+=' | '+d.pct+'%';
+    if(d.error) msg+=' | '+d.error;
+    document.getElementById('exst').innerHTML='<span style="color:'+col+'">'+msg+'</span>';
+    const pf=document.getElementById('pf');
+    pf.style.width=(d.pct||0)+'%';
+    const pb=document.getElementById('pbtn');
+    pb.textContent=st==='PAUSED'?'▶ Продолжить':'⏸ Пауза';
+    if(d.line && d.line!==g_exec_line){g_exec_line=d.line;drawTrajCursor();}
+  }catch(e){}
+}
+
+// ─── 2D Trajectory Visualizer ─────────────────────────────────────────────────
+let g_traj=null; // {moves:[{x,z,rapid}], lineMap:[idx]}
+
+async function loadTraj(name){
+  document.getElementById('rsel').value=name;
+  try{
+    const text=await(await fetch(BASE+'/api/file?name='+encodeURIComponent(name))).text();
+    g_traj=parseTraj(text);
+    g_exec_line=0;
+    drawTraj(g_traj,-1);
+  }catch(e){}
+}
+
+function parseTraj(text){
+  const lines=text.split('\n');
+  let cx=0,cz=0,modal_g=0; // modal_g: 0=rapid,1=feed
+  const moves=[];
+  const lineMap=[];
+  let nr=0;
+  for(const raw of lines){
+    let ln=raw.replace(/;.*/,'').replace(/\(.*?\)/g,'').trim().toUpperCase();
+    nr++;
+    if(!ln){lineMap.push(-1);continue;}
+    // detect G word
+    const gm=ln.match(/\bG(\d+(?:\.\d+)?)/);
+    if(gm){const gn=parseFloat(gm[1]);if(gn===0||gn===0.0)modal_g=0;else if(gn===1)modal_g=1;}
+    const xm=ln.match(/X([-\d.]+)/);
+    const zm=ln.match(/Z([-\d.]+)/);
+    if((xm||zm)&&(gm||modal_g!==undefined)){
+      if(xm)cx=parseFloat(xm[1]);
+      if(zm)cz=parseFloat(zm[1]);
+      moves.push({x:cx,z:cz,rapid:modal_g===0});
+      lineMap.push(moves.length-1);
+    }else{lineMap.push(-1);}
+  }
+  return{moves,lineMap};
+}
+
+function drawTraj(traj,curIdx){
+  const cv=document.getElementById('traj');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a1628';ctx.fillRect(0,0,W,H);
+  if(!traj||!traj.moves.length){
+    ctx.fillStyle='#3a4a6a';ctx.font='12px monospace';
+    ctx.fillText('Нет данных траектории',10,H/2);return;
+  }
+  const mv=traj.moves;
+  // Bounds
+  let mnx=mv[0].x,mxx=mv[0].x,mnz=mv[0].z,mxz=mv[0].z;
+  for(const m of mv){if(m.x<mnx)mnx=m.x;if(m.x>mxx)mxx=m.x;if(m.z<mnz)mnz=m.z;if(m.z>mxz)mxz=m.z;}
+  const rngx=mxx-mnx||1,rngz=mxz-mnz||1;
+  const PAD=18;
+  const sx=(W-PAD*2)/rngz, sy=(H-PAD*2)/rngx;
+  const sc=Math.min(sx,sy);
+  const ox=PAD+(W-PAD*2-(rngz*sc))/2, oy=PAD+(H-PAD*2-(rngx*sc))/2;
+  const tx=z=>(z-mnz)*sc+ox;
+  const ty=x=>(x-mnx)*sc+oy;
+  // Axes
+  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(tx(0),0);ctx.lineTo(tx(0),H);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,ty(0));ctx.lineTo(W,ty(0));ctx.stroke();
+  // Moves
+  ctx.lineWidth=1.5;
+  let px=tx(mv[0].z),py=ty(mv[0].x);
+  for(let i=1;i<mv.length;i++){
+    const m=mv[i];
+    const nx=tx(m.z),ny=ty(m.x);
+    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,ny);
+    if(m.rapid){ctx.strokeStyle='#37474f';ctx.setLineDash([3,3]);}
+    else{ctx.strokeStyle=i<=curIdx?'#ff8a65':'#29b6f6';ctx.setLineDash([]);}
+    ctx.stroke();
+    px=nx;py=ny;
+  }
+  ctx.setLineDash([]);
+  // Start dot
+  ctx.fillStyle='#66bb6a';ctx.beginPath();ctx.arc(tx(mv[0].z),ty(mv[0].x),4,0,Math.PI*2);ctx.fill();
+  // Cursor
+  if(curIdx>=0&&curIdx<mv.length){
+    const m=mv[curIdx];
+    ctx.fillStyle='#ffee58';ctx.beginPath();ctx.arc(tx(m.z),ty(m.x),5,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function drawTrajCursor(){
+  if(!g_traj) return;
+  const idx=(g_exec_line<g_traj.lineMap.length)?g_traj.lineMap[g_exec_line]:-1;
+  drawTraj(g_traj,idx);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadSt();loadFiles();
+setInterval(loadSt,10000);
+setInterval(pollExec,800);
 </script>
 </body>
 </html>)rawhtml";
@@ -291,12 +458,60 @@ static void handle_file_put(WiFiClient& cl, const String& query, int content_len
 }
 
 static void handle_options(WiFiClient& cl) {
-    // CORS preflight
     cl.print("HTTP/1.1 204 No Content\r\n"
              "Access-Control-Allow-Origin: *\r\n"
-             "Access-Control-Allow-Methods: GET, PUT, DELETE, OPTIONS\r\n"
+             "Access-Control-Allow-Methods: GET, PUT, DELETE, POST, OPTIONS\r\n"
              "Access-Control-Allow-Headers: Content-Type\r\n"
              "Connection: close\r\n\r\n");
+}
+
+static const char* exec_state_str(GcExecSt st) {
+    switch (st) {
+        case GCE_IDLE:        return "IDLE";
+        case GCE_RUNNING:     return "RUNNING";
+        case GCE_WAITING_ACK: return "WAITING_ACK";
+        case GCE_DWELL:       return "DWELL";
+        case GCE_PAUSED:      return "PAUSED";
+        case GCE_DONE:        return "DONE";
+        case GCE_ERROR:       return "ERROR";
+        default:              return "IDLE";
+    }
+}
+
+static void handle_exec_status(WiFiClient& cl) {
+    GcExecSt st = GCodeExec_GetState();
+    const char* fn = GCodeExec_GetFilename();
+    const char* bn = basename_of(fn && fn[0] ? fn : "");
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+        "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"pct\":%d,\"error\":\"%s\"}",
+        exec_state_str(st), bn, GCodeExec_GetLine(),
+        GCodeExec_GetProgress(), GCodeExec_GetError());
+    send_ok_json(cl, buf);
+}
+
+static void handle_run(WiFiClient& cl, const String& query) {
+    String name = get_param(query, "name");
+    if (!name.length()) {
+        send_ok_json(cl, "{\"error\":\"name required\"}");
+        return;
+    }
+    String path = String(GCODE_DIR) + "/" + name;
+    bool ok = GCodeExec_Run(path.c_str());
+    char buf[80];
+    snprintf(buf, sizeof(buf), "{\"ok\":%s,\"file\":\"%s\"}",
+             ok ? "true" : "false", name.c_str());
+    send_ok_json(cl, buf);
+}
+
+static void handle_stop(WiFiClient& cl) {
+    GCodeExec_Stop();
+    send_ok_json(cl, "{\"ok\":true}");
+}
+
+static void handle_pause(WiFiClient& cl) {
+    GCodeExec_TogglePause();
+    send_ok_json(cl, "{\"ok\":true}");
 }
 
 // ─── Обработка одного HTTP клиента ───────────────────────────────────────────
@@ -348,6 +563,14 @@ static void handle_client(WiFiClient& cl) {
         handle_file_delete(cl, query);
     } else if (method == "PUT" && path == "/api/file") {
         handle_file_put(cl, query, content_len);
+    } else if (method == "GET" && path == "/api/exec") {
+        handle_exec_status(cl);
+    } else if (method == "POST" && path == "/api/run") {
+        handle_run(cl, query);
+    } else if (method == "POST" && path == "/api/stop") {
+        handle_stop(cl);
+    } else if (method == "POST" && path == "/api/pause") {
+        handle_pause(cl);
     } else {
         send_404(cl);
     }
