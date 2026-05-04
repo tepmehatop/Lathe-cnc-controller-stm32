@@ -19,6 +19,7 @@
 #include "els_tables.h"
 #include "els_settings.h"
 #include "../Drivers/drv_display.h"
+#include "../Drivers/drv_stepper.h"
 #include "../Drivers/drv_beeper.h"
 #include "../Drivers/drv_inputs.h"
 #include <Arduino.h>
@@ -699,17 +700,56 @@ static void _exec_gcode(const char* line) {
         switch (cmd_num) {
             case 0:
             case 1: {
-                // G0/G1: быстрое/рабочее перемещение
-                // Фаза 5: логируем координаты, отвечаем OK
-                // Фаза 6-7: реализация движения по X/Z
                 const char* xp = strchr(line, 'X');
                 if (!xp) xp = strchr(line, 'x');
                 const char* zp = strchr(line, 'Z');
                 if (!zp) zp = strchr(line, 'z');
-                float xv = xp ? atof(xp + 1) : 0.0f;
-                float zv = zp ? atof(zp + 1) : 0.0f;
-                Serial.printf("[gc] G%d X=%.3f Z=%.3f\n", cmd_num, xv, zv);
-                DRV_Display_SendGCodeAck(true, nullptr);
+
+                els.gcode_has_x = (xp != nullptr);
+                els.gcode_has_y = (zp != nullptr);
+
+                if (!els.gcode_has_x && !els.gcode_has_y) {
+                    DRV_Display_SendGCodeAck(true, nullptr);
+                    break;
+                }
+
+                // Целевые позиции в 0.001мм
+                if (els.gcode_has_x) els.gcode_target_x = (int32_t)(atof(xp + 1) * 1000.0f);
+                if (els.gcode_has_y) els.gcode_target_y = (int32_t)(atof(zp + 1) * 1000.0f);
+
+                const uint32_t hz = RAPID_TRAVERSE_HZ;
+                const uint32_t spm_y = (uint32_t)(MOTOR_Y_STEP_PER_REV) * MICROSTEP_Y * 100UL / SCREW_Y;
+                const uint32_t spm_x = (uint32_t)(MOTOR_X_STEP_PER_REV) * MICROSTEP_X * 100UL / SCREW_X;
+
+                if (els.gcode_has_y) {
+                    int32_t diff = els.gcode_target_y - els.pos_y;
+                    if (diff != 0) {
+                        int32_t steps = (diff > 0 ? diff : -diff) * spm_y / 1000UL;
+                        int8_t  dir   = (diff > 0) ? +1 : -1;
+                        DRV_Stepper_MoveSteps(AXIS_Y, steps, hz, dir);
+                    } else {
+                        els.gcode_has_y = false;
+                    }
+                }
+                if (els.gcode_has_x) {
+                    int32_t diff = els.gcode_target_x - els.pos_x;
+                    if (diff != 0) {
+                        int32_t steps = (diff > 0 ? diff : -diff) * spm_x / 1000UL;
+                        int8_t  dir   = (diff > 0) ? +1 : -1;
+                        DRV_Stepper_MoveSteps(AXIS_X, steps, hz, dir);
+                    } else {
+                        els.gcode_has_x = false;
+                    }
+                }
+
+                if (!els.gcode_has_x && !els.gcode_has_y) {
+                    // Оба движения нулевые — сразу OK
+                    DRV_Display_SendGCodeAck(true, nullptr);
+                } else {
+                    els.gcode_motion = true;
+                    Serial.printf("[gc] G%d → Y=%ld X=%ld\n",
+                                  cmd_num, els.gcode_target_y, els.gcode_target_x);
+                }
                 break;
             }
             case 4:

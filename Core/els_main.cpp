@@ -107,6 +107,7 @@ void ELS_Loop(void) {
     DRV_Encoder_Spindle_Update();
     DRV_Inputs_Process();
     ELS_Menu_Process();
+    ELS_GCode_Process();
     ELS_Control_Update();
     ELS_Serial_Process();
 

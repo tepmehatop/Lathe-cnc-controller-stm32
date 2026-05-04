@@ -156,6 +156,13 @@ typedef struct {
     int8_t  joy_x;      // +1 = к передн. точке, -1 = назад, 0 = стоп
     uint8_t joy_rapid;  // 0 = RAPID не нажат → быстрый ход; 1 = нажат → подача
 
+    // ── GCode позиционирование (Phase 6) ────────────────────
+    bool    gcode_motion;    // true = GCode-ход активен (ELS_Control_Update не трогает оси)
+    int32_t gcode_target_y;  // целевая pos_y (0.001мм) по оси Z каретки
+    int32_t gcode_target_x;  // целевая pos_x (0.001мм) по оси X резцедержателя
+    bool    gcode_has_y;     // Z-ось задействована в текущем ходе
+    bool    gcode_has_x;     // X-ось задействована
+
 } ELS_State_t;
 
 extern ELS_State_t els;

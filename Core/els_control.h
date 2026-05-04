@@ -15,3 +15,6 @@ void ELS_Control_Update(void);
 // Запустить / остановить движение (устанавливает els.running)
 void ELS_Control_Start(void);
 void ELS_Control_Stop(void);
+
+// Мониторинг завершения GCode-движения (вызывать из loop())
+void ELS_GCode_Process(void);

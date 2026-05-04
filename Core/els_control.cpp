@@ -442,7 +442,20 @@ void ELS_Control_Stop(void) {
     s_sph_state    = SPH_IDLE;
 }
 
+void ELS_GCode_Process(void) {
+    if (!els.gcode_motion) return;
+    bool y_done = !els.gcode_has_y || !DRV_Stepper_IsMoving(AXIS_Y);
+    bool x_done = !els.gcode_has_x || !DRV_Stepper_IsMoving(AXIS_X);
+    if (y_done && x_done) {
+        els.gcode_motion = false;
+        DRV_Display_SendGCodeAck(true, nullptr);
+    }
+}
+
 void ELS_Control_Update(void) {
+    // GCode-движение активно — не трогаем оси
+    if (els.gcode_motion) return;
+
     // Блокировка пока джойстик не в нейтрали при старте (как в Arduino)
     if (els.err_0_flag) {
         if (els.running) ELS_Control_Stop();

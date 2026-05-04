@@ -12,6 +12,7 @@
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 #include <LittleFS.h>
+#include <ESPmDNS.h>
 
 // ─── Состояние ────────────────────────────────────────────────────────────────
 
@@ -594,7 +595,11 @@ static void start_server() {
         return;
     }
     s_srv->begin();
-    Serial.printf("[gcode] WiFiServer started: http://%s:%u/\n", s_ip, HTTP_PORT);
+    // mDNS: доступен как http://els.local:8080/ из любого браузера в той же сети
+    MDNS.begin("els");
+    MDNS.addService("http", "tcp", HTTP_PORT);
+    Serial.printf("[gcode] WiFiServer started: http://%s:%u/  (http://els.local:%u/)\n",
+                  s_ip, HTTP_PORT, HTTP_PORT);
     notify_connected();
 }
 
