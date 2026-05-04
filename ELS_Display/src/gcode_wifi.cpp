@@ -19,8 +19,9 @@ static const char* GCODE_DIR    = "/gcode";
 static const uint16_t HTTP_PORT = 8080;
 
 enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
-static GcWifiSt          s_state   = GCW_INIT;
-static uint32_t          s_conn_t  = 0;
+static GcWifiSt          s_state      = GCW_INIT;
+static uint32_t          s_conn_t     = 0;
+static uint32_t          s_ap_retry_t = 0;   // повторная попытка STA из AP-режима
 static WiFiServer*       s_srv     = nullptr;
 static GCWifiConnectedCb s_conn_cb = nullptr;
 static char              s_ip[20]  = {};
@@ -596,7 +597,8 @@ static void start_server() {
 static void start_ap() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASS);
-    s_state = GCW_AP;
+    s_state      = GCW_AP;
+    s_ap_retry_t = millis();
     WiFi.softAPIP().toString().toCharArray(s_ip, sizeof(s_ip));
     Serial.printf("[gcode] AP: %s  IP: %s\n", WIFI_AP_SSID, s_ip);
     start_server();
@@ -665,6 +667,20 @@ void GCodeWiFi_Process() {
             WiFi.disconnect(true);
             delay(100);
             WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASS);
+        }
+    } else if (s_state == GCW_AP) {
+        // Повторная попытка STA каждые 60 секунд (если SSID задан)
+        const char* ssid = WIFI_STA_SSID;
+        if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
+            Serial.println("[gcode] AP → retrying STA...");
+            if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
+            WiFi.softAPdisconnect(true);
+            delay(100);
+            WiFi.mode(WIFI_STA);
+            WiFi.setSleep(false);
+            WiFi.begin(ssid, WIFI_STA_PASS);
+            s_state  = GCW_CONNECTING;
+            s_conn_t = millis();
         }
     }
 }
