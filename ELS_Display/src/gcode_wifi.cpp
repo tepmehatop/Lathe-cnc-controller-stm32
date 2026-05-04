@@ -589,6 +589,10 @@ static void notify_connected() {
 static void start_server() {
     if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
     s_srv = new WiFiServer(HTTP_PORT);
+    if (!s_srv) {
+        Serial.println("[gcode] ERROR: WiFiServer alloc failed!");
+        return;
+    }
     s_srv->begin();
     Serial.printf("[gcode] WiFiServer started: http://%s:%u/\n", s_ip, HTTP_PORT);
     notify_connected();
@@ -640,7 +644,10 @@ void GCodeWiFi_Process() {
     // Обработка клиентов
     if (s_srv && s_srv->hasClient()) {
         WiFiClient cl = s_srv->accept();
-        if (cl) handle_client(cl);
+        if (cl) {
+            Serial.printf("[gcode] client: %s\n", cl.remoteIP().toString().c_str());
+            handle_client(cl);
+        }
     }
 
     // Состояния WiFi
@@ -652,6 +659,7 @@ void GCodeWiFi_Process() {
             WiFi.setSleep(false);
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
+            delay(500);  // дать TCP/IP стеку устояться
             start_server();
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
             Serial.println("[gcode] STA timeout → AP");
