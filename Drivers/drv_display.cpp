@@ -35,7 +35,7 @@ int DRV_Display_TxFree(void) { return DispSerial.availableForWrite(); }
 // ============================================================
 // RX буфер
 // ============================================================
-#define DISP_RX_BUF_LEN  64
+#define DISP_RX_BUF_LEN  128   // увеличен для GCode строк до ~80 символов
 static char    s_rxbuf[DISP_RX_BUF_LEN];
 static uint8_t s_rxlen = 0;
 
@@ -65,8 +65,8 @@ static void _parse_rx(const char* raw) {
 
     // Разделяем на cmd и params по первому ':'
     char* colon = strchr(inner, ':');
-    char cmd_str[32] = {};
-    char prm_str[48] = {};
+    char cmd_str[32]  = {};
+    char prm_str[96]  = {};
     if (colon) {
         size_t clen = (size_t)(colon - inner);
         if (clen >= sizeof(cmd_str)) clen = sizeof(cmd_str)-1;
@@ -82,6 +82,15 @@ static void _parse_rx(const char* raw) {
     // READY / PONG → выставить флаг, SendAll вызовется из loop()
     if (strcmp(cmd_str, "READY") == 0 || strcmp(cmd_str, "PONG") == 0) {
         s_need_sendall = 1;
+        return;
+    }
+
+    // GCODE: строка GCode — передаём в callback для исполнения
+    if (strcmp(cmd_str, "GCODE") == 0) {
+        DispRxCmd_t rx = {};
+        rx.touch = TOUCH_GCODE;
+        strncpy(rx.gcode_line, prm_str, sizeof(rx.gcode_line) - 1);
+        if (s_rx_cb) s_rx_cb(&rx);
         return;
     }
 
@@ -364,6 +373,17 @@ void DRV_Display_SendLCD2004State(void) {
         (int)els.Current_Tooth
     );
     DRV_Display_SendCmd("LCD2004", buf);
+}
+
+// ============================================================
+// GCode ACK: отправить <OK> или <ERR:reason> в ESP32
+// ============================================================
+void DRV_Display_SendGCodeAck(bool ok, const char* err) {
+    if (ok) {
+        _SendCmdPriority("OK", nullptr);
+    } else {
+        _SendCmdPriority("ERR", err ? err : "error");
+    }
 }
 
 // ============================================================

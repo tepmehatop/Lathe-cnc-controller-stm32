@@ -25,6 +25,7 @@
 
 // Forward declarations
 static void _key_select(void);
+static void _exec_gcode(const char* line);
 
 // ============================================================
 // Состояние джойстика от тачскрина
@@ -225,6 +226,10 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
         case TOUCH_ALERT_OK:
             els.err_1_flag = false;
             els.err_2_flag = false;
+            return;
+
+        case TOUCH_GCODE:
+            _exec_gcode(rx->gcode_line);
             return;
 
         default: break;
@@ -669,4 +674,63 @@ void ELS_Menu_Process(void) {
             els.err_0_flag = false;
         }
     }
+}
+
+// ============================================================
+// GCode executor: фаза 5 — приём и разбор строки от ESP32
+// Фаза 6-7: реальное движение (TODO)
+// ============================================================
+static void _exec_gcode(const char* line) {
+#if USE_ESP32_DISPLAY
+    // Найти первое слово G или M (пропускаем Nxxx)
+    const char* p = line;
+    while (*p && *p != 'G' && *p != 'g' && *p != 'M' && *p != 'm') p++;
+
+    if (!*p) {
+        // Пустая строка — OK
+        DRV_Display_SendGCodeAck(true, nullptr);
+        return;
+    }
+
+    char cmd_ch = (*p >= 'a' && *p <= 'z') ? (char)(*p - 32) : *p;
+    int  cmd_num = atoi(p + 1);
+
+    if (cmd_ch == 'G') {
+        switch (cmd_num) {
+            case 0:
+            case 1: {
+                // G0/G1: быстрое/рабочее перемещение
+                // Фаза 5: логируем координаты, отвечаем OK
+                // Фаза 6-7: реализация движения по X/Z
+                const char* xp = strchr(line, 'X');
+                if (!xp) xp = strchr(line, 'x');
+                const char* zp = strchr(line, 'Z');
+                if (!zp) zp = strchr(line, 'z');
+                float xv = xp ? atof(xp + 1) : 0.0f;
+                float zv = zp ? atof(zp + 1) : 0.0f;
+                Serial.printf("[gc] G%d X=%.3f Z=%.3f\n", cmd_num, xv, zv);
+                DRV_Display_SendGCodeAck(true, nullptr);
+                break;
+            }
+            case 4:
+                // G4: dwell — обрабатывается на ESP32, STM32 не получает
+                DRV_Display_SendGCodeAck(true, nullptr);
+                break;
+            case 28:
+                // G28: возврат в исходную — TODO фаза 6
+                Serial.println("[gc] G28 home (stub)");
+                DRV_Display_SendGCodeAck(true, nullptr);
+                break;
+            default:
+                // Неизвестный G-код — принимаем, не блокируем
+                Serial.printf("[gc] G%d (pass)\n", cmd_num);
+                DRV_Display_SendGCodeAck(true, nullptr);
+                break;
+        }
+    } else {
+        // M-коды: M0/M2/M30 перехватывает ESP32, сюда не попадают
+        Serial.printf("[gc] M%d (pass)\n", cmd_num);
+        DRV_Display_SendGCodeAck(true, nullptr);
+    }
+#endif
 }

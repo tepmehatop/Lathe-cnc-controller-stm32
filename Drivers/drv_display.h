@@ -29,14 +29,16 @@ typedef enum {
     TOUCH_ALERT_OK,
     TOUCH_THR_CAT,
     TOUCH_READY,
+    TOUCH_GCODE,    // <GCODE:line> — строка GCode от ESP32
 } DispTouch_t;
 
 // Структура входящей команды с числовым параметром
 typedef struct {
     DispTouch_t touch;
-    char        cmd[16];   // Имя команды (AP, FEED, AFEED, SPHERE, ...)
-    int32_t     value;     // Числовой параметр (если есть)
+    char        cmd[16];        // Имя команды (AP, FEED, AFEED, SPHERE, ...)
+    int32_t     value;          // Числовой параметр (если есть)
     uint8_t     has_value;
+    char        gcode_line[80]; // Строка GCode (при touch == TOUCH_GCODE)
 } DispRxCmd_t;
 
 // Регистрация callback для входящих команд
@@ -68,6 +70,9 @@ void DRV_Display_SendInt2(const char* cmd, int32_t a, int32_t b);
 // Заполняется снаружи через колбэк или вручную из els_main
 void DRV_Display_SendAll(void);
 int  DRV_Display_TxFree(void);
+
+// ---- GCode: отправить ACK в ESP32 (<OK> или <ERR:reason>) ----
+void DRV_Display_SendGCodeAck(bool ok, const char* err);
 
 // ---- Дублирование состояния LCD2004 через ESP32 Serial (для тестирования) ----
 // Отправляет <LCD2004:mode,sub,sm,feed,afeed,ap,pass_nr,pass_total,ph,pass_fin,thr,tooth_n,tooth_c>
