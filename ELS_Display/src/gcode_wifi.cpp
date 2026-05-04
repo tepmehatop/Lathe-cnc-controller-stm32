@@ -23,6 +23,8 @@ enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
 static GcWifiSt          s_state      = GCW_INIT;
 static uint32_t          s_conn_t     = 0;
 static uint32_t          s_ap_retry_t = 0;   // повторная попытка STA из AP-режима
+static uint32_t          s_srv_start_t  = 0; // когда запустили сервер
+static uint32_t          s_last_client_t = 0; // последний входящий клиент
 static WiFiServer*       s_srv     = nullptr;
 static GCWifiConnectedCb s_conn_cb = nullptr;
 static char              s_ip[20]  = {};
@@ -595,6 +597,8 @@ static void start_server() {
         return;
     }
     s_srv->begin();
+    s_srv_start_t  = millis();
+    s_last_client_t = millis();
     // mDNS: доступен как http://els.local:8080/ из любого браузера в той же сети
     MDNS.begin("els");
     MDNS.addService("http", "tcp", HTTP_PORT);
@@ -650,6 +654,7 @@ void GCodeWiFi_Process() {
     if (s_srv && s_srv->hasClient()) {
         WiFiClient cl = s_srv->accept();
         if (cl) {
+            s_last_client_t = millis();
             Serial.printf("[gcode] client: %s\n", cl.remoteIP().toString().c_str());
             handle_client(cl);
         }
@@ -664,7 +669,7 @@ void GCodeWiFi_Process() {
             WiFi.setSleep(false);
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
-            delay(500);  // дать TCP/IP стеку устояться
+            delay(2000);  // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
             start_server();
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
             Serial.println("[gcode] STA timeout → AP");
@@ -680,6 +685,12 @@ void GCodeWiFi_Process() {
             WiFi.disconnect(true);
             delay(100);
             WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASS);
+        } else if (s_srv && millis() - s_srv_start_t > 30000
+                         && millis() - s_last_client_t > 30000) {
+            // Watchdog: сервер запущен >30с, но ни одного клиента → перезапускаем
+            Serial.println("[gcode] watchdog: restarting server...");
+            s_last_client_t = millis();
+            start_server();
         }
     } else if (s_state == GCW_AP) {
         // Повторная попытка STA каждые 60 секунд (если SSID задан)
