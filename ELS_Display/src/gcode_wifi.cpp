@@ -17,7 +17,8 @@
 // ─── Состояние ────────────────────────────────────────────────────────────────
 
 static const char* GCODE_DIR    = "/gcode";
-static const uint16_t HTTP_PORT = 8080;
+static const uint16_t HTTP_PORT = 80;
+static bool s_mdns_started = false;
 
 enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
 static GcWifiSt          s_state      = GCW_INIT;
@@ -597,13 +598,24 @@ static void start_server() {
         return;
     }
     s_srv->begin();
-    s_srv_start_t  = millis();
+    s_srv_start_t   = millis();
     s_last_client_t = millis();
-    // mDNS: доступен как http://els.local:8080/ из любого браузера в той же сети
-    MDNS.begin("els");
-    MDNS.addService("http", "tcp", HTTP_PORT);
-    Serial.printf("[gcode] WiFiServer started: http://%s:%u/  (http://els.local:%u/)\n",
-                  s_ip, HTTP_PORT, HTTP_PORT);
+    // mDNS: инициализируем один раз
+    if (!s_mdns_started) {
+        if (MDNS.begin("els")) {
+            MDNS.addService("http", "tcp", HTTP_PORT);
+            s_mdns_started = true;
+            Serial.println("[gcode] mDNS: http://els.local/");
+        } else {
+            Serial.println("[gcode] mDNS: failed");
+        }
+    }
+    if (HTTP_PORT == 80) {
+        Serial.printf("[gcode] WiFiServer started: http://%s/  (http://els.local/)\n", s_ip);
+    } else {
+        Serial.printf("[gcode] WiFiServer started: http://%s:%u/  (http://els.local:%u/)\n",
+                      s_ip, HTTP_PORT, HTTP_PORT);
+    }
     notify_connected();
 }
 

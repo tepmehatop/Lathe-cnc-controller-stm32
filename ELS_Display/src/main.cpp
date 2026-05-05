@@ -5105,7 +5105,7 @@ void setup()
     // GCode WiFi: AP/STA + LittleFS + HTTP файловый менеджер (порт 80)
     GCodeWiFi_SetConnectedCallback([](const char* ip, bool is_ap) {
         char msg[48];
-        snprintf(msg, sizeof(msg), is_ap ? "AP: %s:8080" : "els.local:8080 (%s)", ip);
+        snprintf(msg, sizeof(msg), is_ap ? "AP: %s/" : "http://els.local/ (%s)", ip);
         show_alert(msg);
     });
     GCodeWiFi_Init();
