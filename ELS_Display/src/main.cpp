@@ -5110,6 +5110,7 @@ void setup()
     disp_drv.flush_cb     = my_disp_flush;
     disp_drv.draw_buf     = &draw_buf;
     disp_drv.full_refresh = 1;
+    disp_drv.sw_rotate    = 1;              // обязателен для lv_disp_set_rotation в LVGL v8
     lv_disp_t* p4_disp = lv_disp_drv_register(&disp_drv);
     // Поворот 90° → логическое разрешение 1280×800 (ландшафт)
     lv_disp_set_rotation(p4_disp, P4_LCD_ROTATION);
