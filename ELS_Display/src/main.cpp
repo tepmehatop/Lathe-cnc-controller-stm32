@@ -1,10 +1,13 @@
 /**
  * @file main.cpp
- * @brief ELS Display - Main firmware for ESP32/ESP32-S3
+ * @brief ELS Display - Main firmware for ESP32/ESP32-S3/ESP32-P4
  *
  * Supports:
- * - ESP32-2432S024 (2.4" 320x240) - ILI9341 via TFT_eSPI
- * - JC4827W543 (4.3" 480x272) - NV3041A via Arduino_GFX
+ * - ESP32-2432S024 (2.4" 320x240)   - ILI9341 via TFT_eSPI
+ * - JC4827W543     (4.3" 480x272)   - NV3041A via Arduino_GFX, ESP32-S3
+ * - JC8012P4A1C    (10.1" 800x1280) - JD9365 via MIPI-DSI, ESP32-P4
+ *
+ * Выбор дисплея: -DJC4827W543_DISPLAY=1 или -DJC8012P4A1C_DISPLAY=1 в platformio.ini
  */
 
 #include <Arduino.h>
@@ -164,16 +167,24 @@ LV_FONT_DECLARE(font_din_cond_56);
     #include <Arduino_GFX_Library.h>
     #include <TouchLib.h>
 
-    // NV3041A QSPI Bus
     Arduino_DataBus *bus = new Arduino_ESP32QSPI(
         45 /* CS */, 47 /* SCK */, 21 /* D0 */, 48 /* D1 */, 40 /* D2 */, 39 /* D3 */
     );
-
-    // NV3041A Panel (480x272) - used directly for LVGL (no Canvas needed)
-    Arduino_GFX *gfx = new Arduino_NV3041A(bus, GFX_NOT_DEFINED /* RST */, 0 /* rotation */, true /* IPS */);
-
-    // Touch GT911
+    Arduino_GFX *gfx = new Arduino_NV3041A(bus, GFX_NOT_DEFINED, 0, true /* IPS */);
     TouchLib touch(Wire, TOUCH_SDA, TOUCH_SCL, GT911_SLAVE_ADDRESS1, TOUCH_RST);
+
+#elif defined(DISPLAY_JC8012P4A1C)
+    // JC8012P4A1C: ESP32-P4 + JD9365 (MIPI-DSI 2-lane) + GSL3680 Touch
+    // Физически 800x1280 (портрет), логически 1280x800 через LVGL поворот 90°
+    #include "display_config_p4.h"
+    #include "lcd/jd9365_lcd.h"
+    #include "touch/gsl3680_touch.h"
+
+    static jd9365_lcd   p4_lcd(P4_LCD_RST);
+    static gsl3680_touch p4_touch(P4_TP_SDA, P4_TP_SCL, P4_TP_RST, P4_TP_INT);
+    // Два PSRAM буфера под физическое разрешение (двойная буферизация)
+    static lv_color_t* p4_buf0 = nullptr;
+    static lv_color_t* p4_buf1_ptr = nullptr;
 
 #else
     // ESP32-2432S024: ESP32 + ILI9341 (SPI) + XPT2046 Touch
@@ -206,10 +217,7 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
     uint32_t h = (area->y2 - area->y1 + 1);
 
 #ifdef DISPLAY_JC4827W543
-    // Direct write to display
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)&color_p->full, w, h);
-
-    // Копируем в PSRAM framebuffer для скриншотов
     if (screen_fb) {
         uint16_t* src = (uint16_t*)&color_p->full;
         for (uint32_t row = 0; row < h; row++) {
@@ -217,8 +225,11 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
             memcpy(dst, src + row * w, w * 2);
         }
     }
+#elif defined(DISPLAY_JC8012P4A1C)
+    // ESP32-P4: MIPI-DSI через esp_lcd_panel_draw_bitmap
+    p4_lcd.lcd_draw_bitmap(area->x1, area->y1, area->x2 + 1, area->y2 + 1,
+                           (uint16_t *)&color_p->full);
 #else
-    // TFT_eSPI write
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
     tft.pushColors((uint16_t *)&color_p->full, w * h, true);
@@ -235,7 +246,6 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
 #ifdef DISPLAY_JC4827W543
-    // GT911 Touch
     if (touch.read()) {
         TP_Point p = touch.getPoint(0);
         data->point.x = p.x;
@@ -244,8 +254,19 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
+#elif defined(DISPLAY_JC8012P4A1C)
+    // GSL3680 Touch (координаты с зеркалированием по X для ландшафтного поворота)
+    uint16_t tx = 0, ty = 0;
+    bool pressed = p4_touch.getTouch(&tx, &ty);
+    tx = P4_LCD_H_RES - tx;  // горизонтальное зеркало (см. esp32p4_lvgl_v8.ino)
+    if (pressed) {
+        data->state = LV_INDEV_STATE_PR;
+        data->point.x = tx;
+        data->point.y = ty;
+    } else {
+        data->state = LV_INDEV_STATE_REL;
+    }
 #else
-    // XPT2046 - TODO: implement
     data->state = LV_INDEV_STATE_REL;
 #endif
 }
@@ -5042,18 +5063,22 @@ void setup()
 
     // Screenshot server запускается позже (после GCodeWiFi_Init) на порту 8081
 
+#elif defined(DISPLAY_JC8012P4A1C)
+    // === JC8012P4A1C Initialization (ESP32-P4, MIPI-DSI) ===
+    Serial.println("Initializing JC8012P4A1C (JD9365 DSI + GSL3680)...");
+    p4_lcd.begin();
+    Serial.println("JD9365 LCD init OK");
+    p4_touch.begin();
+    Serial.println("GSL3680 Touch init OK");
+
 #else
     // === ESP32-2432S024 Initialization ===
     Serial.println("Initializing ESP32-2432S024 (ILI9341)...");
-
     tft.begin();
     tft.setRotation(SCREEN_ROTATION);
     tft.fillScreen(TFT_BLACK);
-
-    // Backlight ON
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
-
     tft.setTextColor(TFT_WHITE);
     tft.setTextSize(2);
     tft.setCursor(10, 10);
@@ -5067,26 +5092,56 @@ void setup()
     Serial.println("Initializing LVGL...");
     lv_init();
 
+#ifdef DISPLAY_JC8012P4A1C
+    // P4: два полных PSRAM-буфера под физическое разрешение 800×1280
+    // full_refresh=true + LVGL поворот 90° → логика 1280×800
+    size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)P4_LCD_H_RES * P4_LCD_V_RES;
+    p4_buf0     = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
+    p4_buf1_ptr = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
+    if (!p4_buf0 || !p4_buf1_ptr) {
+        Serial.println("P4 LVGL buffers FAILED (no PSRAM?)");
+    }
+    lv_disp_draw_buf_init(&draw_buf, p4_buf0, p4_buf1_ptr, (lv_coord_t)P4_LCD_H_RES * P4_LCD_V_RES);
+
+    static lv_disp_drv_t disp_drv;
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res      = P4_LCD_H_RES;   // физ. 800
+    disp_drv.ver_res      = P4_LCD_V_RES;   // физ. 1280
+    disp_drv.flush_cb     = my_disp_flush;
+    disp_drv.draw_buf     = &draw_buf;
+    disp_drv.full_refresh = 1;
+    lv_disp_t* p4_disp = lv_disp_drv_register(&disp_drv);
+    // Поворот 90° → логическое разрешение 1280×800 (ландшафт)
+    lv_disp_set_rotation(p4_disp, P4_LCD_ROTATION);
+    p4_touch.set_rotation(1);  // синхронизируем поворот тача
+#else
     lv_disp_draw_buf_init(&draw_buf, buf1, NULL, SCREEN_WIDTH * 32);
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = SCREEN_WIDTH;
-    disp_drv.ver_res = SCREEN_HEIGHT;
+    disp_drv.hor_res  = SCREEN_WIDTH;
+    disp_drv.ver_res  = SCREEN_HEIGHT;
     disp_drv.flush_cb = my_disp_flush;
     disp_drv.draw_buf = &draw_buf;
     lv_disp_drv_register(&disp_drv);
+#endif
 
     static lv_indev_drv_t indev_drv;
     lv_indev_drv_init(&indev_drv);
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
+    indev_drv.type    = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = my_touchpad_read;
     lv_indev_drv_register(&indev_drv);
 
     Serial.println("LVGL initialized OK");
 
     // === UART Initialization ===
+#ifdef DISPLAY_JC8012P4A1C
+    // ESP32-P4: явно задаём GPIO пины (см. display_config_p4.h)
+    Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
     uart_protocol.begin(Serial2, UART_BAUD_RATE);
+#else
+    uart_protocol.begin(Serial2, UART_BAUD_RATE);
+#endif
     uart_protocol.setDataUpdateCallback(onDataUpdate);
     uart_protocol.setAlertCallback(show_alert);
     uart_protocol.setAlertDismissCallback(dismiss_alert);
