@@ -177,8 +177,8 @@ LV_FONT_DECLARE(font_din_cond_56);
     // JC8012P4A1C: ESP32-P4 + JD9365 (MIPI-DSI 2-lane) + GSL3680 Touch
     // Физически 800x1280 (портрет), логически 1280x800 через LVGL поворот 90°
     #include "display_config_p4.h"
-    #include "lcd/jd9365_lcd.h"
-    #include "touch/gsl3680_touch.h"
+    #include "jd9365_lcd.h"
+    #include "gsl3680_touch.h"
 
     static jd9365_lcd   p4_lcd(P4_LCD_RST);
     static gsl3680_touch p4_touch(P4_TP_SDA, P4_TP_SCL, P4_TP_RST, P4_TP_INT);
