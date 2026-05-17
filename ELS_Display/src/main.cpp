@@ -18,27 +18,27 @@
 #include "gcode_wifi.h"
 #include "gcode_exec.h"
 
-#ifdef DISPLAY_JC4827W543
-#include <WiFi.h>
-#include <esp_http_server.h>
+// ============================================================================
+// USB CDC Screenshot — общий код для jc4827w543 и jc8012p4a1c
+// ============================================================================
+#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C)
 
 // stb JPEG encoder (single-header)
 #define STBI_WRITE_NO_STDIO
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-
 // PSRAM framebuffer — RGB565 (заполняется в my_disp_flush)
 static uint16_t* screen_fb = nullptr;
 
-// JPEG буфер в PSRAM (~128KB достаточно для 480×272 при качестве 80)
+// JPEG буфер в PSRAM
 static uint8_t*  jpeg_buf  = nullptr;
 static uint32_t  jpeg_size = 0;
 static uint32_t  jpeg_cap  = 0;
 
-// Семафоры: httpd task (core 0) ↔ loop() task (core 1)
-static SemaphoreHandle_t sem_requested = nullptr;  // httpd → loop: "сделай скриншот"
-static SemaphoreHandle_t sem_done      = nullptr;  // loop → httpd: "готово"
+// Семафоры: capture task ↔ loop() task
+static SemaphoreHandle_t sem_requested = nullptr;
+static SemaphoreHandle_t sem_done      = nullptr;
 
 // stb callback — дописывает данные в jpeg_buf
 static void jpeg_write_cb(void* /*ctx*/, void* data, int size) {
@@ -47,76 +47,34 @@ static void jpeg_write_cb(void* /*ctx*/, void* data, int size) {
     jpeg_size += (uint32_t)size;
 }
 
-// Вызывается из loop() — конвертирует screen_fb RGB565 → JPEG в jpeg_buf
+// Конвертирует screen_fb RGB565 → JPEG в jpeg_buf
 static void do_capture() {
     if (!screen_fb || !jpeg_buf) { jpeg_size = 0; return; }
+#ifdef DISPLAY_JC8012P4A1C
+    const int W = 800;   // физ. ширина (flush после sw_rotate даёт физ. координаты 800×1280)
+    const int H = 1280;  // физ. высота
+#else
     const int W = SCREEN_WIDTH, H = SCREEN_HEIGHT;
-
-    // Временный RGB888 буфер в PSRAM (391KB — слишком большой для стека)
-    uint8_t* rgb = (uint8_t*)ps_malloc((size_t)W * H * 3);
+#endif
+    uint8_t* rgb = (uint8_t*)heap_caps_malloc((size_t)W * H * 3, MALLOC_CAP_SPIRAM);
     if (!rgb) { jpeg_size = 0; Serial.println("JPEG: ps_malloc rgb failed"); return; }
-
-    // RGB565 (LV_COLOR_16_SWAP=0) → RGB888
     for (int y = 0; y < H; y++) {
         const uint16_t* src = screen_fb + y * W;
         uint8_t*        dst = rgb + y * W * 3;
         for (int x = 0; x < W; x++) {
             uint16_t px = src[x];
-            dst[x*3+0] = (uint8_t)(((px >> 11) & 0x1F) << 3);  // R
-            dst[x*3+1] = (uint8_t)(((px >>  5) & 0x3F) << 2);  // G
-            dst[x*3+2] = (uint8_t)( (px        & 0x1F) << 3);  // B
+            dst[x*3+0] = (uint8_t)(((px >> 11) & 0x1F) << 3);
+            dst[x*3+1] = (uint8_t)(((px >>  5) & 0x3F) << 2);
+            dst[x*3+2] = (uint8_t)( (px        & 0x1F) << 3);
         }
     }
-
     jpeg_size = 0;
     stbi_write_jpg_to_func(jpeg_write_cb, nullptr, W, H, 3, rgb, 80);
     free(rgb);
     Serial.printf("JPEG ready: %u bytes\n", jpeg_size);
 }
 
-// HTTP handler — работает в httpd task (core 0)
-// Сигналит loop() сделать скриншот, ждёт результата, шлёт JPEG
-static esp_err_t screenshot_handler(httpd_req_t* req) {
-    if (!screen_fb || !jpeg_buf || !sem_requested || !sem_done) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not ready");
-        return ESP_FAIL;
-    }
-
-    // Запрашиваем захват у loop() task
-    xSemaphoreGive(sem_requested);
-
-    // Ждём завершения (max 5 секунд)
-    if (xSemaphoreTake(sem_done, pdMS_TO_TICKS(5000)) != pdTRUE) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture timeout");
-        return ESP_FAIL;
-    }
-
-    if (jpeg_size == 0) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture failed");
-        return ESP_FAIL;
-    }
-
-    httpd_resp_set_type(req, "image/jpeg");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-
-    // Chunked transfer по 4KB
-    const size_t CHUNK = 4096;
-    esp_err_t ret = ESP_OK;
-    size_t sent = 0;
-    while (sent < jpeg_size && ret == ESP_OK) {
-        size_t chunk = jpeg_size - sent;
-        if (chunk > CHUNK) chunk = CHUNK;
-        ret = httpd_resp_send_chunk(req, (const char*)jpeg_buf + sent, (ssize_t)chunk);
-        if (ret == ESP_OK) sent += chunk;
-    }
-    Serial.printf("Screenshot: sent %u/%u bytes, ret=%d\n",
-                  (unsigned)sent, (unsigned)jpeg_size, ret);
-    if (ret == ESP_OK) httpd_resp_send_chunk(req, nullptr, 0);
-    return ret;
-}
-
 // FreeRTOS задача с большим стеком (32KB) — ждёт запрос, кодирует JPEG
-// (stb JPEG нужно ~10-16KB стека, Arduino loop() имеет 8KB — мало!)
 static void capture_task_fn(void* /*pvParameters*/) {
     while (true) {
         if (sem_requested && xSemaphoreTake(sem_requested, portMAX_DELAY) == pdTRUE) {
@@ -126,7 +84,44 @@ static void capture_task_fn(void* /*pvParameters*/) {
     }
 }
 
-// Noop — всё делает capture_task_fn
+#endif // DISPLAY_JC4827W543 || DISPLAY_JC8012P4A1C
+
+// ============================================================================
+// jc4827w543 only: WiFi + HTTP screenshot server
+// ============================================================================
+#ifdef DISPLAY_JC4827W543
+#include <WiFi.h>
+#include <esp_http_server.h>
+
+static esp_err_t screenshot_handler(httpd_req_t* req) {
+    if (!screen_fb || !jpeg_buf || !sem_requested || !sem_done) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not ready");
+        return ESP_FAIL;
+    }
+    xSemaphoreGive(sem_requested);
+    if (xSemaphoreTake(sem_done, pdMS_TO_TICKS(5000)) != pdTRUE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture timeout");
+        return ESP_FAIL;
+    }
+    if (jpeg_size == 0) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Capture failed");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "image/jpeg");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    const size_t CHUNK = 4096;
+    esp_err_t ret = ESP_OK;
+    size_t sent = 0;
+    while (sent < jpeg_size && ret == ESP_OK) {
+        size_t chunk = jpeg_size - sent;
+        if (chunk > CHUNK) chunk = CHUNK;
+        ret = httpd_resp_send_chunk(req, (const char*)jpeg_buf + sent, (ssize_t)chunk);
+        if (ret == ESP_OK) sent += chunk;
+    }
+    if (ret == ESP_OK) httpd_resp_send_chunk(req, nullptr, 0);
+    return ret;
+}
+
 static void handle_screenshot_server() { }
 #endif // DISPLAY_JC4827W543
 
@@ -226,9 +221,22 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // ESP32-P4: MIPI-DSI через esp_lcd_panel_draw_bitmap
-    p4_lcd.lcd_draw_bitmap(area->x1, area->y1, area->x2 + 1, area->y2 + 1,
-                           (uint16_t *)&color_p->full);
+    // ESP32-P4: LVGL hor=1280, ver=800 (логика), full_refresh=1 → area=(0,0)-(1279,799)
+    // Вручную поворачиваем 90° CCW: logical(lx,ly) → physical(px=ly, py=1279-lx)
+    // screen_fb используется как буфер ротации (800×1280 физических пикселей)
+    if (screen_fb) {
+        uint16_t* src = (uint16_t*)&color_p->full;
+        for (int ly = 0; ly < 800; ly++) {
+            const uint16_t* row_src = src + ly * 1280;
+            for (int lx = 0; lx < 1280; lx++) {
+                screen_fb[(1279 - lx) * 800 + ly] = row_src[lx];
+            }
+        }
+        p4_lcd.lcd_draw_bitmap(0, 0, 800, 1280, screen_fb);
+    } else {
+        p4_lcd.lcd_draw_bitmap(area->x1, area->y1, area->x2 + 1, area->y2 + 1,
+                               (uint16_t *)&color_p->full);
+    }
 #else
     tft.startWrite();
     tft.setAddrWindow(area->x1, area->y1, w, h);
@@ -255,14 +263,14 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
         data->state = LV_INDEV_STATE_REL;
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // GSL3680 Touch (координаты с зеркалированием по X для ландшафтного поворота)
+    // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CCW)
+    // 90° CCW inverse: logical_x = ty, logical_y = 799 - tx
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
-    tx = P4_LCD_H_RES - tx;  // горизонтальное зеркало (см. esp32p4_lvgl_v8.ino)
     if (pressed) {
         data->state = LV_INDEV_STATE_PR;
-        data->point.x = tx;
-        data->point.y = ty;
+        data->point.x = (lv_coord_t)ty;
+        data->point.y = (lv_coord_t)(799 - tx);
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
@@ -5071,6 +5079,22 @@ void setup()
     p4_touch.begin();
     Serial.println("GSL3680 Touch init OK");
 
+    // Screenshot инфраструктура (физический буфер 800×1280)
+    screen_fb = (uint16_t*)heap_caps_malloc((uint32_t)P4_LCD_H_RES * P4_LCD_V_RES * 2, MALLOC_CAP_SPIRAM);
+    if (screen_fb) {
+        memset(screen_fb, 0, (uint32_t)P4_LCD_H_RES * P4_LCD_V_RES * 2);
+        Serial.println("P4 screen_fb allocated OK");
+    } else {
+        Serial.println("P4 screen_fb FAILED");
+    }
+    sem_requested = xSemaphoreCreateBinary();
+    sem_done      = xSemaphoreCreateBinary();
+    jpeg_cap = (uint32_t)P4_LCD_H_RES * P4_LCD_V_RES * 2;  // 2MB — запас для 800×1280 JPEG
+    jpeg_buf = (uint8_t*)heap_caps_malloc(jpeg_cap, MALLOC_CAP_SPIRAM);
+    if (jpeg_buf) Serial.printf("P4 JPEG buffer: %u bytes OK\n", jpeg_cap);
+    xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
+    Serial.println("P4 JPEG capture task started");
+
 #else
     // === ESP32-2432S024 Initialization ===
     Serial.println("Initializing ESP32-2432S024 (ILI9341)...");
@@ -5093,28 +5117,21 @@ void setup()
     lv_init();
 
 #ifdef DISPLAY_JC8012P4A1C
-    // P4: два полных PSRAM-буфера под физическое разрешение 800×1280
-    // full_refresh=true + LVGL поворот 90° → логика 1280×800
-    size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)P4_LCD_H_RES * P4_LCD_V_RES;
-    p4_buf0     = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
-    p4_buf1_ptr = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
-    if (!p4_buf0 || !p4_buf1_ptr) {
-        Serial.println("P4 LVGL buffers FAILED (no PSRAM?)");
-    }
-    lv_disp_draw_buf_init(&draw_buf, p4_buf0, p4_buf1_ptr, (lv_coord_t)P4_LCD_H_RES * P4_LCD_V_RES);
+    // P4: логика 1280×800, ротация делается вручную в my_disp_flush (90° CCW)
+    // screen_fb (800×1280) используется как буфер ротации — выделяется выше в init
+    size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)SCREEN_WIDTH * SCREEN_HEIGHT;
+    p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
+    if (!p4_buf0) Serial.println("P4 LVGL buf FAILED");
+    lv_disp_draw_buf_init(&draw_buf, p4_buf0, nullptr, (lv_coord_t)SCREEN_WIDTH * SCREEN_HEIGHT);
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res      = P4_LCD_H_RES;   // физ. 800
-    disp_drv.ver_res      = P4_LCD_V_RES;   // физ. 1280
+    disp_drv.hor_res      = SCREEN_WIDTH;   // логических 1280
+    disp_drv.ver_res      = SCREEN_HEIGHT;  // логических 800
     disp_drv.flush_cb     = my_disp_flush;
     disp_drv.draw_buf     = &draw_buf;
     disp_drv.full_refresh = 1;
-    disp_drv.sw_rotate    = 1;              // обязателен для lv_disp_set_rotation в LVGL v8
-    lv_disp_t* p4_disp = lv_disp_drv_register(&disp_drv);
-    // Поворот 90° → логическое разрешение 1280×800 (ландшафт)
-    lv_disp_set_rotation(p4_disp, P4_LCD_ROTATION);
-    p4_touch.set_rotation(1);  // синхронизируем поворот тача
+    lv_disp_drv_register(&disp_drv);
 #else
     lv_disp_draw_buf_init(&draw_buf, buf1, NULL, SCREEN_WIDTH * 32);
 
@@ -5238,9 +5255,11 @@ void loop()
         }
     }
 
+#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C)
 #ifdef DISPLAY_JC4827W543
     // Проверяем HTTP screenshot сервер
     handle_screenshot_server();
+#endif
 
     // USB CDC Screenshot state machine
     // Протокол: PC шлёт 'S' → ESP32 отвечает {0xDE,0xAD,0xBE,0xEF} + 4-byte LE size + JPEG
@@ -5290,7 +5309,7 @@ void loop()
             }
         }
     }
-#endif
+#endif  // DISPLAY_JC4827W543 || DISPLAY_JC8012P4A1C
 
     delay(5);
 }

@@ -19,6 +19,13 @@ import subprocess
 import time
 from datetime import datetime
 
+try:
+    from PIL import Image
+    import io
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
 MAGIC = b'\xDE\xAD\xBE\xEF'
 TIMEOUT = 15  # секунд
 
@@ -111,7 +118,7 @@ def take_screenshot(port):
     jpeg_size = struct.unpack('<I', size_bytes)[0]
     print(f"Размер JPEG: {jpeg_size} байт ({jpeg_size/1024:.1f} KB)")
 
-    if jpeg_size == 0 or jpeg_size > 300000:
+    if jpeg_size == 0 or jpeg_size > 5000000:
         print(f"Ошибка: неправильный размер JPEG ({jpeg_size})")
         ser.close()
         return None
@@ -134,6 +141,20 @@ def take_screenshot(port):
 
     print(f"\r  100% ({jpeg_size} байт) — готово!          ")
     ser.close()
+
+    # Если JPEG портретный (800×1280) — автоповорот на 90° CCW → ландшафт 1280×800
+    if HAS_PIL:
+        try:
+            img = Image.open(io.BytesIO(jpeg_data))
+            w, h = img.size
+            if h > w:  # портретный кадр (физические coords P4)
+                img = img.rotate(90, expand=True)
+                print(f"  Авто-поворот 90° (физический {w}×{h} → логический {img.width}×{img.height})")
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=90)
+            jpeg_data = buf.getvalue()
+        except Exception as e:
+            print(f"  PIL rotate failed: {e} — сохраняем как есть")
 
     # Сохраняем файл
     out_dir = os.path.dirname(os.path.abspath(__file__))
