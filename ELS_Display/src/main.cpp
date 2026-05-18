@@ -221,14 +221,16 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // P4: LVGL 1280×800 → CCW-поворот → screen_fb 800×1280
-    // Модуль смонтирован CCW. С hw mirror_x/y: fb[(1279-lx)*800+ly] ← lvgl[ly*1280+lx]
+    // P4: LVGL 1280×800 → rotation270 → screen_fb 800×1280
+    // fb[row=1279-lx][col=ly] = LVGL(lx,ly). Sequential write = cache-friendly.
     if (screen_fb) {
-        uint16_t* src = (uint16_t*)&color_p->full;
-        for (int ly = 0; ly < 800; ly++) {
-            const uint16_t* row_src = src + (uint32_t)ly * 1280;
-            for (int lx = 0; lx < 1280; lx++) {
-                screen_fb[(uint32_t)(1279 - lx) * 800 + ly] = row_src[lx];
+        const uint16_t* src = (const uint16_t*)&color_p->full;
+        for (int row = 0; row < 1280; row++) {
+            uint16_t* dst = screen_fb + (uint32_t)row * 800;
+            int lx = 1279 - row;
+            const uint16_t* col_src = src + lx;
+            for (int ly = 0; ly < 800; ly++) {
+                dst[ly] = col_src[(uint32_t)ly * 1280];
             }
         }
         p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
@@ -259,14 +261,15 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
         data->state = LV_INDEV_STATE_REL;
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // GSL3680 Touch: getTouch() уже применяет mirror_x/y → (tx∈[0..799], ty∈[0..1279])
-    // CCW монтаж → lx_lvgl = 1279-ty, ly_lvgl = tx → LVGL 1280×800
+    // GSL3680 Touch: mirror_x/y в конфиге → tx=799-raw_x, ty=1279-raw_y
+    // Flush=rotation270CW: LVGL(lx,ly) → физ.(1279-lx, ly); обратно: lx=raw_y, ly=raw_x
+    // С mirror: lx=1279-ty=raw_y, ly=799-tx=raw_x
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {
         data->state = LV_INDEV_STATE_PR;
         data->point.x = (lv_coord_t)(P4_LCD_V_RES - 1 - ty);
-        data->point.y = (lv_coord_t)tx;
+        data->point.y = (lv_coord_t)(P4_LCD_H_RES - 1 - tx);
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
@@ -5313,5 +5316,7 @@ void loop()
     }
 #endif  // DISPLAY_JC4827W543 || DISPLAY_JC8012P4A1C
 
+#ifndef DISPLAY_JC8012P4A1C
     delay(5);
+#endif
 }
