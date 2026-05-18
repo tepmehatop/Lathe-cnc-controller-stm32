@@ -222,14 +222,15 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
     }
 #elif defined(DISPLAY_JC8012P4A1C)
     // ESP32-P4: LVGL hor=1280, ver=800 (логика), full_refresh=1 → area=(0,0)-(1279,799)
-    // Вручную поворачиваем 90° CCW: logical(lx,ly) → physical(px=ly, py=1279-lx)
-    // screen_fb используется как буфер ротации (800×1280 физических пикселей)
+    // Поворот 90° CW (с учётом hardware mirror_x/y в драйвере JD9365):
+    //   logical(lx, ly) → screen_fb[lx*800 + (799-ly)]
+    //   ↳ glass: (ly, 1279-lx) → CW landscape: (lx, ly) = logical(lx, ly) ✓
     if (screen_fb) {
         uint16_t* src = (uint16_t*)&color_p->full;
         for (int ly = 0; ly < 800; ly++) {
             const uint16_t* row_src = src + ly * 1280;
             for (int lx = 0; lx < 1280; lx++) {
-                screen_fb[(1279 - lx) * 800 + ly] = row_src[lx];
+                screen_fb[lx * 800 + (799 - ly)] = row_src[lx];
             }
         }
         p4_lcd.lcd_draw_bitmap(0, 0, 800, 1280, screen_fb);
@@ -263,8 +264,9 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
         data->state = LV_INDEV_STATE_REL;
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CCW)
-    // 90° CCW inverse: logical_x = ty, logical_y = 799 - tx
+    // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CW + mirror)
+    // driver mirror_x/y: tx=799-px_glass, ty=1279-py_glass
+    // CW landscape: lx = ty (=lx_orig), ly = 799-tx (=ly_orig)
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {

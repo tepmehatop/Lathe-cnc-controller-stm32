@@ -142,14 +142,16 @@ def take_screenshot(port):
     print(f"\r  100% ({jpeg_size} байт) — готово!          ")
     ser.close()
 
-    # Если JPEG портретный (800×1280) — автоповорот на 90° CCW → ландшафт 1280×800
+    # Если JPEG портретный (800×1280) — автоповорот на 90° CW → ландшафт 1280×800
+    # JC8012P4A1C: физический буфер screen_fb хранит пиксели с поворотом 90° CW,
+    # поэтому для просмотра нужен обратный поворот -90° (CW) = rotate(-90)
     if HAS_PIL:
         try:
             img = Image.open(io.BytesIO(jpeg_data))
             w, h = img.size
             if h > w:  # портретный кадр (физические coords P4)
-                img = img.rotate(90, expand=True)
-                print(f"  Авто-поворот 90° (физический {w}×{h} → логический {img.width}×{img.height})")
+                img = img.rotate(-90, expand=True)
+                print(f"  Авто-поворот -90° (физический {w}×{h} → логический {img.width}×{img.height})")
             buf = io.BytesIO()
             img.save(buf, format='JPEG', quality=90)
             jpeg_data = buf.getvalue()
