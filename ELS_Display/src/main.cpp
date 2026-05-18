@@ -221,17 +221,42 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // ESP32-P4: LVGL 480×272 → масштаб + CW-поворот → screen_fb 800×1280
-    // hw mirror_x/y: glass(799-px, 1279-py); CW: lx_land=gy, ly_land=799-gx
-    // → fb[row,col] ← lvgl[ col*272/800, (1279-row)*480/1280 ]
+    // P4: LVGL 480×272 → bilinear upscale + CW-rotate → screen_fb 800×1280
+    // CW+mirror: fb[fb_row, fb_col] ← lvgl[ fy=fb_col*271/799, fx=(1279-fb_row)*479/1279 ]
     if (screen_fb) {
+        static int lut_row0[P4_LCD_H_RES], lut_row1[P4_LCD_H_RES], lut_ty[P4_LCD_H_RES];
+        static bool lut_ready = false;
+        if (!lut_ready) {
+            for (int fc = 0; fc < P4_LCD_H_RES; fc++) {
+                int fy_fp = fc * (SCREEN_HEIGHT - 1) * 256 / (P4_LCD_H_RES - 1);
+                int ly0 = fy_fp >> 8;
+                int ly1 = (ly0 + 1 < SCREEN_HEIGHT) ? ly0 + 1 : SCREEN_HEIGHT - 1;
+                lut_row0[fc] = ly0 * SCREEN_WIDTH;
+                lut_row1[fc] = ly1 * SCREEN_WIDTH;
+                lut_ty[fc]   = fy_fp & 0xFF;
+            }
+            lut_ready = true;
+        }
         uint16_t* src = (uint16_t*)&color_p->full;
         for (int fb_row = 0; fb_row < P4_LCD_V_RES; fb_row++) {
-            int lx_lvgl = (P4_LCD_V_RES - 1 - fb_row) * SCREEN_WIDTH / P4_LCD_V_RES;
+            int fx_fp = (P4_LCD_V_RES - 1 - fb_row) * (SCREEN_WIDTH - 1) * 256 / (P4_LCD_V_RES - 1);
+            int lx0 = fx_fp >> 8;
+            int lx1 = (lx0 + 1 < SCREEN_WIDTH) ? lx0 + 1 : SCREEN_WIDTH - 1;
+            int tx = fx_fp & 0xFF;
+            int itx = 256 - tx;
             uint16_t* dst = screen_fb + fb_row * P4_LCD_H_RES;
-            for (int fb_col = 0; fb_col < P4_LCD_H_RES; fb_col++) {
-                int ly_lvgl = fb_col * SCREEN_HEIGHT / P4_LCD_H_RES;
-                dst[fb_col] = src[ly_lvgl * SCREEN_WIDTH + lx_lvgl];
+            for (int fc = 0; fc < P4_LCD_H_RES; fc++) {
+                int r0 = lut_row0[fc], r1 = lut_row1[fc];
+                int ty_val = lut_ty[fc], ity = 256 - ty_val;
+                uint16_t p00 = src[r0 + lx0], p10 = src[r0 + lx1];
+                uint16_t p01 = src[r1 + lx0], p11 = src[r1 + lx1];
+                int r = ((((p00>>11&31)*itx + (p10>>11&31)*tx)*ity +
+                           ((p01>>11&31)*itx + (p11>>11&31)*tx)*ty_val) >> 16);
+                int g = ((((p00>>5&63)*itx  + (p10>>5&63)*tx )*ity +
+                           ((p01>>5&63)*itx  + (p11>>5&63)*tx )*ty_val) >> 16);
+                int b = ((((p00&31)*itx      + (p10&31)*tx    )*ity +
+                           ((p01&31)*itx      + (p11&31)*tx    )*ty_val) >> 16);
+                dst[fc] = ((uint16_t)r << 11) | ((uint16_t)g << 5) | (uint16_t)b;
             }
         }
         p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
