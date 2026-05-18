@@ -8,6 +8,7 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_ldo_regulator.h"
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "Arduino.h"
@@ -51,21 +52,43 @@ void jd9365_lcd::example_bsp_enable_dsi_phy_power()
 #endif
 }
 
+#define BL_LEDC_TIMER      LEDC_TIMER_0
+#define BL_LEDC_CHANNEL    LEDC_CHANNEL_0
+#define BL_LEDC_FREQ_HZ    20000
+#define BL_LEDC_DUTY_RES   LEDC_TIMER_8_BIT  // 0-255
+#define BL_LEDC_MAX_DUTY   255
+
 void jd9365_lcd::example_bsp_init_lcd_backlight()
 {
 #if EXAMPLE_PIN_NUM_BK_LIGHT >= 0
-    gpio_config_t bk_gpio_config = {
-        .pin_bit_mask = 1ULL << EXAMPLE_PIN_NUM_BK_LIGHT,
-        .mode = GPIO_MODE_OUTPUT
-        };
-    ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
+    ledc_timer_config_t timer = {
+        .speed_mode      = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = BL_LEDC_DUTY_RES,
+        .timer_num       = BL_LEDC_TIMER,
+        .freq_hz         = BL_LEDC_FREQ_HZ,
+        .clk_cfg         = LEDC_AUTO_CLK,
+    };
+    ledc_timer_config(&timer);
+
+    ledc_channel_config_t ch = {
+        .gpio_num   = EXAMPLE_PIN_NUM_BK_LIGHT,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel    = BL_LEDC_CHANNEL,
+        .timer_sel  = BL_LEDC_TIMER,
+        .duty       = 0,
+        .hpoint     = 0,
+    };
+    ledc_channel_config(&ch);
 #endif
 }
 
 void jd9365_lcd::example_bsp_set_lcd_backlight(uint32_t level)
 {
 #if EXAMPLE_PIN_NUM_BK_LIGHT >= 0
-    gpio_set_level(EXAMPLE_PIN_NUM_BK_LIGHT, level);
+    // level 0 = off, 1 = on (100%), или 0-255 для PWM
+    uint32_t duty = (level == 0) ? 0 : (level <= 1 ? BL_LEDC_MAX_DUTY : level);
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL, duty);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, BL_LEDC_CHANNEL);
 #endif
 }
 

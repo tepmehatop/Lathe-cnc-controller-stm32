@@ -221,14 +221,14 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // P4: LVGL 1280×800 нативно → CW-поворот → screen_fb 800×1280
-    // hw mirror_x/y + CW: fb[lx*800+(799-ly)] ← lvgl[ly*1280+lx]
+    // P4: LVGL 1280×800 → CCW-поворот → screen_fb 800×1280
+    // Модуль смонтирован CCW. С hw mirror_x/y: fb[(1279-lx)*800+ly] ← lvgl[ly*1280+lx]
     if (screen_fb) {
         uint16_t* src = (uint16_t*)&color_p->full;
         for (int ly = 0; ly < 800; ly++) {
             const uint16_t* row_src = src + (uint32_t)ly * 1280;
             for (int lx = 0; lx < 1280; lx++) {
-                screen_fb[(uint32_t)lx * 800 + (799 - ly)] = row_src[lx];
+                screen_fb[(uint32_t)(1279 - lx) * 800 + ly] = row_src[lx];
             }
         }
         p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
