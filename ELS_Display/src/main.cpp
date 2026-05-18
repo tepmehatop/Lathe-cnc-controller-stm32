@@ -221,42 +221,14 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // P4: LVGL 480×272 → bilinear upscale + CW-rotate → screen_fb 800×1280
-    // CW+mirror: fb[fb_row, fb_col] ← lvgl[ fy=fb_col*271/799, fx=(1279-fb_row)*479/1279 ]
+    // P4: LVGL 1280×800 нативно → CW-поворот → screen_fb 800×1280
+    // hw mirror_x/y + CW: fb[lx*800+(799-ly)] ← lvgl[ly*1280+lx]
     if (screen_fb) {
-        static int lut_row0[P4_LCD_H_RES], lut_row1[P4_LCD_H_RES], lut_ty[P4_LCD_H_RES];
-        static bool lut_ready = false;
-        if (!lut_ready) {
-            for (int fc = 0; fc < P4_LCD_H_RES; fc++) {
-                int fy_fp = fc * (SCREEN_HEIGHT - 1) * 256 / (P4_LCD_H_RES - 1);
-                int ly0 = fy_fp >> 8;
-                int ly1 = (ly0 + 1 < SCREEN_HEIGHT) ? ly0 + 1 : SCREEN_HEIGHT - 1;
-                lut_row0[fc] = ly0 * SCREEN_WIDTH;
-                lut_row1[fc] = ly1 * SCREEN_WIDTH;
-                lut_ty[fc]   = fy_fp & 0xFF;
-            }
-            lut_ready = true;
-        }
         uint16_t* src = (uint16_t*)&color_p->full;
-        for (int fb_row = 0; fb_row < P4_LCD_V_RES; fb_row++) {
-            int fx_fp = (P4_LCD_V_RES - 1 - fb_row) * (SCREEN_WIDTH - 1) * 256 / (P4_LCD_V_RES - 1);
-            int lx0 = fx_fp >> 8;
-            int lx1 = (lx0 + 1 < SCREEN_WIDTH) ? lx0 + 1 : SCREEN_WIDTH - 1;
-            int tx = fx_fp & 0xFF;
-            int itx = 256 - tx;
-            uint16_t* dst = screen_fb + fb_row * P4_LCD_H_RES;
-            for (int fc = 0; fc < P4_LCD_H_RES; fc++) {
-                int r0 = lut_row0[fc], r1 = lut_row1[fc];
-                int ty_val = lut_ty[fc], ity = 256 - ty_val;
-                uint16_t p00 = src[r0 + lx0], p10 = src[r0 + lx1];
-                uint16_t p01 = src[r1 + lx0], p11 = src[r1 + lx1];
-                int r = ((((p00>>11&31)*itx + (p10>>11&31)*tx)*ity +
-                           ((p01>>11&31)*itx + (p11>>11&31)*tx)*ty_val) >> 16);
-                int g = ((((p00>>5&63)*itx  + (p10>>5&63)*tx )*ity +
-                           ((p01>>5&63)*itx  + (p11>>5&63)*tx )*ty_val) >> 16);
-                int b = ((((p00&31)*itx      + (p10&31)*tx    )*ity +
-                           ((p01&31)*itx      + (p11&31)*tx    )*ty_val) >> 16);
-                dst[fc] = ((uint16_t)r << 11) | ((uint16_t)g << 5) | (uint16_t)b;
+        for (int ly = 0; ly < 800; ly++) {
+            const uint16_t* row_src = src + (uint32_t)ly * 1280;
+            for (int lx = 0; lx < 1280; lx++) {
+                screen_fb[(uint32_t)lx * 800 + (799 - ly)] = row_src[lx];
             }
         }
         p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
@@ -288,13 +260,13 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     }
 #elif defined(DISPLAY_JC8012P4A1C)
     // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CW + mirror)
-    // CW: lx_land=ty, ly_land=799-tx; масштаб → LVGL 480×272
+    // CW: lx_lvgl = ty (0..1279), ly_lvgl = 799-tx (0..799) → LVGL 1280×800
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {
         data->state = LV_INDEV_STATE_PR;
-        data->point.x = (lv_coord_t)(ty * SCREEN_WIDTH / P4_LCD_V_RES);
-        data->point.y = (lv_coord_t)((P4_LCD_H_RES - 1 - tx) * SCREEN_HEIGHT / P4_LCD_H_RES);
+        data->point.x = (lv_coord_t)ty;
+        data->point.y = (lv_coord_t)(P4_LCD_H_RES - 1 - tx);
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
@@ -337,7 +309,7 @@ lv_obj_t* create_font_demo_screen()
 
         // Фон строки
         lv_obj_t* row_bg = lv_obj_create(screen);
-        lv_obj_set_size(row_bg, 480, row_h);
+        lv_obj_set_size(row_bg, SCREEN_WIDTH, row_h);
         lv_obj_set_pos(row_bg, 0, y);
         lv_obj_set_style_bg_color(row_bg, lv_color_hex(bg_clr[i]), 0);
         lv_obj_set_style_radius(row_bg, 0, 0);
@@ -1062,8 +1034,8 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
 static void create_k_content(lv_obj_t* screen)
 {
     lv_obj_t* panel = lv_obj_create(screen);
-    lv_obj_set_size(panel, 480, 236);
-    lv_obj_set_pos(panel, 0, 36);
+    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - SCALE_H(36));
+    lv_obj_set_pos(panel, 0, SCALE_H(36));
     lv_obj_set_style_bg_color(panel, lv_color_hex(0x0a0a0a), 0);
     lv_obj_set_style_radius(panel, 0, 0);
     lv_obj_set_style_pad_all(panel, 0, 0);
@@ -1071,17 +1043,17 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
     g_ui.k_content = panel;
 
-    const int PAD = 6, GAP = 4;
-    const int RIGHT_W = 56;
-    const int LEFT_W  = 480 - 2*PAD - RIGHT_W - GAP;   // 408
-    const int INNER_H = 236 - 2*PAD;                   // 224
-    const int FEAT_H  = 72;
-    const int GRID_Y  = PAD + FEAT_H + GAP;            // 82
-    const int GRID_H  = INNER_H - FEAT_H - GAP;        // 148
-    const int ROW_H   = (GRID_H - GAP) / 2;            // 72
-    const int COL_W0  = (LEFT_W - 2*GAP) / 3;          // 133
-    const int COL_W2  = LEFT_W - 2*COL_W0 - 2*GAP;    // 134
-    const int RIGHT_X = PAD + LEFT_W + GAP;            // 418
+    const int PAD = SCALE_X(6), GAP = SCALE_X(4);
+    const int RIGHT_W = SCALE_X(56);
+    const int LEFT_W   = SCREEN_WIDTH - 2*PAD - RIGHT_W - GAP;
+    const int INNER_H  = (SCREEN_HEIGHT - SCALE_H(36)) - 2*PAD;
+    const int FEAT_H   = SCALE_H(72);
+    const int GRID_Y   = PAD + FEAT_H + GAP;
+    const int GRID_H   = INNER_H - FEAT_H - GAP;
+    const int ROW_H    = (GRID_H - GAP) / 2;
+    const int COL_W0   = (LEFT_W - 2*GAP) / 3;
+    const int COL_W2   = LEFT_W - 2*COL_W0 - 2*GAP;
+    const int RIGHT_X  = PAD + LEFT_W + GAP;
     int col_x[3] = { PAD, PAD + COL_W0 + GAP, PAD + 2*COL_W0 + 2*GAP };
 
     // ── Featured cell ────────────────────────────────────────────────────────
@@ -1367,8 +1339,8 @@ static void create_k_content(lv_obj_t* screen)
 static void create_i_content(lv_obj_t* screen)
 {
     lv_obj_t* panel = lv_obj_create(screen);
-    lv_obj_set_size(panel, 480, 236);
-    lv_obj_set_pos(panel, 0, 36);
+    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - SCALE_H(36));
+    lv_obj_set_pos(panel, 0, SCALE_H(36));
     lv_obj_set_style_bg_color(panel, lv_color_hex(0x0a0a0a), 0);
     lv_obj_set_style_radius(panel, 0, 0);
     lv_obj_set_style_pad_all(panel, 0, 0);
@@ -1377,13 +1349,13 @@ static void create_i_content(lv_obj_t* screen)
     lv_obj_add_flag(panel, LV_OBJ_FLAG_HIDDEN);  // hidden by default
     g_ui.i_content = panel;
 
-    const int PAD = 6, GAP = 4;
-    const int BTN_H   = 36;
-    const int INNER_W = 480 - 2*PAD;       // 468
-    const int INNER_H = 236 - 2*PAD;       // 224
-    const int GRID_H  = INNER_H - BTN_H - GAP;   // 182
-    const int ROW_H   = (GRID_H - GAP) / 2;      // 89
-    const int COL_W   = (INNER_W - 2*GAP) / 3;   // 153
+    const int PAD = SCALE_X(6), GAP = SCALE_X(4);
+    const int BTN_H   = SCALE_H(36);
+    const int INNER_W = SCREEN_WIDTH - 2*PAD;
+    const int INNER_H = (SCREEN_HEIGHT - SCALE_H(36)) - 2*PAD;
+    const int GRID_H  = INNER_H - BTN_H - GAP;
+    const int ROW_H   = (GRID_H - GAP) / 2;
+    const int COL_W   = (INNER_W - 2*GAP) / 3;
     int col_x[3] = { PAD, PAD + COL_W + GAP, PAD + 2*COL_W + 2*GAP };
     int row_y[2] = { PAD, PAD + ROW_H + GAP };
 
@@ -1602,7 +1574,7 @@ static void switch_layout(uint8_t new_layout)
 static void create_settings_menu(lv_obj_t* screen)
 {
     lv_obj_t* ov = lv_obj_create(screen);
-    lv_obj_set_size(ov, 480, 272);
+    lv_obj_set_size(ov, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_set_pos(ov, 0, 0);
     lv_obj_set_style_bg_color(ov, lv_color_hex(0x000814), 0);
     lv_obj_set_style_bg_opa(ov, LV_OPA_90, 0);
@@ -1621,15 +1593,15 @@ static void create_settings_menu(lv_obj_t* screen)
         "\xD0\x9D\xD0\x90\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x99\xD0\x9A\xD0\x98");  // НАСТРОЙКИ
 
     lv_obj_t* lay_lbl = lv_label_create(ov);
-    lv_obj_set_pos(lay_lbl, 20, 50);
+    lv_obj_set_pos(lay_lbl, SCALE_X(20), SCALE_Y(50));
     lv_obj_set_style_text_color(lay_lbl, lv_color_hex(0x6a9fb5), 0);
     lv_obj_set_style_text_font(lay_lbl, &font_dejavu_12, 0);
     lv_label_set_text(lay_lbl,
         "\xD0\x9A\xD0\x9E\xD0\x9C\xD0\x9F\xD0\x9E\xD0\x9D\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90:");  // КОМПОНОВКА:
 
     lv_obj_t* btn_k = lv_btn_create(ov);
-    lv_obj_set_size(btn_k, 190, 44);
-    lv_obj_set_pos(btn_k, 20, 66);
+    lv_obj_set_size(btn_k, SCALE_W(190), SCALE_H(44));
+    lv_obj_set_pos(btn_k, SCALE_X(20), SCALE_Y(66));
     lv_obj_set_style_bg_color(btn_k, lv_color_hex(g_layout == 0 ? 0x003a5a : 0x0d2233), 0);
     lv_obj_set_style_border_color(btn_k, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_border_width(btn_k, g_layout == 0 ? 2 : 1, 0);
@@ -1680,7 +1652,7 @@ static void create_settings_menu(lv_obj_t* screen)
         "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ПРОЧЕЕ: В РАЗРАБОТКЕ
 
     lv_obj_t* close_btn = lv_btn_create(ov);
-    lv_obj_set_size(close_btn, 160, 36);
+    lv_obj_set_size(close_btn, SCALE_W(160), SCALE_H(36));
     lv_obj_align(close_btn, LV_ALIGN_BOTTOM_MID, 0, -16);
     lv_obj_set_style_bg_color(close_btn, lv_color_hex(0x2a1a1a), 0);
     lv_obj_set_style_border_color(close_btn, lv_color_hex(0x604040), 0);
@@ -1723,7 +1695,7 @@ lv_obj_t* create_dark_pro_ui()
     // STATUSBAR — 480×36, bottom border 2px cyan
     // =========================================================
     lv_obj_t* statusbar = lv_obj_create(screen);
-    lv_obj_set_size(statusbar, 480, 36);
+    lv_obj_set_size(statusbar, SCREEN_WIDTH, SCALE_H(36));
     lv_obj_set_pos(statusbar, 0, 0);
     lv_obj_set_style_bg_color(statusbar, lv_color_hex(0x0d2a3d), 0);
     lv_obj_set_style_radius(statusbar, 0, 0);
@@ -1739,7 +1711,7 @@ lv_obj_t* create_dark_pro_ui()
     // "M1 - ПОДАЧА" — Tahoma Bold 22  (Issue 1: was hardcoded M3)
     {
         lv_obj_t* mode_label = lv_label_create(statusbar);
-        lv_obj_set_pos(mode_label, 15, 7);
+        lv_obj_set_pos(mode_label, SCALE_X(15), SCALE_Y(7));
         lv_obj_set_style_text_color(mode_label, lv_color_hex(0x00d4ff), 0);
         lv_obj_set_style_text_font(mode_label, &font_tahoma_bold_22, 0);
         lv_label_set_text(mode_label, MODE_STRS[1]);  // M1 - ПОДАЧА
@@ -1747,7 +1719,7 @@ lv_obj_t* create_dark_pro_ui()
 
         // Подрежим — справа от режима, мелким шрифтом
         lv_obj_t* submode_label = lv_label_create(statusbar);
-        lv_obj_set_pos(submode_label, 210, 10);
+        lv_obj_set_pos(submode_label, SCALE_X(210), SCALE_Y(10));
         lv_obj_set_style_text_color(submode_label, lv_color_hex(0x4a7a8a), 0);
         lv_obj_set_style_text_font(submode_label, &font_dejavu_16, 0);
         lv_label_set_text(submode_label, "");  // обновится по UART
@@ -1892,7 +1864,7 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* tbar = lv_obj_create(screen);
-        lv_obj_set_size(tbar, 480, 20);
+        lv_obj_set_size(tbar, SCREEN_WIDTH, SCALE_H(20));
         lv_obj_set_pos(tbar, 0, 0);
         lv_obj_set_style_bg_color(tbar, lv_color_hex(0x500000), 0);
         lv_obj_set_style_bg_opa(tbar, LV_OPA_COVER, 0);
@@ -1931,7 +1903,7 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* tap = lv_btn_create(statusbar);
-        lv_obj_set_size(tap, 200, 36);
+        lv_obj_set_size(tap, SCALE_W(200), SCALE_H(36));
         lv_obj_set_pos(tap, 0, 0);
         lv_obj_set_style_bg_opa(tap, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(tap, 0, 0);
@@ -1947,7 +1919,7 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* ov = lv_obj_create(screen);
-        lv_obj_set_size(ov, 480, 272);
+        lv_obj_set_size(ov, SCREEN_WIDTH, SCREEN_HEIGHT);
         lv_obj_set_pos(ov, 0, 0);
         lv_obj_set_style_bg_color(ov, lv_color_hex(0x000814), 0);
         lv_obj_set_style_bg_opa(ov, LV_OPA_90, 0);
@@ -3281,7 +3253,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
 
     // Полупрозрачный фон — левая область (правые кнопки x=418..474 остаются доступными)
     g_roller.backdrop = lv_obj_create(scr);
-    lv_obj_set_size(g_roller.backdrop, 416, 272);
+    lv_obj_set_size(g_roller.backdrop, SCREEN_WIDTH - SCALE_W(64), SCREEN_HEIGHT);
     lv_obj_set_pos(g_roller.backdrop, 0, 0);
     lv_obj_set_style_bg_color(g_roller.backdrop, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(g_roller.backdrop, 140, 0);
@@ -3298,8 +3270,8 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
     }, LV_EVENT_ALL, nullptr);
 
     // Центральная панель барабана
-    const int PW = 260, PH = 260;
-    const int PX = (416 - PW) / 2, PY = (272 - PH) / 2;
+    const int PW = SCALE_W(260), PH = SCALE_H(260);
+    const int PX = ((SCREEN_WIDTH - SCALE_W(64)) - PW) / 2, PY = (SCREEN_HEIGHT - PH) / 2;
     g_roller.panel = lv_obj_create(scr);
     lv_obj_set_size(g_roller.panel, PW, PH);
     lv_obj_set_pos(g_roller.panel, PX, PY);
@@ -5141,8 +5113,8 @@ void setup()
     lv_init();
 
 #ifdef DISPLAY_JC8012P4A1C
-    // P4: LVGL 480×272 (как jc4827w543), CW-поворот + масштаб в my_disp_flush
-    // screen_fb (800×1280) — физический буфер, выделяется выше в init
+    // P4: LVGL 1280×800 нативно, CW-поворот без масштаба в my_disp_flush
+    // screen_fb (800×1280) — физический буфер для DMA, выделяется выше в init
     size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)SCREEN_WIDTH * SCREEN_HEIGHT;
     p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
     if (!p4_buf0) Serial.println("P4 LVGL buf FAILED");

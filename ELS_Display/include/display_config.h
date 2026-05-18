@@ -56,10 +56,10 @@
     #define SCALE_FACTOR_Y 0.85f  // 272/320 = 0.85
 
 #elif defined(DISPLAY_JC8012P4A1C)
-    // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет), LVGL 480×272 (как jc4827w543)
-    // Масштабирование и CW-поворот делается в flush callback → весь UI без правок
-    #define SCREEN_WIDTH  480
-    #define SCREEN_HEIGHT 272
+    // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет), LVGL 1280×800 нативно
+    // UI масштабируется макросами SCALE_X/Y, поворот только в flush (без scaling)
+    #define SCREEN_WIDTH  1280
+    #define SCREEN_HEIGHT 800
 
     #define DISPLAY_NAME "JC8012P4A1C"
     #define DISPLAY_SIZE "10.1\""
