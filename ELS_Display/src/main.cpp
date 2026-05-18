@@ -5306,6 +5306,7 @@ void loop()
                 usb_ss_sent += chunk;
             }
             if (usb_ss_sent >= jpeg_size) {
+                Serial.flush();  // сбросить USB CDC буфер (иначе последние ~64 байта теряются)
                 usb_ss_state = 0;
             }
         }
