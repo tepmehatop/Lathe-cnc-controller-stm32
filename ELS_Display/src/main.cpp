@@ -259,14 +259,14 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
         data->state = LV_INDEV_STATE_REL;
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CW + mirror)
-    // CW: lx_lvgl = ty (0..1279), ly_lvgl = 799-tx (0..799) → LVGL 1280×800
+    // GSL3680 Touch: getTouch() уже применяет mirror_x/y → (tx∈[0..799], ty∈[0..1279])
+    // CCW монтаж → lx_lvgl = 1279-ty, ly_lvgl = tx → LVGL 1280×800
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {
         data->state = LV_INDEV_STATE_PR;
-        data->point.x = (lv_coord_t)ty;
-        data->point.y = (lv_coord_t)(P4_LCD_H_RES - 1 - tx);
+        data->point.x = (lv_coord_t)(P4_LCD_V_RES - 1 - ty);
+        data->point.y = (lv_coord_t)tx;
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
@@ -1294,7 +1294,7 @@ static void create_k_content(lv_obj_t* screen)
     }
 
     // ── Right vertical buttons ────────────────────────────────────────────────
-    const int UP_H = 64, OK_H = 88, DN_H = 64;
+    const int UP_H = SCALE_H(64), OK_H = SCALE_H(88), DN_H = SCALE_H(64);
     lv_obj_t* up_btn = lv_btn_create(panel);
     lv_obj_set_size(up_btn, RIGHT_W, UP_H);
     lv_obj_set_pos(up_btn, RIGHT_X, PAD);
