@@ -221,22 +221,20 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // ESP32-P4: LVGL hor=1280, ver=800 (логика), full_refresh=1 → area=(0,0)-(1279,799)
-    // Поворот 90° CW (с учётом hardware mirror_x/y в драйвере JD9365):
-    //   logical(lx, ly) → screen_fb[lx*800 + (799-ly)]
-    //   ↳ glass: (ly, 1279-lx) → CW landscape: (lx, ly) = logical(lx, ly) ✓
+    // ESP32-P4: LVGL 480×272 → масштаб + CW-поворот → screen_fb 800×1280
+    // hw mirror_x/y: glass(799-px, 1279-py); CW: lx_land=gy, ly_land=799-gx
+    // → fb[row,col] ← lvgl[ col*272/800, (1279-row)*480/1280 ]
     if (screen_fb) {
         uint16_t* src = (uint16_t*)&color_p->full;
-        for (int ly = 0; ly < 800; ly++) {
-            const uint16_t* row_src = src + ly * 1280;
-            for (int lx = 0; lx < 1280; lx++) {
-                screen_fb[lx * 800 + (799 - ly)] = row_src[lx];
+        for (int fb_row = 0; fb_row < P4_LCD_V_RES; fb_row++) {
+            int lx_lvgl = (P4_LCD_V_RES - 1 - fb_row) * SCREEN_WIDTH / P4_LCD_V_RES;
+            uint16_t* dst = screen_fb + fb_row * P4_LCD_H_RES;
+            for (int fb_col = 0; fb_col < P4_LCD_H_RES; fb_col++) {
+                int ly_lvgl = fb_col * SCREEN_HEIGHT / P4_LCD_H_RES;
+                dst[fb_col] = src[ly_lvgl * SCREEN_WIDTH + lx_lvgl];
             }
         }
-        p4_lcd.lcd_draw_bitmap(0, 0, 800, 1280, screen_fb);
-    } else {
-        p4_lcd.lcd_draw_bitmap(area->x1, area->y1, area->x2 + 1, area->y2 + 1,
-                               (uint16_t *)&color_p->full);
+        p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
     }
 #else
     tft.startWrite();
@@ -265,14 +263,13 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     }
 #elif defined(DISPLAY_JC8012P4A1C)
     // GSL3680 Touch: физ. (tx,ty) в 800×1280 → логич. 1280×800 (90° CW + mirror)
-    // driver mirror_x/y: tx=799-px_glass, ty=1279-py_glass
-    // CW landscape: lx = ty (=lx_orig), ly = 799-tx (=ly_orig)
+    // CW: lx_land=ty, ly_land=799-tx; масштаб → LVGL 480×272
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {
         data->state = LV_INDEV_STATE_PR;
-        data->point.x = (lv_coord_t)ty;
-        data->point.y = (lv_coord_t)(799 - tx);
+        data->point.x = (lv_coord_t)(ty * SCREEN_WIDTH / P4_LCD_V_RES);
+        data->point.y = (lv_coord_t)((P4_LCD_H_RES - 1 - tx) * SCREEN_HEIGHT / P4_LCD_H_RES);
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
@@ -5119,8 +5116,8 @@ void setup()
     lv_init();
 
 #ifdef DISPLAY_JC8012P4A1C
-    // P4: логика 1280×800, ротация делается вручную в my_disp_flush (90° CCW)
-    // screen_fb (800×1280) используется как буфер ротации — выделяется выше в init
+    // P4: LVGL 480×272 (как jc4827w543), CW-поворот + масштаб в my_disp_flush
+    // screen_fb (800×1280) — физический буфер, выделяется выше в init
     size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)SCREEN_WIDTH * SCREEN_HEIGHT;
     p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
     if (!p4_buf0) Serial.println("P4 LVGL buf FAILED");

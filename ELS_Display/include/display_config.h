@@ -56,17 +56,17 @@
     #define SCALE_FACTOR_Y 0.85f  // 272/320 = 0.85
 
 #elif defined(DISPLAY_JC8012P4A1C)
-    // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет)
-    // Логически 1280x800 через LVGL поворот 90° → ландшафт, совместимо с UI
-    #define SCREEN_WIDTH  1280
-    #define SCREEN_HEIGHT 800
+    // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет), LVGL 480×272 (как jc4827w543)
+    // Масштабирование и CW-поворот делается в flush callback → весь UI без правок
+    #define SCREEN_WIDTH  480
+    #define SCREEN_HEIGHT 272
 
     #define DISPLAY_NAME "JC8012P4A1C"
     #define DISPLAY_SIZE "10.1\""
 
-    // Масштабирование UI с базы 480x272 (jc4827w543) → 1280x800
-    #define SCALE_FACTOR_X 2.67f  // 1280/480 = 2.667
-    #define SCALE_FACTOR_Y 2.94f  // 800/272 = 2.941
+    // Масштаб 480×272 → 1280×800 (применяется в flush при записи в screen_fb)
+    #define SCALE_FACTOR_X 2.67f  // 1280/480
+    #define SCALE_FACTOR_Y 2.94f  // 800/272
 
 #else
     #error "No display selected! Set -DJC4827W543_DISPLAY=1 or -DJC8012P4A1C_DISPLAY=1 in platformio.ini"
