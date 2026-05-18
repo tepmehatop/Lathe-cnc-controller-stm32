@@ -590,7 +590,7 @@ static void notify_connected() {
     if (s_conn_cb) s_conn_cb(s_ip, s_state == GCW_AP);
 }
 
-static void start_server() {
+static void start_server(bool notify = true) {
     if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
     s_srv = new WiFiServer(HTTP_PORT);
     if (!s_srv) {
@@ -616,7 +616,7 @@ static void start_server() {
         Serial.printf("[gcode] WiFiServer started: http://%s:%u/  (http://els.local:%u/)\n",
                       s_ip, HTTP_PORT, HTTP_PORT);
     }
-    notify_connected();
+    if (notify) notify_connected();
 }
 
 static void start_ap() {
@@ -702,7 +702,7 @@ void GCodeWiFi_Process() {
             // Watchdog: сервер запущен >30с, но ни одного клиента → перезапускаем
             Serial.println("[gcode] watchdog: restarting server...");
             s_last_client_t = millis();
-            start_server();
+            start_server(false);  // watchdog — без повторного алерта
         }
     } else if (s_state == GCW_AP) {
         // Повторная попытка STA каждые 60 секунд (если SSID задан)

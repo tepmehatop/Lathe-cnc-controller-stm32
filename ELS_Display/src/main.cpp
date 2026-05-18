@@ -1668,14 +1668,19 @@ static void create_settings_menu(lv_obj_t* screen)
         lv_obj_add_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
     }, LV_EVENT_CLICKED, nullptr);
 
-    // Double-tap on ⚠ warn icon → open settings
+    // Tap on ⚠ warn icon → show WiFi info; double-tap → also open settings
     if (g_ui.warn_bg) {
         lv_obj_add_flag(g_ui.warn_bg, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(g_ui.warn_bg, [](lv_event_t*) {
             static uint32_t s_wtap = 0; uint32_t now = millis();
-            if ((now - s_wtap) < 400)
-                lv_obj_clear_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
-            s_wtap = now;
+            bool dbl = (now - s_wtap) < 400; s_wtap = now;
+            char msg[48];
+            const char* ip = GCodeWiFi_GetIP();
+            bool is_ap = GCodeWiFi_IsAP();
+            snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "http://els.local/ (%s)",
+                     (ip && *ip) ? ip : "...");
+            show_alert(msg);
+            if (dbl) lv_obj_clear_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
         }, LV_EVENT_CLICKED, nullptr);
     }
 }
