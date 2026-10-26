@@ -23,3 +23,15 @@ ELS_Display/include/wifi_config.h
 
 # Файл договорённостей — не публикуется
 AGREEMENTS.md
+
+# Инструкции для Claude — локальные, не публикуются
+CLAUDE.md
+.claude/
+
+# Локальные списки шаблонов персональных данных для tools/check_pii.sh
+.pii_patterns
+
+# Результаты тестов и скриншоты (содержат локальные пути)
+tools/screenshot_*.jpg
+tools/screenshots_full/
+tools/test_results_full.jsonl
