@@ -13,6 +13,7 @@
  */
 
 #include "els_menu.h"
+#include <string.h>
 #include "els_state.h"
 #include "els_control.h"
 #include "els_config.h"
@@ -132,6 +133,38 @@ static void _set_select_menu(uint8_t sm) {
 #endif
 }
 
+// Параметры текущей резьбы → дисплей ESP32
+static void _send_thread_info(void) {
+    uint8_t ts = els.Thread_Step;
+    DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
+    DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
+    DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
+    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
+    DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
+    int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
+    DRV_Display_SendInt("THREAD_CYCL",  cycl);
+}
+
+// Категория резьбы по подписи: 0 = метрическая, 1 = дюймовая (tpi), 2 = G-труб, 3 = K-труб
+static uint8_t _thread_category(uint8_t idx) {
+    const char* p = Thread_Info[idx].Thread_Print;
+    if (p[0] == 'G') return 2;
+    if (p[0] == 'K') return 3;
+    if (strstr(p, "tpi")) return 1;
+    return 0;
+}
+
+// THR_CAT (двойной тап на шаге резьбы): первая резьба следующей категории
+static void _next_thread_category(void) {
+    uint8_t next = (uint8_t)((_thread_category(els.Thread_Step) + 1) % 4);
+    for (uint8_t i = 0; i < TOTAL_THREADS; i++) {
+        if (_thread_category(i) == next) {
+            els.Thread_Step = i;
+            break;
+        }
+    }
+}
+
 // ============================================================
 // Callback от ESP32: обработка TOUCH команд
 // ============================================================
@@ -173,14 +206,7 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
             if (els.mode == MODE_THREAD) {
                 if (els.Thread_Step > 0) {
                     els.Thread_Step--;
-                    uint8_t ts = els.Thread_Step;
-                    DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
-                    DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
-                    DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
-                    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
-                    DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
-                    int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
-                    DRV_Display_SendInt("THREAD_CYCL",  cycl);
+                    _send_thread_info();
                 }
             } else if (els.mode == MODE_CONE_L || els.mode == MODE_CONE_R) {
                 if (els.Cone_Step > 0) els.Cone_Step--;
@@ -194,14 +220,7 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
                 extern const uint8_t TOTAL_THREADS;
                 if (els.Thread_Step < TOTAL_THREADS - 1) {
                     els.Thread_Step++;
-                    uint8_t ts = els.Thread_Step;
-                    DRV_Display_SendCmd("THREAD_NAME", Thread_Info[ts].Thread_Print);
-                    DRV_Display_SendInt("THREAD",       (int32_t)(Thread_Info[ts].Step * 100.0f));
-                    DRV_Display_SendInt("RPM_LIM",      Thread_Info[ts].Limit_Print);
-                    int16_t ph = (els.Ph > 0) ? els.Ph : 1;
-                    DRV_Display_SendInt("THREAD_TRAVEL", (int32_t)(Thread_Info[ts].Step * 100.0f * ph));
-                    int32_t cycl = (int32_t)Thread_Info[ts].Pass + PASS_FINISH + els.Pass_Fin + els.Thr_Pass_Summ;
-                    DRV_Display_SendInt("THREAD_CYCL",  cycl);
+                    _send_thread_info();
                 }
             } else if (els.mode == MODE_CONE_L || els.mode == MODE_CONE_R) {
                 extern const uint8_t TOTAL_CONE;
@@ -215,6 +234,16 @@ static void _on_display_rx(const DispRxCmd_t* rx) {
         // Джойстик — управление движением через тачскрин
         // Флаги s_touch_joy_* читаются в ELS_Menu_Process() и
         // записываются в els.joy_y/joy_x когда физический джойстик в нейтрали.
+        case TOUCH_THR_CAT:
+            if (els.mode == MODE_THREAD) {
+                _next_thread_category();
+                _send_thread_info();
+            }
+#if USE_ESP32_DISPLAY
+            _send_basic_state();
+#endif
+            return;
+
         case TOUCH_JOY_LEFT:  s_touch_joy_y = +1; return;
         case TOUCH_JOY_RIGHT: s_touch_joy_y = -1; return;
         case TOUCH_JOY_UP:    s_touch_joy_x = +1; return;

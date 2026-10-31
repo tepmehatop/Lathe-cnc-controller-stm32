@@ -51,30 +51,43 @@
     #define DISPLAY_NAME "JC4827W543"
     #define DISPLAY_SIZE "4.3\""
 
-    // Масштабирование UI с базы 240x320 → 480x272
-    #define SCALE_FACTOR_X 2.0f   // 480/240 = 2.0
-    #define SCALE_FACTOR_Y 0.85f  // 272/320 = 0.85
+    // Базовый экран UI — масштаб 1:1
+    #define SCALE_FACTOR_X 1.0f
+    #define SCALE_FACTOR_Y 1.0f
 
 #elif defined(DISPLAY_JC8012P4A1C)
     // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет), LVGL 1280×800 нативно
-    // UI масштабируется макросами SCALE_X/Y, поворот только в flush (без scaling)
+    // UI масштабируется макросами UX/UY/US, поворот только в flush
     #define SCREEN_WIDTH  1280
     #define SCREEN_HEIGHT 800
 
     #define DISPLAY_NAME "JC8012P4A1C"
     #define DISPLAY_SIZE "10.1\""
 
-    // Масштаб 480×272 → 1280×800 (применяется в flush при записи в screen_fb)
-    #define SCALE_FACTOR_X 2.67f  // 1280/480
-    #define SCALE_FACTOR_Y 2.94f  // 800/272
+    // Масштаб 480×272 → 1280×800
+    #define SCALE_FACTOR_X 2.667f  // 1280/480
+    #define SCALE_FACTOR_Y 2.941f  // 800/272
 
 #else
     #error "No display selected! Set -DJC4827W543_DISPLAY=1 or -DJC8012P4A1C_DISPLAY=1 in platformio.ini"
 #endif
 
 // ============================================================================
-// МАКРОСЫ ДЛЯ МАСШТАБИРОВАНИЯ (автоматически адаптируют размеры)
+// МАСШТАБИРОВАНИЕ UI
+// Весь UI задаётся в пикселях базового экрана 4.3" (480×272). На другом
+// разрешении размеры пересчитываются пропорционально:
+//   UX(v) — по горизонтали (x, ширина), UY(v) — по вертикали (y, высота),
+//   US(v) — равномерно (рамки, радиусы, отступы, метрики шрифтов) = масштаб по X.
+// На 4.3" все три — тождественные. Шрифты для других экранов генерируются под
+// тем же именем с размером ×(SCREEN_WIDTH/480) — см. tools/gen_p4_fonts.sh.
 // ============================================================================
+#define UI_BASE_W 480
+#define UI_BASE_H 272
+#define UX(v) ((int)(v) * SCREEN_WIDTH  / UI_BASE_W)
+#define UY(v) ((int)(v) * SCREEN_HEIGHT / UI_BASE_H)
+#define US(v) UX(v)
+
+// Устаревшие макросы (используйте UX/UY/US)
 
 // Масштабировать координату X
 #define SCALE_X(x) ((int)((x) * SCALE_FACTOR_X))

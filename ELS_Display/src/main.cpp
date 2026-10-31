@@ -250,8 +250,29 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 // LVGL Touch Driver
 // ============================================================================
 
+// Имитация касания для автотестов (<TAP:x,y> по USB): нажатие держится 120 мс
+static struct { bool active; lv_coord_t x, y; uint32_t until_ms; } g_sim_tap = {};
+static void sim_tap(int x, int y)
+{
+    g_sim_tap.x = (lv_coord_t)x;
+    g_sim_tap.y = (lv_coord_t)y;
+    g_sim_tap.until_ms = millis() + 120;
+    g_sim_tap.active = true;
+}
+
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
+    if (g_sim_tap.active) {
+        data->point.x = g_sim_tap.x;
+        data->point.y = g_sim_tap.y;
+        if ((int32_t)(millis() - g_sim_tap.until_ms) < 0) {
+            data->state = LV_INDEV_STATE_PR;
+        } else {
+            data->state = LV_INDEV_STATE_REL;
+            g_sim_tap.active = false;
+        }
+        return;
+    }
 #ifdef DISPLAY_JC4827W543
     if (touch.read()) {
         TP_Point p = touch.getPoint(0);
@@ -284,6 +305,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 // Строки: 1=Arial Bold, 2=DIN Alternate, 3=DIN Condensed, 4=Tahoma Bold
 // ============================================================================
 
+#ifndef DISPLAY_JC8012P4A1C  // демо-шрифты (Arial/DIN/Tahoma 56) для 10.1" не генерируются
 lv_obj_t* create_font_demo_screen()
 {
     struct FontRow { const char* name; const lv_font_t* font56; const lv_font_t* font40; };
@@ -300,7 +322,7 @@ lv_obj_t* create_font_demo_screen()
 
     // Заголовок
     lv_obj_t* hdr = lv_label_create(screen);
-    lv_obj_set_pos(hdr, 8, 3);
+    lv_obj_set_pos(hdr, UX(8), UY(3));
     lv_obj_set_style_text_color(hdr, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_text_font(hdr, &font_dejavu_12, 0);
     lv_label_set_text(hdr, "FONT DEMO  [cyan=1.50 @ 56px]  [green=1650 @ 40px]");
@@ -319,27 +341,27 @@ lv_obj_t* create_font_demo_screen()
         lv_obj_set_style_radius(row_bg, 0, 0);
         lv_obj_set_style_border_side(row_bg, LV_BORDER_SIDE_BOTTOM, 0);
         lv_obj_set_style_border_color(row_bg, lv_color_hex(0x1a3040), 0);
-        lv_obj_set_style_border_width(row_bg, 1, 0);
+        lv_obj_set_style_border_width(row_bg, US(1), 0);
         lv_obj_set_style_pad_all(row_bg, 0, 0);
         lv_obj_clear_flag(row_bg, LV_OBJ_FLAG_SCROLLABLE);
 
         // Название шрифта
         lv_obj_t* name_lbl = lv_label_create(row_bg);
-        lv_obj_set_pos(name_lbl, 5, 8);
+        lv_obj_set_pos(name_lbl, UX(5), UY(8));
         lv_obj_set_style_text_color(name_lbl, lv_color_hex(0x5a8a9a), 0);
         lv_obj_set_style_text_font(name_lbl, &font_dejavu_12, 0);
         lv_label_set_text(name_lbl, rows[i].name);
 
         // "1.50" — большой шрифт 56px
         lv_obj_t* val_56 = lv_label_create(row_bg);
-        lv_obj_set_pos(val_56, 115, 2);
+        lv_obj_set_pos(val_56, UX(115), UY(2));
         lv_obj_set_style_text_color(val_56, lv_color_hex(0x00d4ff), 0);
         lv_obj_set_style_text_font(val_56, rows[i].font56, 0);
         lv_label_set_text(val_56, "1.50");
 
         // "1650" — средний шрифт 40px
         lv_obj_t* val_40 = lv_label_create(row_bg);
-        lv_obj_set_pos(val_40, 310, 10);
+        lv_obj_set_pos(val_40, UX(310), UY(10));
         lv_obj_set_style_text_color(val_40, lv_color_hex(0x00ff88), 0);
         lv_obj_set_style_text_font(val_40, rows[i].font40, 0);
         lv_label_set_text(val_40, "1650");
@@ -348,6 +370,7 @@ lv_obj_t* create_font_demo_screen()
     lv_scr_load(screen);
     return screen;
 }
+#endif  // !DISPLAY_JC8012P4A1C
 
 // ============================================================================
 // Хранит указатели на все динамически обновляемые виджеты UI
@@ -444,6 +467,7 @@ struct UIHandles {
 };
 
 static UIHandles g_ui = {};
+static bool s_sphere_alert = false;   // показан алерт "Режим невозможен!" (M6 + внутренний подрежим)
 
 // ============================================================================
 // Хранит виджеты, специфичные для каждого варианта компоновки (K или I).
@@ -991,6 +1015,33 @@ static void handle_ok_btn_click()
 }
 
 // ============================================================================
+// Тап по основному значению (K и I): вход/выход из редактирования.
+// В M3 двойной тап открывает меню типа резьбы. Редактирование (барабан) открывается
+// с задержкой окна двойного тапа — иначе барабан перекрывает экран и второй тап
+// попадает в него, а не в основное значение.
+// ============================================================================
+static lv_timer_t* s_primary_tap_timer = nullptr;
+
+static void primary_value_tap()
+{
+    if (s_last_mode == MODE_THREAD && !g_edit_param.active) {
+        if (s_primary_tap_timer) {          // второй тап в окне 400 мс
+            lv_timer_del(s_primary_tap_timer);
+            s_primary_tap_timer = nullptr;
+            show_thr_type_menu();
+            return;
+        }
+        s_primary_tap_timer = lv_timer_create([](lv_timer_t* t) {
+            s_primary_tap_timer = nullptr;
+            lv_timer_del(t);
+            enter_edit_mode();
+        }, 400, nullptr);
+        return;
+    }
+    if (g_edit_param.active) exit_edit_mode(); else enter_edit_mode();
+}
+
+// ============================================================================
 // Вспомогательная функция создания ячейки параметра (общий стиль для K и I)
 // ============================================================================
 struct CellRefs { lv_obj_t* box; lv_obj_t* title; lv_obj_t* val; };
@@ -1006,9 +1057,9 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
     lv_obj_set_style_border_side(box, LV_BORDER_SIDE_LEFT, 0);
     lv_obj_set_style_border_color(box, lv_color_hex(editable ? 0xffaa44 : 0x00d4ff), 0);
-    lv_obj_set_style_border_width(box, 3, 0);
-    lv_obj_set_style_radius(box, 4, 0);
-    lv_obj_set_style_pad_all(box, 4, 0);
+    lv_obj_set_style_border_width(box, US(3), 0);
+    lv_obj_set_style_radius(box, US(4), 0);
+    lv_obj_set_style_pad_all(box, US(4), 0);
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
 
     // title: small label at top
@@ -1019,9 +1070,9 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
     lv_label_set_text(title, title_text);
 
     // val: vertically centered in remaining space below title
-    // title_h≈16, val_h≈30, content=(h-8), remaining=(h-8-16-30)/2
-    int val_y = 16 + ((h - 8 - 16 - 30) >> 1);
-    if (val_y < 16) val_y = 16;
+    // title_h≈16, val_h≈30, content=(h-8), remaining=(h-8-16-30)/2 (метрики шрифтов → US)
+    int val_y = US(16) + ((h - US(8) - US(16) - US(30)) >> 1);
+    if (val_y < US(16)) val_y = US(16);
     lv_obj_t* val = lv_label_create(box);
     lv_obj_set_pos(val, 0, val_y);
     lv_obj_set_style_text_font(val, &font_tahoma_bold_28, 0);
@@ -1038,8 +1089,8 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
 static void create_k_content(lv_obj_t* screen)
 {
     lv_obj_t* panel = lv_obj_create(screen);
-    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - SCALE_H(36));
-    lv_obj_set_pos(panel, 0, SCALE_H(36));
+    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - UY(36));
+    lv_obj_set_pos(panel, 0, UY(36));
     lv_obj_set_style_bg_color(panel, lv_color_hex(0x0a0a0a), 0);
     lv_obj_set_style_radius(panel, 0, 0);
     lv_obj_set_style_pad_all(panel, 0, 0);
@@ -1047,11 +1098,11 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
     g_ui.k_content = panel;
 
-    const int PAD = SCALE_X(6), GAP = SCALE_X(4);
-    const int RIGHT_W = SCALE_X(56);
+    const int PAD = UX(6), GAP = UX(4);
+    const int RIGHT_W = UX(56);
     const int LEFT_W   = SCREEN_WIDTH - 2*PAD - RIGHT_W - GAP;
-    const int INNER_H  = (SCREEN_HEIGHT - SCALE_H(36)) - 2*PAD;
-    const int FEAT_H   = SCALE_H(72);
+    const int INNER_H  = (SCREEN_HEIGHT - UY(36)) - 2*PAD;
+    const int FEAT_H   = UY(72);
     const int GRID_Y   = PAD + FEAT_H + GAP;
     const int GRID_H   = INNER_H - FEAT_H - GAP;
     const int ROW_H    = (GRID_H - GAP) / 2;
@@ -1068,15 +1119,15 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_bg_opa(feat, LV_OPA_COVER, 0);
     lv_obj_set_style_border_side(feat, LV_BORDER_SIDE_LEFT, 0);
     lv_obj_set_style_border_color(feat, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(feat, 4, 0);
-    lv_obj_set_style_radius(feat, 4, 0);
+    lv_obj_set_style_border_width(feat, US(4), 0);
+    lv_obj_set_style_radius(feat, US(4), 0);
     lv_obj_set_style_pad_all(feat, 0, 0);
     lv_obj_clear_flag(feat, LV_OBJ_FLAG_SCROLLABLE);
     g_wk.primary_edit_box = feat;
 
     // Primary title/unit (tappable in M3 for THR_CAT)
     lv_obj_t* p_unit = lv_label_create(feat);
-    lv_obj_set_pos(p_unit, 8, 5);
+    lv_obj_set_pos(p_unit, UX(8), UY(5));
     lv_obj_set_style_text_font(p_unit, &font_dejavu_14, 0);
     lv_obj_set_style_text_color(p_unit, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(p_unit, "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x9C\xD0\x9C");  // ШАГ ММ
@@ -1093,7 +1144,7 @@ static void create_k_content(lv_obj_t* screen)
 
     // Primary value (big, cyan, digit font) — vertically centered below title
     lv_obj_t* p_val = lv_label_create(feat);
-    lv_obj_set_pos(p_val, 8, 28);
+    lv_obj_set_pos(p_val, UX(8), UY(28));
     lv_obj_set_style_text_font(p_val, &font_tahoma_bold_40, 0);
     lv_obj_set_style_text_color(p_val, lv_color_hex(0x00d4ff), 0);
     lv_label_set_text(p_val, "1.50");
@@ -1105,7 +1156,7 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_text_color(tag, lv_color_hex(0xff8800), 0);
     lv_obj_set_style_text_font(tag, &font_tahoma_bold_28, 0);
     lv_label_set_text(tag, "");
-    lv_obj_set_pos(tag, 200, 18);
+    lv_obj_set_pos(tag, UX(200), UY(18));
     lv_obj_add_flag(tag, LV_OBJ_FLAG_HIDDEN);
     g_wk.thread_tag = tag;
 
@@ -1114,7 +1165,7 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_text_font(s_unit, &font_dejavu_14, 0);
     lv_obj_set_style_text_color(s_unit, lv_color_hex(0x3a7a5a), 0);
     lv_label_set_text(s_unit, "RPM");
-    lv_obj_align(s_unit, LV_ALIGN_TOP_RIGHT, -8, 5);
+    lv_obj_align(s_unit, LV_ALIGN_TOP_RIGHT, -UX(8), UY(5));
     g_wk.secondary_unit = s_unit;
 
     // Secondary value (right side) — same font as param cell values, with gap below unit
@@ -1123,13 +1174,13 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_text_color(s_val, lv_color_hex(0x00ff88), 0);
     lv_label_set_text(s_val, "1650");
     lv_label_set_recolor(s_val, true);
-    lv_obj_align(s_val, LV_ALIGN_TOP_RIGHT, -8, 24);
+    lv_obj_align(s_val, LV_ALIGN_TOP_RIGHT, -UX(8), UY(24));
     g_wk.secondary_val      = s_val;
     g_wk.secondary_val_glow = nullptr;
 
     // RPM bar — invisible stub (removed per user request; kept for API compat)
     lv_obj_t* rbar = lv_bar_create(feat);
-    lv_obj_set_size(rbar, 1, 1);
+    lv_obj_set_size(rbar, UX(1), UY(1));
     lv_obj_set_style_opa(rbar, LV_OPA_TRANSP, 0);
     lv_bar_set_range(rbar, 0, 3000);
     lv_bar_set_value(rbar, 0, LV_ANIM_OFF);
@@ -1140,7 +1191,7 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_text_color(arL, lv_color_hex(0xffcc00), 0);
     lv_obj_set_style_text_font(arL, &lv_font_montserrat_20, 0);
     lv_label_set_text(arL, LV_SYMBOL_UP);
-    lv_obj_set_pos(arL, 8, 20);
+    lv_obj_set_pos(arL, UX(8), UY(20));
     lv_obj_add_flag(arL, LV_OBJ_FLAG_HIDDEN);
     g_wk.edit_arrow_left = arL;
 
@@ -1148,26 +1199,18 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_style_text_color(arR, lv_color_hex(0xffcc00), 0);
     lv_obj_set_style_text_font(arR, &lv_font_montserrat_20, 0);
     lv_label_set_text(arR, LV_SYMBOL_DOWN);
-    lv_obj_align(arR, LV_ALIGN_TOP_RIGHT, -8, 20);
+    lv_obj_align(arR, LV_ALIGN_TOP_RIGHT, -UX(8), UY(20));
     lv_obj_add_flag(arR, LV_OBJ_FLAG_HIDDEN);
     g_wk.edit_arrow_right = arR;
 
     // Transparent tap zone — enter/exit primary edit + double-tap = thread type menu
     lv_obj_t* tap = lv_btn_create(feat);
-    lv_obj_set_size(tap, LEFT_W - 100, FEAT_H - 8);
+    lv_obj_set_size(tap, LEFT_W - UX(100), FEAT_H - UY(8));
     lv_obj_set_pos(tap, 0, 0);
     lv_obj_set_style_bg_opa(tap, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(tap, 0, 0);
     lv_obj_set_style_shadow_width(tap, 0, 0);
-    lv_obj_add_event_cb(tap, [](lv_event_t*) {
-        static uint32_t s_ftap = 0; uint32_t now = millis();
-        bool dbl = (now - s_ftap) < 400; s_ftap = now;
-        if (dbl && s_last_mode == MODE_THREAD) {
-            if (g_edit_param.active) exit_edit_mode();
-            show_thr_type_menu(); return;
-        }
-        if (g_edit_param.active) exit_edit_mode(); else enter_edit_mode();
-    }, LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_event_cb(tap, [](lv_event_t*) { primary_value_tap(); }, LV_EVENT_CLICKED, nullptr);
 
     // ── Grid cells 3×2 ───────────────────────────────────────────────────────
     // Row 1: ПОЗИЦИЯ Z
@@ -1274,9 +1317,9 @@ static void create_k_content(lv_obj_t* screen)
         lv_obj_set_style_bg_opa(dim, LV_OPA_COVER, 0);
         lv_obj_set_style_border_side(dim, LV_BORDER_SIDE_LEFT, 0);
         lv_obj_set_style_border_color(dim, lv_color_hex(0x1a3a4a), 0);
-        lv_obj_set_style_border_width(dim, 2, 0);
-        lv_obj_set_style_radius(dim, 4, 0);
-        lv_obj_set_style_pad_all(dim, 8, 0);
+        lv_obj_set_style_border_width(dim, US(2), 0);
+        lv_obj_set_style_radius(dim, US(4), 0);
+        lv_obj_set_style_pad_all(dim, US(8), 0);
         lv_obj_clear_flag(dim, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(dim, LV_OBJ_FLAG_CLICKABLE);
         // Значение: название текущего SM (обновляется через update_sm_row6)
@@ -1285,7 +1328,7 @@ static void create_k_content(lv_obj_t* screen)
         lv_obj_set_style_text_color(dlbl, lv_color_hex(0x2a3a4a), 0);
         lv_obj_align(dlbl, LV_ALIGN_CENTER, 0, 0);
         lv_label_set_long_mode(dlbl, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(dlbl, COL_W2 - 20);
+        lv_obj_set_width(dlbl, COL_W2 - UX(20));
         lv_obj_set_style_text_align(dlbl, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_text(dlbl, "--");
         g_ui.sm_row6 = dlbl;
@@ -1298,14 +1341,14 @@ static void create_k_content(lv_obj_t* screen)
     }
 
     // ── Right vertical buttons ────────────────────────────────────────────────
-    const int UP_H = SCALE_H(64), OK_H = SCALE_H(88), DN_H = SCALE_H(64);
+    const int UP_H = UY(64), OK_H = UY(88), DN_H = UY(64);
     lv_obj_t* up_btn = lv_btn_create(panel);
     lv_obj_set_size(up_btn, RIGHT_W, UP_H);
     lv_obj_set_pos(up_btn, RIGHT_X, PAD);
     lv_obj_set_style_bg_color(up_btn, lv_color_hex(0x2a4a5a), 0);
     lv_obj_set_style_border_color(up_btn, lv_color_hex(0x3a6a8a), 0);
-    lv_obj_set_style_border_width(up_btn, 1, 0);
-    lv_obj_set_style_radius(up_btn, 4, 0);
+    lv_obj_set_style_border_width(up_btn, US(1), 0);
+    lv_obj_set_style_radius(up_btn, US(4), 0);
     lv_obj_set_style_shadow_width(up_btn, 0, 0);
     { lv_obj_t* l = lv_label_create(up_btn); lv_obj_center(l); lv_label_set_text(l, LV_SYMBOL_UP); }
     lv_obj_add_event_cb(up_btn, [](lv_event_t*) { handle_up_btn_click(); }, LV_EVENT_CLICKED, nullptr);
@@ -1315,9 +1358,9 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_pos(ok_btn, RIGHT_X, PAD + UP_H + GAP);
     lv_obj_set_style_bg_color(ok_btn, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_border_color(ok_btn, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(ok_btn, 1, 0);
-    lv_obj_set_style_radius(ok_btn, 4, 0);
-    lv_obj_set_style_shadow_width(ok_btn, 10, 0);
+    lv_obj_set_style_border_width(ok_btn, US(1), 0);
+    lv_obj_set_style_radius(ok_btn, US(4), 0);
+    lv_obj_set_style_shadow_width(ok_btn, US(10), 0);
     lv_obj_set_style_shadow_color(ok_btn, lv_color_hex(0x00d4ff), 0);
     { lv_obj_t* l = lv_label_create(ok_btn); lv_obj_center(l);
       lv_obj_set_style_text_color(l, lv_color_hex(0x000000), 0);
@@ -1330,8 +1373,8 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_set_pos(dn_btn, RIGHT_X, PAD + UP_H + GAP + OK_H + GAP);
     lv_obj_set_style_bg_color(dn_btn, lv_color_hex(0x2a4a5a), 0);
     lv_obj_set_style_border_color(dn_btn, lv_color_hex(0x3a6a8a), 0);
-    lv_obj_set_style_border_width(dn_btn, 1, 0);
-    lv_obj_set_style_radius(dn_btn, 4, 0);
+    lv_obj_set_style_border_width(dn_btn, US(1), 0);
+    lv_obj_set_style_radius(dn_btn, US(4), 0);
     lv_obj_set_style_shadow_width(dn_btn, 0, 0);
     { lv_obj_t* l = lv_label_create(dn_btn); lv_obj_center(l); lv_label_set_text(l, LV_SYMBOL_DOWN); }
     lv_obj_add_event_cb(dn_btn, [](lv_event_t*) { handle_dn_btn_click(); }, LV_EVENT_CLICKED, nullptr);
@@ -1343,8 +1386,8 @@ static void create_k_content(lv_obj_t* screen)
 static void create_i_content(lv_obj_t* screen)
 {
     lv_obj_t* panel = lv_obj_create(screen);
-    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - SCALE_H(36));
-    lv_obj_set_pos(panel, 0, SCALE_H(36));
+    lv_obj_set_size(panel, SCREEN_WIDTH, SCREEN_HEIGHT - UY(36));
+    lv_obj_set_pos(panel, 0, UY(36));
     lv_obj_set_style_bg_color(panel, lv_color_hex(0x0a0a0a), 0);
     lv_obj_set_style_radius(panel, 0, 0);
     lv_obj_set_style_pad_all(panel, 0, 0);
@@ -1353,10 +1396,10 @@ static void create_i_content(lv_obj_t* screen)
     lv_obj_add_flag(panel, LV_OBJ_FLAG_HIDDEN);  // hidden by default
     g_ui.i_content = panel;
 
-    const int PAD = SCALE_X(6), GAP = SCALE_X(4);
-    const int BTN_H   = SCALE_H(36);
+    const int PAD = UX(6), GAP = UX(4);
+    const int BTN_H   = UY(36);
     const int INNER_W = SCREEN_WIDTH - 2*PAD;
-    const int INNER_H = (SCREEN_HEIGHT - SCALE_H(36)) - 2*PAD;
+    const int INNER_H = (SCREEN_HEIGHT - UY(36)) - 2*PAD;
     const int GRID_H  = INNER_H - BTN_H - GAP;
     const int ROW_H   = (GRID_H - GAP) / 2;
     const int COL_W   = (INNER_W - 2*GAP) / 3;
@@ -1439,25 +1482,17 @@ static void create_i_content(lv_obj_t* screen)
         lv_obj_set_style_text_color(itag, lv_color_hex(0xff8800), 0);
         lv_obj_set_style_text_font(itag, &font_tahoma_bold_22, 0);
         lv_label_set_text(itag, "");
-        lv_obj_align(itag, LV_ALIGN_TOP_RIGHT, -4, 0);
+        lv_obj_align(itag, LV_ALIGN_TOP_RIGHT, -UX(4), 0);
         lv_obj_add_flag(itag, LV_OBJ_FLAG_HIDDEN);
         g_wi.thread_tag = itag;
         // Edit tap zone
         lv_obj_t* itap = lv_btn_create(r.box);
-        lv_obj_set_size(itap, COL_W, ROW_H - 6);
+        lv_obj_set_size(itap, COL_W, ROW_H - UY(6));
         lv_obj_set_pos(itap, 0, 0);
         lv_obj_set_style_bg_opa(itap, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(itap, 0, 0);
         lv_obj_set_style_shadow_width(itap, 0, 0);
-        lv_obj_add_event_cb(itap, [](lv_event_t*) {
-            static uint32_t s_ptap = 0; uint32_t now = millis();
-            bool dbl = (now - s_ptap) < 400; s_ptap = now;
-            if (dbl && s_last_mode == MODE_THREAD) {
-                if (g_edit_param.active) exit_edit_mode();
-                show_thr_type_menu(); return;
-            }
-            if (g_edit_param.active) exit_edit_mode(); else enter_edit_mode();
-        }, LV_EVENT_CLICKED, nullptr);
+        lv_obj_add_event_cb(itap, [](lv_event_t*) { primary_value_tap(); }, LV_EVENT_CLICKED, nullptr);
     }
     // Cell [3]: secondary_val — RPM / cycles / etc.
     {
@@ -1469,7 +1504,7 @@ static void create_i_content(lv_obj_t* screen)
         lv_obj_set_style_text_color(r.val, lv_color_hex(0x00ff88), 0);
         // Invisible RPM bar (functionally required)
         lv_obj_t* ibar = lv_bar_create(r.box);
-        lv_obj_set_size(ibar, 1, 1);
+        lv_obj_set_size(ibar, UX(1), UY(1));
         lv_obj_set_style_opa(ibar, LV_OPA_TRANSP, 0);
         lv_bar_set_range(ibar, 0, 3000);
         lv_bar_set_value(ibar, 0, LV_ANIM_OFF);
@@ -1507,7 +1542,7 @@ static void create_i_content(lv_obj_t* screen)
 
     // ── Bottom button row ─────────────────────────────────────────────────────
     const int BTN_Y = PAD + GRID_H + GAP;
-    const int UP_W  = (INNER_W - 2*GAP - 30) / 3;  // ~140
+    const int UP_W  = (INNER_W - 2*GAP - UX(30)) / 3;  // ~140
     const int OK_W  = INNER_W - 2*UP_W - 2*GAP;    // ~158
     int btn_x[3] = { PAD, PAD + UP_W + GAP, PAD + UP_W + GAP + OK_W + GAP };
 
@@ -1516,8 +1551,8 @@ static void create_i_content(lv_obj_t* screen)
     lv_obj_set_pos(up_btn, btn_x[0], BTN_Y);
     lv_obj_set_style_bg_color(up_btn, lv_color_hex(0x2a4a5a), 0);
     lv_obj_set_style_border_color(up_btn, lv_color_hex(0x3a6a8a), 0);
-    lv_obj_set_style_border_width(up_btn, 1, 0);
-    lv_obj_set_style_radius(up_btn, 4, 0);
+    lv_obj_set_style_border_width(up_btn, US(1), 0);
+    lv_obj_set_style_radius(up_btn, US(4), 0);
     lv_obj_set_style_shadow_width(up_btn, 0, 0);
     { lv_obj_t* l = lv_label_create(up_btn); lv_obj_center(l); lv_label_set_text(l, LV_SYMBOL_UP); }
     lv_obj_add_event_cb(up_btn, [](lv_event_t*) { handle_up_btn_click(); }, LV_EVENT_CLICKED, nullptr);
@@ -1527,9 +1562,9 @@ static void create_i_content(lv_obj_t* screen)
     lv_obj_set_pos(ok_btn, btn_x[1], BTN_Y);
     lv_obj_set_style_bg_color(ok_btn, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_border_color(ok_btn, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(ok_btn, 1, 0);
-    lv_obj_set_style_radius(ok_btn, 4, 0);
-    lv_obj_set_style_shadow_width(ok_btn, 10, 0);
+    lv_obj_set_style_border_width(ok_btn, US(1), 0);
+    lv_obj_set_style_radius(ok_btn, US(4), 0);
+    lv_obj_set_style_shadow_width(ok_btn, US(10), 0);
     lv_obj_set_style_shadow_color(ok_btn, lv_color_hex(0x00d4ff), 0);
     { lv_obj_t* l = lv_label_create(ok_btn); lv_obj_center(l);
       lv_obj_set_style_text_color(l, lv_color_hex(0x000000), 0);
@@ -1542,8 +1577,8 @@ static void create_i_content(lv_obj_t* screen)
     lv_obj_set_pos(dn_btn, btn_x[2], BTN_Y);
     lv_obj_set_style_bg_color(dn_btn, lv_color_hex(0x2a4a5a), 0);
     lv_obj_set_style_border_color(dn_btn, lv_color_hex(0x3a6a8a), 0);
-    lv_obj_set_style_border_width(dn_btn, 1, 0);
-    lv_obj_set_style_radius(dn_btn, 4, 0);
+    lv_obj_set_style_border_width(dn_btn, US(1), 0);
+    lv_obj_set_style_radius(dn_btn, US(4), 0);
     lv_obj_set_style_shadow_width(dn_btn, 0, 0);
     { lv_obj_t* l = lv_label_create(dn_btn); lv_obj_center(l); lv_label_set_text(l, LV_SYMBOL_DOWN); }
     lv_obj_add_event_cb(dn_btn, [](lv_event_t*) { handle_dn_btn_click(); }, LV_EVENT_CLICKED, nullptr);
@@ -1590,26 +1625,26 @@ static void create_settings_menu(lv_obj_t* screen)
     g_ui.settings_menu = ov;
 
     lv_obj_t* title = lv_label_create(ov);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 12);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, UY(12));
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
     lv_label_set_text(title,
         "\xD0\x9D\xD0\x90\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x99\xD0\x9A\xD0\x98");  // НАСТРОЙКИ
 
     lv_obj_t* lay_lbl = lv_label_create(ov);
-    lv_obj_set_pos(lay_lbl, SCALE_X(20), SCALE_Y(50));
+    lv_obj_set_pos(lay_lbl, UX(20), UY(50));
     lv_obj_set_style_text_color(lay_lbl, lv_color_hex(0x6a9fb5), 0);
     lv_obj_set_style_text_font(lay_lbl, &font_dejavu_12, 0);
     lv_label_set_text(lay_lbl,
         "\xD0\x9A\xD0\x9E\xD0\x9C\xD0\x9F\xD0\x9E\xD0\x9D\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90:");  // КОМПОНОВКА:
 
     lv_obj_t* btn_k = lv_btn_create(ov);
-    lv_obj_set_size(btn_k, SCALE_W(190), SCALE_H(44));
-    lv_obj_set_pos(btn_k, SCALE_X(20), SCALE_Y(66));
+    lv_obj_set_size(btn_k, UX(190), UY(44));
+    lv_obj_set_pos(btn_k, UX(20), UY(66));
     lv_obj_set_style_bg_color(btn_k, lv_color_hex(g_layout == 0 ? 0x003a5a : 0x0d2233), 0);
     lv_obj_set_style_border_color(btn_k, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(btn_k, g_layout == 0 ? 2 : 1, 0);
-    lv_obj_set_style_radius(btn_k, 6, 0);
+    lv_obj_set_style_border_width(btn_k, g_layout == 0 ? US(2) : US(1), 0);
+    lv_obj_set_style_radius(btn_k, US(6), 0);
     lv_obj_set_style_shadow_width(btn_k, 0, 0);
     { lv_obj_t* l = lv_label_create(btn_k); lv_obj_center(l);
       lv_obj_set_style_text_font(l, &font_tahoma_bold_22, 0);
@@ -1622,12 +1657,12 @@ static void create_settings_menu(lv_obj_t* screen)
     }, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t* btn_i = lv_btn_create(ov);
-    lv_obj_set_size(btn_i, 190, 44);
-    lv_obj_set_pos(btn_i, 220, 66);
+    lv_obj_set_size(btn_i, UX(190), UY(44));
+    lv_obj_set_pos(btn_i, UX(220), UY(66));
     lv_obj_set_style_bg_color(btn_i, lv_color_hex(g_layout == 1 ? 0x003a5a : 0x0d2233), 0);
     lv_obj_set_style_border_color(btn_i, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(btn_i, g_layout == 1 ? 2 : 1, 0);
-    lv_obj_set_style_radius(btn_i, 6, 0);
+    lv_obj_set_style_border_width(btn_i, g_layout == 1 ? US(2) : US(1), 0);
+    lv_obj_set_style_radius(btn_i, US(6), 0);
     lv_obj_set_style_shadow_width(btn_i, 0, 0);
     { lv_obj_t* l = lv_label_create(btn_i); lv_obj_center(l);
       lv_obj_set_style_text_font(l, &font_tahoma_bold_22, 0);
@@ -1640,7 +1675,7 @@ static void create_settings_menu(lv_obj_t* screen)
     }, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t* lang_lbl = lv_label_create(ov);
-    lv_obj_set_pos(lang_lbl, 20, 126);
+    lv_obj_set_pos(lang_lbl, UX(20), UY(126));
     lv_obj_set_style_text_color(lang_lbl, lv_color_hex(0x6a9fb5), 0);
     lv_obj_set_style_text_font(lang_lbl, &font_dejavu_12, 0);
     lv_label_set_text(lang_lbl,
@@ -1648,7 +1683,7 @@ static void create_settings_menu(lv_obj_t* screen)
         "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ЯЗЫК: RU/EN — В РАЗРАБОТКЕ
 
     lv_obj_t* other_lbl = lv_label_create(ov);
-    lv_obj_set_pos(other_lbl, 20, 148);
+    lv_obj_set_pos(other_lbl, UX(20), UY(148));
     lv_obj_set_style_text_color(other_lbl, lv_color_hex(0x6a9fb5), 0);
     lv_obj_set_style_text_font(other_lbl, &font_dejavu_12, 0);
     lv_label_set_text(other_lbl,
@@ -1656,12 +1691,12 @@ static void create_settings_menu(lv_obj_t* screen)
         "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ПРОЧЕЕ: В РАЗРАБОТКЕ
 
     lv_obj_t* close_btn = lv_btn_create(ov);
-    lv_obj_set_size(close_btn, SCALE_W(160), SCALE_H(36));
-    lv_obj_align(close_btn, LV_ALIGN_BOTTOM_MID, 0, -16);
+    lv_obj_set_size(close_btn, UX(160), UY(36));
+    lv_obj_align(close_btn, LV_ALIGN_BOTTOM_MID, 0, -UY(16));
     lv_obj_set_style_bg_color(close_btn, lv_color_hex(0x2a1a1a), 0);
     lv_obj_set_style_border_color(close_btn, lv_color_hex(0x604040), 0);
-    lv_obj_set_style_border_width(close_btn, 1, 0);
-    lv_obj_set_style_radius(close_btn, 6, 0);
+    lv_obj_set_style_border_width(close_btn, US(1), 0);
+    lv_obj_set_style_radius(close_btn, US(6), 0);
     lv_obj_set_style_shadow_width(close_btn, 0, 0);
     { lv_obj_t* l = lv_label_create(close_btn); lv_obj_center(l);
       lv_obj_set_style_text_font(l, &font_tahoma_bold_22, 0);
@@ -1704,15 +1739,15 @@ lv_obj_t* create_dark_pro_ui()
     // STATUSBAR — 480×36, bottom border 2px cyan
     // =========================================================
     lv_obj_t* statusbar = lv_obj_create(screen);
-    lv_obj_set_size(statusbar, SCREEN_WIDTH, SCALE_H(36));
+    lv_obj_set_size(statusbar, SCREEN_WIDTH, UY(36));
     lv_obj_set_pos(statusbar, 0, 0);
     lv_obj_set_style_bg_color(statusbar, lv_color_hex(0x0d2a3d), 0);
     lv_obj_set_style_radius(statusbar, 0, 0);
     lv_obj_set_style_pad_all(statusbar, 0, 0);
     lv_obj_set_style_border_side(statusbar, LV_BORDER_SIDE_BOTTOM, 0);
     lv_obj_set_style_border_color(statusbar, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(statusbar, 2, 0);
-    lv_obj_set_style_shadow_width(statusbar, 10, 0);
+    lv_obj_set_style_border_width(statusbar, US(2), 0);
+    lv_obj_set_style_shadow_width(statusbar, US(10), 0);
     lv_obj_set_style_shadow_color(statusbar, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_shadow_opa(statusbar, LV_OPA_30, 0);
     lv_obj_clear_flag(statusbar, LV_OBJ_FLAG_SCROLLABLE);
@@ -1720,7 +1755,7 @@ lv_obj_t* create_dark_pro_ui()
     // "M1 - ПОДАЧА" — Tahoma Bold 22  (Issue 1: was hardcoded M3)
     {
         lv_obj_t* mode_label = lv_label_create(statusbar);
-        lv_obj_set_pos(mode_label, SCALE_X(15), SCALE_Y(7));
+        lv_obj_set_pos(mode_label, UX(15), UY(7));
         lv_obj_set_style_text_color(mode_label, lv_color_hex(0x00d4ff), 0);
         lv_obj_set_style_text_font(mode_label, &font_tahoma_bold_22, 0);
         lv_label_set_text(mode_label, MODE_STRS[1]);  // M1 - ПОДАЧА
@@ -1728,7 +1763,7 @@ lv_obj_t* create_dark_pro_ui()
 
         // Подрежим — справа от режима, мелким шрифтом
         lv_obj_t* submode_label = lv_label_create(statusbar);
-        lv_obj_set_pos(submode_label, SCALE_X(210), SCALE_Y(10));
+        lv_obj_set_pos(submode_label, UX(210), UY(10));
         lv_obj_set_style_text_color(submode_label, lv_color_hex(0x4a7a8a), 0);
         lv_obj_set_style_text_font(submode_label, &font_dejavu_16, 0);
         lv_label_set_text(submode_label, "");  // обновится по UART
@@ -1737,12 +1772,12 @@ lv_obj_t* create_dark_pro_ui()
 
     // Иконка S2 (зелёная, активная)
     lv_obj_t* s2_ic = lv_obj_create(statusbar);
-    lv_obj_set_size(s2_ic, 24, 24);
-    lv_obj_set_pos(s2_ic, 396, 6);
+    lv_obj_set_size(s2_ic, US(24), US(24));
+    lv_obj_set_pos(s2_ic, UX(396), UY(6));
     lv_obj_set_style_bg_color(s2_ic, lv_color_hex(0x00ff88), 0);
     lv_obj_set_style_radius(s2_ic, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(s2_ic, 0, 0);
-    lv_obj_set_style_shadow_width(s2_ic, 8, 0);
+    lv_obj_set_style_shadow_width(s2_ic, US(8), 0);
     lv_obj_set_style_shadow_color(s2_ic, lv_color_hex(0x00ff88), 0);
     lv_obj_clear_flag(s2_ic, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t* s2_lbl = lv_label_create(s2_ic);
@@ -1758,12 +1793,12 @@ lv_obj_t* create_dark_pro_ui()
 
     // Иконка ⚡ (зелёная, активная)
     lv_obj_t* pwr_ic = lv_obj_create(statusbar);
-    lv_obj_set_size(pwr_ic, 24, 24);
-    lv_obj_set_pos(pwr_ic, 424, 6);
+    lv_obj_set_size(pwr_ic, US(24), US(24));
+    lv_obj_set_pos(pwr_ic, UX(424), UY(6));
     lv_obj_set_style_bg_color(pwr_ic, lv_color_hex(0x00ff88), 0);
     lv_obj_set_style_radius(pwr_ic, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(pwr_ic, 0, 0);
-    lv_obj_set_style_shadow_width(pwr_ic, 6, 0);
+    lv_obj_set_style_shadow_width(pwr_ic, US(6), 0);
     lv_obj_set_style_shadow_color(pwr_ic, lv_color_hex(0x00ff88), 0);
     lv_obj_clear_flag(pwr_ic, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t* pwr_lbl = lv_label_create(pwr_ic);
@@ -1774,8 +1809,8 @@ lv_obj_t* create_dark_pro_ui()
 
     // Иконка ⚠ (серая, неактивная)
     lv_obj_t* warn_ic = lv_obj_create(statusbar);
-    lv_obj_set_size(warn_ic, 24, 24);
-    lv_obj_set_pos(warn_ic, 452, 6);
+    lv_obj_set_size(warn_ic, US(24), US(24));
+    lv_obj_set_pos(warn_ic, UX(452), UY(6));
     lv_obj_set_style_bg_color(warn_ic, lv_color_hex(0x333333), 0);
     lv_obj_set_style_radius(warn_ic, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_border_width(warn_ic, 0, 0);
@@ -1794,14 +1829,14 @@ lv_obj_t* create_dark_pro_ui()
     {
         struct LimInfo { int x; const char* sym; lv_obj_t** field; };
         LimInfo lims[] = {
-            {312, LV_SYMBOL_LEFT,  &g_ui.lim_L},  // Z- ←
-            {332, LV_SYMBOL_RIGHT, &g_ui.lim_R},  // Z+ →
-            {352, LV_SYMBOL_UP,   &g_ui.lim_F},  // X+ ↑
-            {372, LV_SYMBOL_DOWN, &g_ui.lim_B},  // X- ↓
+            {UX(312), LV_SYMBOL_LEFT,  &g_ui.lim_L},  // Z- ←
+            {UX(332), LV_SYMBOL_RIGHT, &g_ui.lim_R},  // Z+ →
+            {UX(352), LV_SYMBOL_UP,   &g_ui.lim_F},  // X+ ↑
+            {UX(372), LV_SYMBOL_DOWN, &g_ui.lim_B},  // X- ↓
         };
         for (auto& li : lims) {
             lv_obj_t* lbl = lv_label_create(statusbar);
-            lv_obj_set_pos(lbl, li.x, 8);
+            lv_obj_set_pos(lbl, li.x, UY(8));
             lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
             lv_obj_set_style_text_color(lbl, lv_color_hex(0x1a3a4a), 0);  // NOT SET (тёмный)
             lv_label_set_text(lbl, li.sym);
@@ -1815,14 +1850,14 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* abox = lv_obj_create(screen);
-        lv_obj_set_size(abox, 400, 110);
+        lv_obj_set_size(abox, UX(400), UY(110));
         lv_obj_align(abox, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_bg_color(abox, lv_color_hex(0x1a0a00), 0);
         lv_obj_set_style_bg_opa(abox, LV_OPA_90, 0);
         lv_obj_set_style_border_color(abox, lv_color_hex(0xff8800), 0);
-        lv_obj_set_style_border_width(abox, 2, 0);
-        lv_obj_set_style_radius(abox, 8, 0);
-        lv_obj_set_style_shadow_width(abox, 16, 0);
+        lv_obj_set_style_border_width(abox, US(2), 0);
+        lv_obj_set_style_radius(abox, US(8), 0);
+        lv_obj_set_style_shadow_width(abox, US(16), 0);
         lv_obj_set_style_shadow_color(abox, lv_color_hex(0xff8800), 0);
         lv_obj_set_style_shadow_opa(abox, LV_OPA_50, 0);
         lv_obj_clear_flag(abox, LV_OBJ_FLAG_SCROLLABLE);
@@ -1831,15 +1866,15 @@ lv_obj_t* create_dark_pro_ui()
 
         // Иконка предупреждения
         lv_obj_t* aicon = lv_label_create(abox);
-        lv_obj_set_pos(aicon, 10, 10);
+        lv_obj_set_pos(aicon, UX(10), UY(10));
         lv_obj_set_style_text_font(aicon, &lv_font_montserrat_28, 0);
         lv_obj_set_style_text_color(aicon, lv_color_hex(0xff8800), 0);
         lv_label_set_text(aicon, LV_SYMBOL_WARNING);
 
         // Текст алерта (2 строки, кириллица)
         lv_obj_t* amsg = lv_label_create(abox);
-        lv_obj_set_pos(amsg, 50, 12);
-        lv_obj_set_size(amsg, 300, 60);
+        lv_obj_set_pos(amsg, UX(50), UY(12));
+        lv_obj_set_size(amsg, UX(340), UY(60));   // 2 строки даже для "в нейтральное положение"
         lv_obj_set_style_text_font(amsg, &font_tahoma_bold_22, 0);
         lv_obj_set_style_text_color(amsg, lv_color_hex(0xffcc44), 0);
         lv_label_set_long_mode(amsg, LV_LABEL_LONG_WRAP);
@@ -1848,12 +1883,12 @@ lv_obj_t* create_dark_pro_ui()
 
         // Кнопка OK для немедленного закрытия
         lv_obj_t* aok = lv_btn_create(abox);
-        lv_obj_set_size(aok, 80, 28);
-        lv_obj_align(aok, LV_ALIGN_BOTTOM_RIGHT, -8, -8);
+        lv_obj_set_size(aok, UX(80), UY(28));
+        lv_obj_align(aok, LV_ALIGN_BOTTOM_RIGHT, -UX(8), -UY(8));
         lv_obj_set_style_bg_color(aok, lv_color_hex(0x2a1800), 0);
         lv_obj_set_style_border_color(aok, lv_color_hex(0xff8800), 0);
-        lv_obj_set_style_border_width(aok, 1, 0);
-        lv_obj_set_style_radius(aok, 4, 0);
+        lv_obj_set_style_border_width(aok, US(1), 0);
+        lv_obj_set_style_radius(aok, US(4), 0);
         lv_obj_set_style_shadow_width(aok, 0, 0);
         lv_obj_t* aok_lbl = lv_label_create(aok);
         lv_obj_center(aok_lbl);
@@ -1873,7 +1908,7 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* tbar = lv_obj_create(screen);
-        lv_obj_set_size(tbar, SCREEN_WIDTH, SCALE_H(20));
+        lv_obj_set_size(tbar, SCREEN_WIDTH, UY(20));
         lv_obj_set_pos(tbar, 0, 0);
         lv_obj_set_style_bg_color(tbar, lv_color_hex(0x500000), 0);
         lv_obj_set_style_bg_opa(tbar, LV_OPA_COVER, 0);
@@ -1912,7 +1947,7 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* tap = lv_btn_create(statusbar);
-        lv_obj_set_size(tap, SCALE_W(200), SCALE_H(36));
+        lv_obj_set_size(tap, UX(200), UY(36));
         lv_obj_set_pos(tap, 0, 0);
         lv_obj_set_style_bg_opa(tap, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(tap, 0, 0);
@@ -1941,7 +1976,7 @@ lv_obj_t* create_dark_pro_ui()
 
         // Заголовок: ВЫБОР РЕЖИМА
         lv_obj_t* title = lv_label_create(ov);
-        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
+        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, UY(10));
         lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
         lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
         lv_label_set_text(title,
@@ -1953,12 +1988,12 @@ lv_obj_t* create_dark_pro_ui()
             int col = i % 2;
             int row = i / 2;
             lv_obj_t* btn = lv_btn_create(ov);
-            lv_obj_set_size(btn, 218, 38);
-            lv_obj_set_pos(btn, 12 + col * 235, 44 + row * 47);
+            lv_obj_set_size(btn, UX(218), UY(38));
+            lv_obj_set_pos(btn, UX(12) + col * UX(235), UY(44) + row * UY(47));
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0d2233), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x1a4060), 0);
-            lv_obj_set_style_border_width(btn, 1, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(1), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             g_ui.mode_btns[i] = btn;
 
@@ -1998,12 +2033,12 @@ lv_obj_t* create_dark_pro_ui()
 
         // Кнопка ОТМЕНА
         lv_obj_t* cancel = lv_btn_create(ov);
-        lv_obj_set_size(cancel, 150, 32);
-        lv_obj_align(cancel, LV_ALIGN_BOTTOM_MID, 0, -8);
+        lv_obj_set_size(cancel, UX(150), UY(32));
+        lv_obj_align(cancel, LV_ALIGN_BOTTOM_MID, 0, -UY(8));
         lv_obj_set_style_bg_color(cancel, lv_color_hex(0x2a1a1a), 0);
         lv_obj_set_style_border_color(cancel, lv_color_hex(0x604040), 0);
-        lv_obj_set_style_border_width(cancel, 1, 0);
-        lv_obj_set_style_radius(cancel, 6, 0);
+        lv_obj_set_style_border_width(cancel, US(1), 0);
+        lv_obj_set_style_radius(cancel, US(6), 0);
         lv_obj_set_style_shadow_width(cancel, 0, 0);
         lv_obj_t* cancel_lbl = lv_label_create(cancel);
         lv_obj_center(cancel_lbl);
@@ -2023,13 +2058,13 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* ov = lv_obj_create(screen);
-        lv_obj_set_size(ov, 450, 215);
-        lv_obj_align(ov, LV_ALIGN_CENTER, 0, 5);
+        lv_obj_set_size(ov, UX(450), UY(215));
+        lv_obj_align(ov, LV_ALIGN_CENTER, 0, UY(5));
         lv_obj_set_style_bg_color(ov, lv_color_hex(0x00080f), 0);
         lv_obj_set_style_bg_opa(ov, LV_OPA_90, 0);
         lv_obj_set_style_border_color(ov, lv_color_hex(0x00ff88), 0);
-        lv_obj_set_style_border_width(ov, 2, 0);
-        lv_obj_set_style_radius(ov, 8, 0);
+        lv_obj_set_style_border_width(ov, US(2), 0);
+        lv_obj_set_style_radius(ov, US(8), 0);
         lv_obj_set_style_pad_all(ov, 0, 0);
         lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(ov, LV_OBJ_FLAG_HIDDEN);
@@ -2037,7 +2072,7 @@ lv_obj_t* create_dark_pro_ui()
 
         // Заголовок: ДЖОЙСТИК
         lv_obj_t* title = lv_label_create(ov);
-        lv_obj_set_pos(title, 10, 7);
+        lv_obj_set_pos(title, UX(10), UY(7));
         lv_obj_set_style_text_color(title, lv_color_hex(0x00ff88), 0);
         lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
         // "ДЖОЙСТИК" = Д-Ж-О-Й-С-Т-И-К
@@ -2046,16 +2081,16 @@ lv_obj_t* create_dark_pro_ui()
 
         // Кнопка ✕ закрыть (top-right)
         lv_obj_t* close_btn = lv_btn_create(ov);
-        lv_obj_set_size(close_btn, 32, 28);
-        lv_obj_set_pos(close_btn, 413, 5);
+        lv_obj_set_size(close_btn, UX(32), UY(28));
+        lv_obj_set_pos(close_btn, UX(413), UY(5));
         lv_obj_set_style_bg_color(close_btn, lv_color_hex(0x2a1010), 0);
         lv_obj_set_style_border_color(close_btn, lv_color_hex(0x884444), 0);
-        lv_obj_set_style_border_width(close_btn, 1, 0);
-        lv_obj_set_style_radius(close_btn, 4, 0);
+        lv_obj_set_style_border_width(close_btn, US(1), 0);
+        lv_obj_set_style_radius(close_btn, US(4), 0);
         lv_obj_set_style_shadow_width(close_btn, 0, 0);
         lv_obj_t* close_lbl = lv_label_create(close_btn);
         lv_obj_center(close_lbl);
-        lv_obj_set_style_text_font(close_lbl, &font_tahoma_bold_22, 0);
+        lv_obj_set_style_text_font(close_lbl, &lv_font_montserrat_20, 0);  // LV_SYMBOL — только в Montserrat
         lv_obj_set_style_text_color(close_lbl, lv_color_hex(0xff6666), 0);
         lv_label_set_text(close_lbl, LV_SYMBOL_CLOSE);
         lv_obj_add_event_cb(close_btn, [](lv_event_t*) {
@@ -2066,12 +2101,12 @@ lv_obj_t* create_dark_pro_ui()
         // Крест управления осями (левая часть, X=10..240, Y=38..195)
         // ↑/↓ = ось X (поперечный суппорт), ←/→ = ось Z (продольная)
         // =====================
-        const int cx = 10;   // начало X-области
-        const int cy = 38;   // начало Y-области
-        const int bw = 72;   // ширина кнопки
-        const int bh = 50;   // высота кнопки
-        const int bx = cx + bw + 5;   // центральная X позиция (для ↑ и ↓)
-        const int by = cy + bh + 5;   // центральная Y позиция (для ← и →)
+        const int cx = UX(10);   // начало X-области
+        const int cy = UY(38);   // начало Y-области
+        const int bw = UX(72);   // ширина кнопки
+        const int bh = UY(50);   // высота кнопки
+        const int bx = cx + bw + UX(5);   // центральная X позиция (для ↑ и ↓)
+        const int by = cy + bh + UY(5);   // центральная Y позиция (для ← и →)
 
         // Общий стиль кнопок-стрелок
         auto make_dir_btn = [&](const char* txt, int x, int y,
@@ -2081,12 +2116,12 @@ lv_obj_t* create_dark_pro_ui()
             lv_obj_set_pos(btn, x, y);
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0d2233), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x00d4ff), 0);
-            lv_obj_set_style_border_width(btn, 2, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(2), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
-            lv_obj_set_style_text_font(lbl, &font_tahoma_bold_28, 0);
+            lv_obj_set_style_text_font(lbl, &lv_font_montserrat_28, 0);  // стрелки LV_SYMBOL_* есть только в Montserrat
             lv_obj_set_style_text_color(lbl, lv_color_hex(0x00d4ff), 0);
             lv_label_set_text(lbl, txt);
             lv_obj_set_user_data(btn, (void*)cmd);
@@ -2103,9 +2138,9 @@ lv_obj_t* create_dark_pro_ui()
         // ← Z- (лево)
         make_dir_btn(LV_SYMBOL_LEFT,  cx,        by,      "JOY:LEFT");
         // → Z+ (право)
-        make_dir_btn(LV_SYMBOL_RIGHT, bx + bw + 5, by,    "JOY:RIGHT");
+        make_dir_btn(LV_SYMBOL_RIGHT, bx + bw + UX(5), by,    "JOY:RIGHT");
         // ↓ X- (низ)
-        make_dir_btn(LV_SYMBOL_DOWN,  bx,        by + bh + 5, "JOY:DOWN");
+        make_dir_btn(LV_SYMBOL_DOWN,  bx,        by + bh + UY(5), "JOY:DOWN");
 
         // СТОП (центр креста)
         {
@@ -2114,8 +2149,8 @@ lv_obj_t* create_dark_pro_ui()
             lv_obj_set_pos(btn, bx, by);
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x2a0808), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0xff4444), 0);
-            lv_obj_set_style_border_width(btn, 2, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(2), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2134,19 +2169,19 @@ lv_obj_t* create_dark_pro_ui()
         // Правая панель кнопок (X=250..440, Y=38..195)
         // Кнопки: БЫСТРО, UP, DOWN, OK
         // =====================
-        const int rx = 255;   // начало правой панели
-        const int rbw = 180;  // ширина правых кнопок
-        const int rbh = 38;   // высота правых кнопок
+        const int rx = UX(255);   // начало правой панели
+        const int rbw = UX(180);  // ширина правых кнопок
+        const int rbh = UY(38);   // высота правых кнопок
 
         // БЫСТРО (toggle rapid mode)
         {
             lv_obj_t* btn = lv_btn_create(ov);
             lv_obj_set_size(btn, rbw, rbh);
-            lv_obj_set_pos(btn, rx, 38);
+            lv_obj_set_pos(btn, rx, UY(38));
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0a1f0a), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x00aa44), 0);
-            lv_obj_set_style_border_width(btn, 2, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(2), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2176,11 +2211,11 @@ lv_obj_t* create_dark_pro_ui()
         {
             lv_obj_t* btn = lv_btn_create(ov);
             lv_obj_set_size(btn, rbw, rbh);
-            lv_obj_set_pos(btn, rx, 84);
+            lv_obj_set_pos(btn, rx, UY(84));
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0d2233), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x1a6080), 0);
-            lv_obj_set_style_border_width(btn, 1, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(1), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2197,11 +2232,11 @@ lv_obj_t* create_dark_pro_ui()
         {
             lv_obj_t* btn = lv_btn_create(ov);
             lv_obj_set_size(btn, rbw, rbh);
-            lv_obj_set_pos(btn, rx, 130);
+            lv_obj_set_pos(btn, rx, UY(130));
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0d2233), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x1a6080), 0);
-            lv_obj_set_style_border_width(btn, 1, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(1), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2218,11 +2253,11 @@ lv_obj_t* create_dark_pro_ui()
         {
             lv_obj_t* btn = lv_btn_create(ov);
             lv_obj_set_size(btn, rbw, rbh);
-            lv_obj_set_pos(btn, rx, 170);
+            lv_obj_set_pos(btn, rx, UY(170));
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x00192a), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x00d4ff), 0);
-            lv_obj_set_style_border_width(btn, 2, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(2), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2242,13 +2277,13 @@ lv_obj_t* create_dark_pro_ui()
     // =========================================================
     {
         lv_obj_t* ov = lv_obj_create(screen);
-        lv_obj_set_size(ov, 260, 220);
+        lv_obj_set_size(ov, UX(260), UY(220));
         lv_obj_align(ov, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_bg_color(ov, lv_color_hex(0x000814), 0);
         lv_obj_set_style_bg_opa(ov, LV_OPA_90, 0);
         lv_obj_set_style_border_color(ov, lv_color_hex(0x00d4ff), 0);
-        lv_obj_set_style_border_width(ov, 2, 0);
-        lv_obj_set_style_radius(ov, 8, 0);
+        lv_obj_set_style_border_width(ov, US(2), 0);
+        lv_obj_set_style_radius(ov, US(8), 0);
         lv_obj_set_style_pad_all(ov, 0, 0);
         lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(ov, LV_OBJ_FLAG_HIDDEN);
@@ -2256,7 +2291,7 @@ lv_obj_t* create_dark_pro_ui()
 
         // Заголовок: ТИП РЕЗЬБЫ
         lv_obj_t* title = lv_label_create(ov);
-        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, UY(8));
         lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
         lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
         lv_label_set_text(title,
@@ -2273,12 +2308,12 @@ lv_obj_t* create_dark_pro_ui()
 
         for (int i = 0; i < 4; i++) {
             lv_obj_t* btn = lv_btn_create(ov);
-            lv_obj_set_size(btn, 220, 34);
-            lv_obj_set_pos(btn, 20, 40 + i * 38);
+            lv_obj_set_size(btn, UX(220), UY(32));
+            lv_obj_set_pos(btn, UX(20), UY(38) + i * UY(36));   // последняя кончается выше кнопки ОТМЕНА
             lv_obj_set_style_bg_color(btn, lv_color_hex(0x0d2233), 0);
             lv_obj_set_style_border_color(btn, lv_color_hex(0x1a4060), 0);
-            lv_obj_set_style_border_width(btn, 1, 0);
-            lv_obj_set_style_radius(btn, 6, 0);
+            lv_obj_set_style_border_width(btn, US(1), 0);
+            lv_obj_set_style_radius(btn, US(6), 0);
             lv_obj_set_style_shadow_width(btn, 0, 0);
             lv_obj_t* lbl = lv_label_create(btn);
             lv_obj_center(lbl);
@@ -2295,12 +2330,12 @@ lv_obj_t* create_dark_pro_ui()
 
         // Кнопка ОТМЕНА
         lv_obj_t* cancel = lv_btn_create(ov);
-        lv_obj_set_size(cancel, 150, 28);
-        lv_obj_align(cancel, LV_ALIGN_BOTTOM_MID, 0, -6);
+        lv_obj_set_size(cancel, UX(150), UY(28));
+        lv_obj_align(cancel, LV_ALIGN_BOTTOM_MID, 0, -UY(6));
         lv_obj_set_style_bg_color(cancel, lv_color_hex(0x2a1a1a), 0);
         lv_obj_set_style_border_color(cancel, lv_color_hex(0x604040), 0);
-        lv_obj_set_style_border_width(cancel, 1, 0);
-        lv_obj_set_style_radius(cancel, 6, 0);
+        lv_obj_set_style_border_width(cancel, US(1), 0);
+        lv_obj_set_style_radius(cancel, US(6), 0);
         lv_obj_set_style_shadow_width(cancel, 0, 0);
         lv_obj_t* cancel_lbl = lv_label_create(cancel);
         lv_obj_center(cancel_lbl);
@@ -2497,7 +2532,7 @@ static void apply_mode_layout(LatheMode mode)
             active ? lv_color_hex(0x003a5a) : lv_color_hex(0x0d2233), 0);
         lv_obj_set_style_border_color(g_ui.mode_btns[i],
             active ? lv_color_hex(0x00d4ff) : lv_color_hex(0x1a4060), 0);
-        lv_obj_set_style_border_width(g_ui.mode_btns[i], active ? 2 : 1, 0);
+        lv_obj_set_style_border_width(g_ui.mode_btns[i], active ? US(2) : US(1), 0);
     }
 
     // ── Подпись вторичного значения + заголовки строк правой панели ──────────
@@ -2889,9 +2924,9 @@ static void enter_edit_mode()
         lv_obj_set_style_border_color(g_ui.primary_edit_box, lv_color_hex(0xffcc00), 0);
         lv_obj_set_style_bg_color(g_ui.primary_edit_box, lv_color_hex(0x120a00), 0);
     } else {
-        lv_obj_set_style_border_width(g_ui.primary_val, 2, 0);
+        lv_obj_set_style_border_width(g_ui.primary_val, US(2), 0);
         lv_obj_set_style_border_color(g_ui.primary_val, lv_color_hex(0xffcc00), 0);
-        lv_obj_set_style_pad_hor(g_ui.primary_val, 8, 0);
+        lv_obj_set_style_pad_hor(g_ui.primary_val, US(8), 0);
     }
 
     Serial.println("Edit mode: ON  (UP=KEY:UP, OK=PARAM_OK, DN=KEY:DN)");
@@ -3045,9 +3080,9 @@ static void roller_update_labels() {
     const RollerCfg& c = g_roller.cfg;
     for (int i = 0; i < 5; i++) {
         if (!g_roller.labels[i]) continue;
-        int32_t v = constrain(g_roller.pending_val + (i - 2) * c.val_step, c.val_min, c.val_max);
-        char buf[24];
-        roller_label_text(buf, sizeof(buf), v, c.target);
+        int32_t v = g_roller.pending_val + (i - 2) * c.val_step;
+        char buf[24] = "";   // за границей диапазона — пустая строка, а не повтор крайнего значения
+        if (v >= c.val_min && v <= c.val_max) roller_label_text(buf, sizeof(buf), v, c.target);
         lv_label_set_text(g_roller.labels[i], buf);
         lv_obj_set_style_text_color(g_roller.labels[i], colors[i], 0);
     }
@@ -3230,7 +3265,7 @@ static void close_roller(bool confirm) {
 static void _roller_inertia_cb(lv_timer_t* t) {
     const float DECAY   = 0.92f;
     const float MIN_VEL = 0.35f;
-    const int   STEP_PX = 15;
+    const int   STEP_PX = UY(15);
 
     g_roller.velocity *= DECAY;
     if (fabsf(g_roller.velocity) < MIN_VEL) {
@@ -3262,7 +3297,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
 
     // Полупрозрачный фон — левая область (правые кнопки x=418..474 остаются доступными)
     g_roller.backdrop = lv_obj_create(scr);
-    lv_obj_set_size(g_roller.backdrop, SCREEN_WIDTH - SCALE_W(64), SCREEN_HEIGHT);
+    lv_obj_set_size(g_roller.backdrop, SCREEN_WIDTH - UX(64), SCREEN_HEIGHT);
     lv_obj_set_pos(g_roller.backdrop, 0, 0);
     lv_obj_set_style_bg_color(g_roller.backdrop, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(g_roller.backdrop, 140, 0);
@@ -3279,16 +3314,16 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
     }, LV_EVENT_ALL, nullptr);
 
     // Центральная панель барабана
-    const int PW = SCALE_W(260), PH = SCALE_H(260);
-    const int PX = ((SCREEN_WIDTH - SCALE_W(64)) - PW) / 2, PY = (SCREEN_HEIGHT - PH) / 2;
+    const int PW = UX(260), PH = UY(260);
+    const int PX = ((SCREEN_WIDTH - UX(64)) - PW) / 2, PY = (SCREEN_HEIGHT - PH) / 2;
     g_roller.panel = lv_obj_create(scr);
     lv_obj_set_size(g_roller.panel, PW, PH);
     lv_obj_set_pos(g_roller.panel, PX, PY);
     lv_obj_set_style_bg_color(g_roller.panel, lv_color_hex(0x0d1e2e), 0);
     lv_obj_set_style_bg_opa(g_roller.panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(g_roller.panel, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(g_roller.panel, 2, 0);
-    lv_obj_set_style_radius(g_roller.panel, 8, 0);
+    lv_obj_set_style_border_width(g_roller.panel, US(2), 0);
+    lv_obj_set_style_radius(g_roller.panel, US(8), 0);
     lv_obj_set_style_pad_all(g_roller.panel, 0, 0);
     lv_obj_clear_flag(g_roller.panel, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(g_roller.panel, LV_OBJ_FLAG_CLICKABLE);
@@ -3298,20 +3333,20 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_label_set_text(title, cfg.title ? cfg.title : "");
-    lv_obj_set_pos(title, 0, 8);
+    lv_obj_set_pos(title, 0, UY(8));
     lv_obj_set_width(title, PW);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_clear_flag(title, LV_OBJ_FLAG_CLICKABLE);
 
-    const int ROW_H = 40, ROWS_Y = 40;
+    const int ROW_H = UY(40), ROWS_Y = UY(40);
     lv_obj_t* sel_rect = lv_obj_create(g_roller.panel);
-    lv_obj_set_size(sel_rect, PW - 12, 42);
-    lv_obj_set_pos(sel_rect, 4, ROWS_Y + 2 * ROW_H - 4);
+    lv_obj_set_size(sel_rect, PW - UX(12), UY(42));
+    lv_obj_set_pos(sel_rect, UX(4), ROWS_Y + 2 * ROW_H - UY(4));
     lv_obj_set_style_bg_color(sel_rect, lv_color_hex(0x003a5a), 0);
     lv_obj_set_style_bg_opa(sel_rect, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(sel_rect, lv_color_hex(0x00d4ff), 0);
-    lv_obj_set_style_border_width(sel_rect, 1, 0);
-    lv_obj_set_style_radius(sel_rect, 4, 0);
+    lv_obj_set_style_border_width(sel_rect, US(1), 0);
+    lv_obj_set_style_radius(sel_rect, US(4), 0);
     lv_obj_clear_flag(sel_rect, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     // Центральная строка — font_40, внешние — font_28 (текст) или font_22 (строковые)
@@ -3324,7 +3359,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
         g_roller.labels[i] = lv_label_create(g_roller.panel);
         lv_obj_set_style_text_font(g_roller.labels[i], row_fonts[i], 0);
         int label_y = ROWS_Y + i * ROW_H;
-        if (i != 2) label_y += 2;
+        if (i != 2) label_y += UY(2);
         lv_obj_set_pos(g_roller.labels[i], 0, label_y);
         lv_obj_set_width(g_roller.labels[i], lv_pct(100));
         lv_obj_set_style_text_align(g_roller.labels[i], LV_TEXT_ALIGN_CENTER, 0);
@@ -3348,7 +3383,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
             if (!indev) return;
             lv_point_t vect;
             lv_indev_get_vect(indev, &vect);
-            const int STEP_PX = 15;
+            const int STEP_PX = UY(15);
             g_roller.velocity = g_roller.velocity * 0.7f + (-vect.y) * 0.3f;
             g_roller.touch_accum -= vect.y;
             const RollerCfg& c = g_roller.cfg;
@@ -3364,7 +3399,7 @@ static void open_roller(int32_t cur_val, const RollerCfg& cfg) {
             }
         } else if (code == LV_EVENT_RELEASED) {
             g_roller.touch_accum = 0;
-            if (fabsf(g_roller.velocity) >= 2.0f && !g_roller.inertia_timer) {
+            if (fabsf(g_roller.velocity) >= (float)UY(2) && !g_roller.inertia_timer) {
                 g_roller.vel_accum    = 0.0f;
                 g_roller.inertia_timer = lv_timer_create(_roller_inertia_cb, 16, nullptr);
             } else {
@@ -3443,16 +3478,14 @@ static void jump_to_thread_type(int first_idx)
 {
     if (first_idx < 0 || first_idx >= THREAD_TABLE_SIZE) return;
 
-    // Установить шаг ДО входа в edit_mode, чтобы roller открылся на правильной позиции
+    // enter_edit_mode() берёт шаг из текущего состояния STM32 — поэтому выбранный
+    // тип выставляется ПОСЛЕ входа в редактирование, иначе барабан открылся бы на старом шаге
+    if (!g_edit_param.active && !g_roller.active) enter_edit_mode();
     g_edit_param.local_step = first_idx;
     g_edit_param.last_ms    = millis();
-
     if (g_roller.active) {
-        // Roller уже открыт — переместить сразу без переоткрытия
         g_roller.pending_val = first_idx;
         roller_update_labels();
-    } else if (!g_edit_param.active) {
-        enter_edit_mode();
     }
 
     const char* lbl = s_thread_table[first_idx].label;
@@ -3795,7 +3828,7 @@ static void show_alert(const char* message)
     // Кружок ⚠ → оранжевый
     if (g_ui.warn_bg) {
         lv_obj_set_style_bg_color(g_ui.warn_bg, lv_color_hex(0xff8800), 0);
-        lv_obj_set_style_shadow_width(g_ui.warn_bg, 8, 0);
+        lv_obj_set_style_shadow_width(g_ui.warn_bg, US(8), 0);
         lv_obj_set_style_shadow_color(g_ui.warn_bg, lv_color_hex(0xff8800), 0);
     }
     Serial.printf("Alert: %s\n", message);
@@ -3946,6 +3979,10 @@ static void update_ui_values(const LatheData& data)
     {
         int mi = (int)data.mode;
         if (mi >= 1 && mi <= 8) lv_label_set_text(g_ui.mode_lbl, MODE_STRS[mi]);
+        if (s_sphere_alert && data.mode != MODE_SPHERE) {   // ушли из M6 — алерт неактуален
+            if (g_alert.active) dismiss_alert();
+            s_sphere_alert = false;
+        }
 
         int si = (int)data.submode;
         if (si >= 1 && si <= 3) lv_label_set_text(g_ui.submode_lbl, SUBMODE_STRS[si]);
@@ -4361,10 +4398,15 @@ static void update_ui_values(const LatheData& data)
                          (long)(sphere_diam / 100), (long)(abs(sphere_diam % 100) / 10));
                 lv_label_set_text(g_ui.thr_type_val, buf);
             }
-            // Алерт "Режим невозможен!" при INTERNAL подрежиме
-            if (data.submode == SUBMODE_INTERNAL && !g_alert.active)
+            // Алерт "Режим невозможен!" при INTERNAL подрежиме; снимается, как только подрежим сменили
+            if (data.submode == SUBMODE_INTERNAL && !g_alert.active) {
                 show_alert("\xD0\xA0\xD0\xB5\xD0\xB6\xD0\xB8\xD0\xBC "
                            "\xD0\xBD\xD0\xB5\xD0\xB2\xD0\xBE\xD0\xB7\xD0\xBC\xD0\xBE\xD0\xB6\xD0\xB5\xD0\xBD!");
+                s_sphere_alert = true;
+            } else if (data.submode != SUBMODE_INTERNAL && s_sphere_alert) {
+                if (g_alert.active) dismiss_alert();
+                s_sphere_alert = false;
+            }
             break;
         }
 
@@ -4998,11 +5040,61 @@ void onDataUpdate(const LatheData& data)
 }
 
 // ============================================================================
+// Автотесты: текущие тексты виджетов одной строкой (<UIDUMP> по USB)
+// Формат: [UI] key="text" ... (перевод строки в тексте → \n), цвета — RRGGBB
+// ============================================================================
+static void ui_dump()
+{
+    const struct { const char* key; lv_obj_t* obj; } labels[] = {
+        {"mode_lbl", g_ui.mode_lbl},         {"submode_lbl", g_ui.submode_lbl},
+        {"primary_unit", g_ui.primary_unit}, {"primary_val", g_ui.primary_val},
+        {"thread_tag", g_ui.thread_tag},
+        {"secondary_unit", g_ui.secondary_unit}, {"secondary_val", g_ui.secondary_val},
+        {"row1_title", g_ui.row1_title}, {"row1_val", g_ui.row1_val},
+        {"row2_title", g_ui.row2_title}, {"row2_val", g_ui.row2_val},
+        {"row3_title", g_ui.row3_title}, {"row3_val", g_ui.row3_val},
+        {"row4_title", g_ui.row4_title}, {"row4_val", g_ui.row4_val},
+        {"thr_type_title", g_ui.thr_type_title}, {"thr_type_val", g_ui.thr_type_val},
+        {"sm_row6", g_ui.sm_row6}, {"s2_lbl", g_ui.s2_lbl}, {"alert_msg", g_ui.alert_msg},
+    };
+    Serial.print("[UI]");
+    for (const auto& l : labels) {
+        if (!l.obj) continue;
+        Serial.printf(" %s=\"", l.key);
+        for (const char* p = lv_label_get_text(l.obj); *p; p++) {
+            if (*p == '\n') Serial.print("\\n");
+            else if (*p == '"') Serial.print("\\\"");
+            else Serial.print(*p);
+        }
+        Serial.print("\"");
+    }
+    auto hidden = [](lv_obj_t* o) { return !o || lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN); };
+    auto color  = [](lv_obj_t* o, lv_style_selector_t part) {
+        return (unsigned)(lv_color_to32(lv_obj_get_style_text_color(o, part)) & 0xFFFFFF);
+    };
+    Serial.printf(" alert=%d mode_menu=%d thr_type_menu=%d joystick=%d settings=%d roller=%d"
+                  " edit=%d sub_edit=%d thr_type_box=%d",
+                  !hidden(g_ui.alert_box), !hidden(g_ui.mode_menu), !hidden(g_ui.thr_type_menu),
+                  !hidden(g_ui.joystick_overlay), !hidden(g_ui.settings_menu), (int)g_roller.active,
+                  (int)g_edit_param.active, (int)g_sub_edit.active, !hidden(g_ui.thr_type_box));
+    if (g_ui.lim_L)
+        Serial.printf(" lim=%06X,%06X,%06X,%06X", color(g_ui.lim_L, 0), color(g_ui.lim_R, 0),
+                      color(g_ui.lim_F, 0), color(g_ui.lim_B, 0));
+    if (g_ui.pwr_bg)
+        Serial.printf(" pwr_bg=%06X",
+                      (unsigned)(lv_color_to32(lv_obj_get_style_bg_color(g_ui.pwr_bg, 0)) & 0xFFFFFF));
+    if (g_ui.row1_val) Serial.printf(" row1_color=%06X", color(g_ui.row1_val, 0));
+    if (g_ui.row2_val) Serial.printf(" row2_color=%06X", color(g_ui.row2_val, 0));
+    Serial.println();
+}
+
+// ============================================================================
 // Setup
 // ============================================================================
 
 void setup()
 {
+    Serial.setRxBufferSize(4096);   // команды автотестов по USB не теряются при занятом loop()
     Serial.begin(115200);
     delay(500);
     Serial.println("\n\n===========================================");
@@ -5261,8 +5353,13 @@ void loop()
         if (dt > dbg_max) dbg_max = dt;
         dbg_loops++;
         if (t0 - dbg_last >= 2000) {
-            Serial.printf("[DBG] loops/2s=%lu lv_max=%lums\n",
-                          (unsigned long)dbg_loops, (unsigned long)dbg_max);
+            // lv_mem_free — только для встроенного пула LVGL (4.3"); на 10.1" память LVGL в PSRAM
+            lv_mem_monitor_t mon;
+            lv_mem_monitor(&mon);
+            Serial.printf("[DBG] loops/2s=%lu lv_max=%lums lv_mem_free=%u heap=%u psram=%u\n",
+                          (unsigned long)dbg_loops, (unsigned long)dbg_max,
+                          (unsigned)mon.free_size, (unsigned)ESP.getFreeHeap(),
+                          (unsigned)ESP.getFreePsram());
             dbg_last = t0; dbg_max = 0; dbg_loops = 0;
         }
     }
@@ -5277,18 +5374,51 @@ void loop()
     // Протокол: PC шлёт 'S' → ESP32 отвечает {0xDE,0xAD,0xBE,0xEF} + 4-byte LE size + JPEG
     {
         static uint8_t  usb_ss_state = 0;
-        static uint32_t usb_ss_sent  = 0;
 
         if (usb_ss_state == 0) {
-            // Ждём байт 'S' от PC (закрой Serial Monitor перед использованием!)
-            if (Serial.available() >= 1 && Serial.peek() == 'S') {
-                Serial.read();
-                if (sem_requested) {
-                    xSemaphoreGive(sem_requested);
-                    usb_ss_state = 1;
+            // USB CDC (закрой Serial Monitor перед использованием!):
+            //   'S'          → скриншот
+            //   <BTN:name>   → <TOUCH:name> в STM32 (как нажатие на экране)
+            //   <TAP:x,y>    → имитация касания, x/y в координатах базы 480×272
+            //   <UIDUMP>     → тексты виджетов в [UI]-строку (автотесты)
+            //   <RXMUTE:0|1> → игнорировать данные от STM32 (автотесты)
+            //   <CMD:val>    → обработать как команду от STM32
+            static char    usb_inj_buf[128];
+            static uint8_t usb_inj_len = 0;
+            while (Serial.available() >= 1) {
+                char c = (char)Serial.read();
+                if (usb_inj_len > 0) {
+                    if (usb_inj_len < sizeof(usb_inj_buf) - 1) usb_inj_buf[usb_inj_len++] = c;
+                    if (c == '>') {
+                        usb_inj_buf[usb_inj_len - 1] = '\0';  // без '>'
+                        int tx, ty;
+                        if (strncmp(usb_inj_buf, "<BTN:", 5) == 0) {
+                            uart_protocol.sendButtonPress(usb_inj_buf + 5);
+                            Serial.printf("[BTN→STM32] TOUCH:%s\n", usb_inj_buf + 5);
+                        } else if (sscanf(usb_inj_buf, "<TAP:%d,%d", &tx, &ty) == 2) {
+                            sim_tap(UX(tx), UY(ty));
+                            Serial.printf("[TAP] %d,%d\n", tx, ty);
+                        } else if (strcmp(usb_inj_buf, "<UIDUMP") == 0) {
+                            ui_dump();
+                        } else if (sscanf(usb_inj_buf, "<RXMUTE:%d", &tx) == 1) {
+                            uart_protocol.setRxMute(tx != 0);
+                            Serial.printf("[RXMUTE] %d\n", tx);
+                        } else {
+                            usb_inj_buf[usb_inj_len - 1] = '>';
+                            usb_inj_buf[usb_inj_len] = '\0';
+                            uart_protocol.injectCmd(usb_inj_buf);
+                            Serial.printf("[INJ] %s\n", usb_inj_buf);
+                        }
+                        usb_inj_len = 0;
+                    } else if (c == '\n' || c == '\r') {
+                        usb_inj_len = 0;
+                    }
+                } else if (c == 'S') {
+                    if (sem_requested) { xSemaphoreGive(sem_requested); usb_ss_state = 1; }
+                    break;
+                } else if (c == '<') {
+                    usb_inj_buf[0] = c; usb_inj_len = 1;
                 }
-            } else if (Serial.available() >= 1) {
-                Serial.read();  // выбрасываем мусор
             }
         } else if (usb_ss_state == 1) {
             // Ждём завершения захвата (неблокирующе)
@@ -5301,23 +5431,12 @@ void loop()
                         (uint8_t)(jpeg_size >> 16),
                         (uint8_t)(jpeg_size >> 24)
                     };
+                    // Весь кадр одной операцией: иначе между кусками в поток USB
+                    // вклиниваются [STATE]/[DBG] из следующих итераций loop() и JPEG ломается
                     Serial.write(hdr, 8);
-                    usb_ss_sent = 0;
-                    usb_ss_state = 2;
-                } else {
-                    usb_ss_state = 0;  // ошибка захвата
+                    Serial.write(jpeg_buf, jpeg_size);
+                    Serial.flush();  // сбросить USB CDC буфер (иначе последние ~64 байта теряются)
                 }
-            }
-        } else if (usb_ss_state == 2) {
-            // Отправляем JPEG кусками по 512 байт за итерацию
-            if (usb_ss_sent < jpeg_size) {
-                uint32_t chunk = jpeg_size - usb_ss_sent;
-                if (chunk > 512) chunk = 512;
-                Serial.write(jpeg_buf + usb_ss_sent, (size_t)chunk);
-                usb_ss_sent += chunk;
-            }
-            if (usb_ss_sent >= jpeg_size) {
-                Serial.flush();  // сбросить USB CDC буфер (иначе последние ~64 байта теряются)
                 usb_ss_state = 0;
             }
         }

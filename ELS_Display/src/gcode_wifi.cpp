@@ -1,7 +1,12 @@
 /**
  * gcode_wifi.cpp
  * WiFi (STA→AP fallback) + LittleFS + простой HTTP сервер на WiFiServer.
- * Обрабатывает одного клиента за раз прямо в loop() — без отдельных задач.
+ *
+ * WiFi и HTTP работают в отдельной задаче FreeRTOS: вызовы WiFi (подключение, softAP,
+ * таймауты связи с WiFi-чипом) и загрузка файлов длятся секундами и не должны
+ * останавливать отрисовку UI и приём UART в loop(). Всё, что трогает LVGL или
+ * исполнитель G-кода, передаётся в loop() через запросы и выполняется в
+ * GCodeWiFi_Process().
  */
 
 #include "gcode_wifi.h"
@@ -31,6 +36,25 @@ static WiFiServer*       s_srv     = nullptr;
 static GCWifiConnectedCb s_conn_cb = nullptr;
 static char              s_ip[20]  = {};
 static char              s_notified_ip[20] = {};  // последний адрес, о котором показан алерт
+
+// Запросы из WiFi-задачи в loop() (под s_req_mux)
+enum GcwReq { GCW_REQ_NONE, GCW_REQ_RUN, GCW_REQ_STOP, GCW_REQ_PAUSE };
+static portMUX_TYPE      s_req_mux = portMUX_INITIALIZER_UNLOCKED;
+static GcwReq            s_req = GCW_REQ_NONE;
+static char              s_req_path[96] = {};
+static bool              s_notify_pending = false;
+static char              s_notify_ip[20] = {};
+static bool              s_notify_ap = false;
+
+static void post_exec_request(GcwReq req, const char* path = nullptr) {
+    portENTER_CRITICAL(&s_req_mux);
+    s_req = req;
+    if (path) {
+        strncpy(s_req_path, path, sizeof(s_req_path) - 1);
+        s_req_path[sizeof(s_req_path) - 1] = '\0';
+    }
+    portEXIT_CRITICAL(&s_req_mux);
+}
 
 // ─── HTML ─────────────────────────────────────────────────────────────────────
 
@@ -504,7 +528,8 @@ static void handle_run(WiFiClient& cl, const String& query) {
         return;
     }
     String path = String(GCODE_DIR) + "/" + name;
-    bool ok = GCodeExec_Run(path.c_str());
+    bool ok = LittleFS.exists(path);   // запуск выполнит loop() (GCodeWiFi_Process)
+    if (ok) post_exec_request(GCW_REQ_RUN, path.c_str());
     char buf[80];
     snprintf(buf, sizeof(buf), "{\"ok\":%s,\"file\":\"%s\"}",
              ok ? "true" : "false", name.c_str());
@@ -512,12 +537,12 @@ static void handle_run(WiFiClient& cl, const String& query) {
 }
 
 static void handle_stop(WiFiClient& cl) {
-    GCodeExec_Stop();
+    post_exec_request(GCW_REQ_STOP);
     send_ok_json(cl, "{\"ok\":true}");
 }
 
 static void handle_pause(WiFiClient& cl) {
-    GCodeExec_TogglePause();
+    post_exec_request(GCW_REQ_PAUSE);
     send_ok_json(cl, "{\"ok\":true}");
 }
 
@@ -592,7 +617,11 @@ static void handle_client(WiFiClient& cl) {
 static void notify_connected() {
     if (strcmp(s_notified_ip, s_ip) == 0) return;
     strncpy(s_notified_ip, s_ip, sizeof(s_notified_ip) - 1);
-    if (s_conn_cb) s_conn_cb(s_ip, s_state == GCW_AP);
+    portENTER_CRITICAL(&s_req_mux);
+    strncpy(s_notify_ip, s_ip, sizeof(s_notify_ip) - 1);
+    s_notify_ap = (s_state == GCW_AP);
+    s_notify_pending = true;          // callback (LVGL-алерт) вызовет loop()
+    portEXIT_CRITICAL(&s_req_mux);
 }
 
 static void start_server(bool notify = true) {
@@ -638,7 +667,7 @@ static void start_ap() {
 
 void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) { s_conn_cb = cb; }
 
-void GCodeWiFi_Init() {
+static void wifi_init_impl() {
     if (!LittleFS.begin(false)) {
         Serial.println("[gcode] LittleFS formatting...");
         LittleFS.begin(true);
@@ -666,7 +695,7 @@ void GCodeWiFi_Init() {
     }
 }
 
-void GCodeWiFi_Process() {
+static void wifi_process_impl() {
     // Обработка клиентов
     if (s_srv && s_srv->hasClient()) {
         WiFiClient cl = s_srv->accept();
@@ -729,6 +758,39 @@ void GCodeWiFi_Process() {
             s_conn_t = millis();
         }
     }
+}
+
+static void wifi_task(void*) {
+    wifi_init_impl();
+    for (;;) {
+        wifi_process_impl();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+
+void GCodeWiFi_Init() {
+    xTaskCreatePinnedToCore(wifi_task, "gcode_wifi", 8192, nullptr, 1, nullptr, 0);
+}
+
+// Вызывается из loop(): выполнить запросы WiFi-задачи в контексте UI/исполнителя
+void GCodeWiFi_Process() {
+    GcwReq req;
+    char path[sizeof(s_req_path)];
+    bool notify;
+    char ip[sizeof(s_notify_ip)];
+    bool is_ap;
+    portENTER_CRITICAL(&s_req_mux);
+    req = s_req;  s_req = GCW_REQ_NONE;
+    memcpy(path, s_req_path, sizeof(path));
+    notify = s_notify_pending;  s_notify_pending = false;
+    memcpy(ip, s_notify_ip, sizeof(ip));
+    is_ap = s_notify_ap;
+    portEXIT_CRITICAL(&s_req_mux);
+
+    if (req == GCW_REQ_RUN)   GCodeExec_Run(path);
+    if (req == GCW_REQ_STOP)  GCodeExec_Stop();
+    if (req == GCW_REQ_PAUSE) GCodeExec_TogglePause();
+    if (notify && s_conn_cb)  s_conn_cb(ip, is_ap);
 }
 
 const char* GCodeWiFi_GetIP()      { return s_ip; }

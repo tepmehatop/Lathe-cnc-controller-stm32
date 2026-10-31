@@ -175,6 +175,11 @@ public:
     // Отправить команду Arduino (нажатие кнопки)
     void sendButtonPress(const char* button_name);
 
+    // Автотесты: обработать <CMD:val> так, будто он пришёл от STM32
+    void injectCmd(const char* cmd) { parseCommand(cmd); }
+    // Автотесты: игнорировать входящие данные от STM32 (инжектированное состояние не перетирается)
+    void setRxMute(bool mute) { rx_mute_ = mute; }
+
     // Отправить готовность
     void sendReady();
 
@@ -228,6 +233,7 @@ private:
     GCodeResponseCallback gcode_response_callback_;
 
     bool data_dirty_;  // true when data_ changed but callback not yet fired
+    bool rx_mute_ = false;
 
     // Парсинг команд
     void parseCommand(const char* cmd);
@@ -266,6 +272,7 @@ private:
     void parseConeThr(const char* params);      // <CONE_THR:0|1>     → cone_thr
     void parseCutterW(const char* params);      // <CUTTER_W:N>       → cutter_w
     void parseCuttingW(const char* params);     // <CUTTING_W:N>      → cutting_w
+    void parseLCD2004(const char* params);      // <LCD2004:...>      → [LCD2004] в USB (тесты)
 
     // Отправка команды
     void sendCommand(const char* cmd, const char* params = nullptr);

@@ -29,8 +29,8 @@
    MEMORY SETTINGS
  *=========================*/
 
-/* Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/
-#define LV_MEM_CUSTOM 0
+/* JC8012P4A1C: память LVGL из PSRAM (lv_mem_p4.h) — пул 48 КБ на 1280×800 исчерпывался */
+#define LV_MEM_CUSTOM 1
 #if LV_MEM_CUSTOM == 0
     /* Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/
     #define LV_MEM_SIZE (48U * 1024U)          /* 48 KB */
@@ -44,10 +44,10 @@
         #undef LV_MEM_POOL_ALLOC
     #endif
 #else       /* LV_MEM_CUSTOM */
-    #define LV_MEM_CUSTOM_INCLUDE <stdlib.h>   /* Header for the dynamic memory function */
-    #define LV_MEM_CUSTOM_ALLOC   malloc
-    #define LV_MEM_CUSTOM_FREE    free
-    #define LV_MEM_CUSTOM_REALLOC realloc
+    #define LV_MEM_CUSTOM_INCLUDE "lv_mem_p4.h"   /* Header for the dynamic memory function */
+    #define LV_MEM_CUSTOM_ALLOC   lv_p4_malloc
+    #define LV_MEM_CUSTOM_FREE    lv_p4_free
+    #define LV_MEM_CUSTOM_REALLOC lv_p4_realloc
 #endif     /* LV_MEM_CUSTOM */
 
 /*====================
@@ -64,28 +64,31 @@
    FONT USAGE
  *================*/
 
-/* Montserrat fonts with various styles and sizes */
+/* Montserrat fonts with various styles and sizes
+ * JC8012P4A1C: встроенные шрифты отключены. lv_font_montserrat_14/20/28 генерируются
+ * в ELS_Display_P4/fonts/ ×8/3 по размеру (tools/gen_p4_fonts.sh) и объявлены ниже
+ * в LV_FONT_CUSTOM_DECLARE — UI использует их по «4.3-дюймовому» размеру. */
 #define LV_FONT_MONTSERRAT_8  0
-#define LV_FONT_MONTSERRAT_10 1
-#define LV_FONT_MONTSERRAT_12 1
-#define LV_FONT_MONTSERRAT_14 1
-#define LV_FONT_MONTSERRAT_16 1
-#define LV_FONT_MONTSERRAT_18 1
-#define LV_FONT_MONTSERRAT_20 1
-#define LV_FONT_MONTSERRAT_22 1
-#define LV_FONT_MONTSERRAT_24 1
+#define LV_FONT_MONTSERRAT_10 0
+#define LV_FONT_MONTSERRAT_12 0
+#define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_MONTSERRAT_16 0
+#define LV_FONT_MONTSERRAT_18 0
+#define LV_FONT_MONTSERRAT_20 0
+#define LV_FONT_MONTSERRAT_22 0
+#define LV_FONT_MONTSERRAT_24 0
 #define LV_FONT_MONTSERRAT_26 0
-#define LV_FONT_MONTSERRAT_28 1
+#define LV_FONT_MONTSERRAT_28 0
 #define LV_FONT_MONTSERRAT_30 0
-#define LV_FONT_MONTSERRAT_32 1
+#define LV_FONT_MONTSERRAT_32 0
 #define LV_FONT_MONTSERRAT_34 0
-#define LV_FONT_MONTSERRAT_36 1
+#define LV_FONT_MONTSERRAT_36 0
 #define LV_FONT_MONTSERRAT_38 0
 #define LV_FONT_MONTSERRAT_40 0
 #define LV_FONT_MONTSERRAT_42 0
 #define LV_FONT_MONTSERRAT_44 0
 #define LV_FONT_MONTSERRAT_46 0
-#define LV_FONT_MONTSERRAT_48 1
+#define LV_FONT_MONTSERRAT_48 0
 
 /* Demonstrate special features */
 #define LV_FONT_MONTSERRAT_12_SUBPX      0
@@ -98,11 +101,14 @@
 #define LV_FONT_UNSCII_16 0
 
 /* Optionally declare custom fonts here. */
-#define LV_FONT_CUSTOM_DECLARE
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_montserrat_14) \
+                               LV_FONT_DECLARE(lv_font_montserrat_20) \
+                               LV_FONT_DECLARE(lv_font_montserrat_28)
+#define LV_FONT_DEFAULT &lv_font_montserrat_14
 
 /* Enable it if you have fonts with a lot of characters.
  * The limit depends on the font size, font face and bpp. */
-#define LV_FONT_FMT_TXT_LARGE 0
+#define LV_FONT_FMT_TXT_LARGE 1  /* шрифты 10.1" крупные (до ~1 МБ битмапов) */
 
 /* Enables/disables support for compressed fonts. */
 #define LV_USE_FONT_COMPRESSED 0
@@ -267,8 +273,8 @@
 #define LV_USE_ASSERT_OBJ           0   /* Check the object's type and existence (e.g. not deleted). (Slow) */
 
 /* Add a custom handler when assert happens e.g. to restart the MCU */
-#define LV_ASSERT_HANDLER_INCLUDE <stdint.h>
-#define LV_ASSERT_HANDLER while(1);   /* Halt by default */
+#define LV_ASSERT_HANDLER_INCLUDE <stdlib.h>
+#define LV_ASSERT_HANDLER abort();    /* паника с backtrace и перезагрузка вместо тихого зависания */
 
 /*==================
  *    DEBUG

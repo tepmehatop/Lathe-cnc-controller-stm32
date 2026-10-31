@@ -50,6 +50,7 @@ void UartProtocol::process()
 
     while (serial_->available()) {
         char c = serial_->read();
+        if (rx_mute_) continue;
 
         if (c == '\n' || c == '\r') {
             if (rx_index_ > 0) {
@@ -66,6 +67,15 @@ void UartProtocol::process()
     // Это предотвращает N перерисовок UI при пачке из N команд (например SendAll).
     if (data_dirty_ && data_update_callback_) {
         data_dirty_ = false;
+        // Дамп состояния для автотестов (tools/run_all_tests.py) — одна строка
+        Serial.printf("[STATE] mode=%d sub=%d sm=%d feed=%d afeed=%d ap=%d "
+                      "pass=%d/%d rpm=%d lim=%d%d%d%d run=%d\n",
+                      (int)data_.mode, (int)data_.submode, (int)data_.select_menu,
+                      (int)data_.feed_mm, (int)data_.afeed_mm, (int)data_.ap,
+                      (int)data_.pass_nr, (int)data_.pass_total, (int)data_.rpm,
+                      (int)data_.limits.left, (int)data_.limits.right,
+                      (int)data_.limits.front, (int)data_.limits.rear,
+                      (int)data_.is_running);
         data_update_callback_(data_);
     }
 }
@@ -207,6 +217,25 @@ void UartProtocol::parseCommand(const char* cmd)
     }
     else if (strcmp(command, "ERR") == 0) {
         if (gcode_response_callback_) gcode_response_callback_(false, params);
+    }
+    else if (strcmp(command, "LCD2004") == 0) {
+        parseLCD2004(params);
+    }
+}
+
+// <LCD2004:...> — копия состояния, которое STM32 выводит на LCD2004.
+// Только печать в USB для автотестов (сверка старого и нового дисплея).
+void UartProtocol::parseLCD2004(const char* params)
+{
+    int mode, sub, sm, feed, afeed, ap, pass_nr, pass_total, ph, pass_fin, thr, tooth_n, tooth_c;
+    int n = sscanf(params, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                   &mode, &sub, &sm, &feed, &afeed, &ap, &pass_nr, &pass_total,
+                   &ph, &pass_fin, &thr, &tooth_n, &tooth_c);
+    if (n == 13) {
+        Serial.printf("[LCD2004] mode=%d sub=%d sm=%d feed=%d afeed=%d ap=%d "
+                      "pass=%d/%d ph=%d fin=%d thr=%d tooth=%d/%d\n",
+                      mode, sub, sm, feed, afeed, ap, pass_nr, pass_total,
+                      ph, pass_fin, thr, tooth_n, tooth_c);
     }
 }
 
@@ -451,7 +480,7 @@ void UartProtocol::parseAlert(const char* params)
         case 3: if (alert_callback_) alert_callback_("\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x90\xD0\xA6\xD0\x98\xD0\xAF\n\xD0\x97\xD0\x90\xD0\x92\xD0\x95\xD0\xA0\xD0\xA8\xD0\x95\xD0\x9D\xD0\x90!");
                 // ОПЕРАЦИЯ ЗАВЕРШЕНА!
                 break;
-        case 4: if (alert_callback_) alert_callback_("Установите джойстик\nв нейтральное\nположение");
+        case 4: if (alert_callback_) alert_callback_("Установите джойстик\nв нейтральное положение");  // 2 строки — поле алерта на 2 строки
                 // Установите джойстик в нейтральное положение
                 break;
         default:
