@@ -18,6 +18,10 @@
 #include <WiFiServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#if CONFIG_ESP_HOSTED_ENABLED
+#include "esp_hosted.h"
+#include "esp_hosted_host_fw_ver.h"
+#endif
 
 // ─── Состояние ────────────────────────────────────────────────────────────────
 
@@ -667,7 +671,37 @@ static void start_ap() {
 
 void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) { s_conn_cb = cb; }
 
+// WiFi через сопроцессор (ESP32-P4 + ESP32-C6, esp_hosted): версии хоста и слейва в лог
+static void log_hosted_versions() {
+#if CONFIG_ESP_HOSTED_ENABLED
+    esp_hosted_coprocessor_fwver_t v = {};
+    int r = esp_hosted_get_coprocessor_fwversion(&v);
+    Serial.printf("[wifi] esp_hosted host=%d.%d.%d, C6 slave: %s %lu.%lu.%lu\n",
+                  ESP_HOSTED_VERSION_MAJOR_1, ESP_HOSTED_VERSION_MINOR_1, ESP_HOSTED_VERSION_PATCH_1,
+                  r == 0 ? "OK" : "нет ответа",
+                  (unsigned long)v.major1, (unsigned long)v.minor1, (unsigned long)v.patch1);
+#endif
+}
+
+// WiFi через сопроцессор: команды до поднятия SDIO-связи с C6 теряются — ждём её (до 10 с)
+static void wait_coprocessor() {
+#if CONFIG_ESP_HOSTED_ENABLED
+    WiFi.mode(WIFI_STA);   // запускает esp_hosted
+    esp_hosted_coprocessor_fwver_t v = {};
+    uint32_t t0 = millis();
+    while (esp_hosted_get_coprocessor_fwversion(&v) != 0 && millis() - t0 < 10000) delay(200);
+    Serial.printf("[wifi] C6 готов через %lu мс\n", (unsigned long)(millis() - t0));
+    log_hosted_versions();
+#endif
+}
+
 static void wifi_init_impl() {
+    // Причина отказа подключения к роутеру — в лог (коды wifi_err_reason_t:
+    // 15/202/204 — пароль/рукопожатие, 201 — сеть не найдена)
+    WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) {
+        Serial.printf("[wifi] STA disconnected, reason=%d\n",
+                      (int)info.wifi_sta_disconnected.reason);
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     if (!LittleFS.begin(false)) {
         Serial.println("[gcode] LittleFS formatting...");
         LittleFS.begin(true);
@@ -681,6 +715,7 @@ static void wifi_init_impl() {
     const char* ssid = WIFI_STA_SSID;
     if (ssid && ssid[0] != '\0') {
         Serial.printf("[gcode] WiFi STA → %s\n", ssid);
+        wait_coprocessor();
         WiFi.persistent(false);
         WiFi.setAutoReconnect(false);
         WiFi.disconnect(true);
@@ -717,7 +752,16 @@ static void wifi_process_impl() {
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
-            Serial.println("[gcode] STA timeout → AP");
+            Serial.printf("[gcode] STA timeout → AP (status=%d)\n", (int)WiFi.status());
+            {   // диагностика: видна ли сеть роутера (чужие SSID не печатаем)
+                int n = WiFi.scanNetworks();
+                int rssi = 0;
+                for (int i = 0; i < n; i++)
+                    if (WiFi.SSID(i) == WIFI_STA_SSID) { rssi = WiFi.RSSI(i); break; }
+                Serial.printf("[wifi] scan: сетей=%d, сеть роутера %s%s\n", n,
+                              rssi ? "видна, RSSI=" : "не найдена", rssi ? String(rssi).c_str() : "");
+                WiFi.scanDelete();
+            }
             WiFi.disconnect(true);
             delay(100);
             start_ap();
@@ -748,6 +792,7 @@ static void wifi_process_impl() {
         const char* ssid = WIFI_STA_SSID;
         if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
             Serial.println("[gcode] AP → retrying STA...");
+            log_hosted_versions();
             if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
             WiFi.softAPdisconnect(true);
             delay(100);
