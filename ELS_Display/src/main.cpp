@@ -177,9 +177,8 @@ LV_FONT_DECLARE(font_din_cond_56);
 
     static jd9365_lcd   p4_lcd(P4_LCD_RST);
     static gsl3680_touch p4_touch(P4_TP_SDA, P4_TP_SCL, P4_TP_RST, P4_TP_INT);
-    // Два PSRAM буфера под физическое разрешение (двойная буферизация)
+    // Буфер частичной отрисовки LVGL (P4_DRAW_BUF_LINES строк, внутренняя SRAM)
     static lv_color_t* p4_buf0 = nullptr;
-    static lv_color_t* p4_buf1_ptr = nullptr;
 
 #else
     // ESP32-2432S024: ESP32 + ILI9341 (SPI) + XPT2046 Touch
@@ -221,19 +220,21 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         }
     }
 #elif defined(DISPLAY_JC8012P4A1C)
-    // P4: LVGL 1280×800 → rotation270 → screen_fb 800×1280
-    // fb[row=1279-lx][col=ly] = LVGL(lx,ly). Sequential write = cache-friendly.
+    // P4: частичная перерисовка. LVGL-область (1280×800) поворачивается прямо во
+    // framebuffer панели (800×1280): fb[row=1279-lx][col=ly] = LVGL(lx,ly).
+    // Колонки x1..x2 ложатся в непрерывный блок строк fb → один cache writeback,
+    // lcd_draw_bitmap с указателем внутрь fb ничего не копирует.
     if (screen_fb) {
         const uint16_t* src = (const uint16_t*)&color_p->full;
-        for (int row = 0; row < 1280; row++) {
-            uint16_t* dst = screen_fb + (uint32_t)row * 800;
-            int lx = 1279 - row;
-            const uint16_t* col_src = src + lx;
-            for (int ly = 0; ly < 800; ly++) {
-                dst[ly] = col_src[(uint32_t)ly * 1280];
-            }
+        for (int lx = area->x1; lx <= area->x2; lx++) {
+            uint16_t* dst = screen_fb + (uint32_t)(P4_LCD_V_RES - 1 - lx) * P4_LCD_H_RES + area->y1;
+            const uint16_t* s = src + (lx - area->x1);
+            for (uint32_t j = 0; j < h; j++) dst[j] = s[j * w];
         }
-        p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
+        int row0 = P4_LCD_V_RES - 1 - area->x2;
+        int row1 = P4_LCD_V_RES - 1 - area->x1;
+        p4_lcd.lcd_draw_bitmap(0, row0, P4_LCD_H_RES, row1 + 1,
+                               screen_fb + (uint32_t)row0 * P4_LCD_H_RES);
     }
 #else
     tft.startWrite();
@@ -5083,13 +5084,15 @@ void setup()
     p4_touch.begin();
     Serial.println("GSL3680 Touch init OK");
 
-    // Screenshot инфраструктура (физический буфер 800×1280)
-    screen_fb = (uint16_t*)heap_caps_malloc((uint32_t)P4_LCD_H_RES * P4_LCD_V_RES * 2, MALLOC_CAP_SPIRAM);
+    // screen_fb = framebuffer самой панели (800×1280): flush пишет в него,
+    // скриншот читает из него же
+    screen_fb = p4_lcd.frame_buffer();
     if (screen_fb) {
         memset(screen_fb, 0, (uint32_t)P4_LCD_H_RES * P4_LCD_V_RES * 2);
-        Serial.println("P4 screen_fb allocated OK");
+        p4_lcd.lcd_draw_bitmap(0, 0, P4_LCD_H_RES, P4_LCD_V_RES, screen_fb);
+        Serial.println("P4 panel framebuffer OK");
     } else {
-        Serial.println("P4 screen_fb FAILED");
+        Serial.println("P4 panel framebuffer FAILED");
     }
     sem_requested = xSemaphoreCreateBinary();
     sem_done      = xSemaphoreCreateBinary();
@@ -5121,12 +5124,18 @@ void setup()
     lv_init();
 
 #ifdef DISPLAY_JC8012P4A1C
-    // P4: LVGL 1280×800 нативно, CW-поворот без масштаба в my_disp_flush
-    // screen_fb (800×1280) — физический буфер для DMA, выделяется выше в init
-    size_t p4_buf_bytes = sizeof(lv_color_t) * (size_t)SCREEN_WIDTH * SCREEN_HEIGHT;
-    p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_bytes, MALLOC_CAP_SPIRAM);
-    if (!p4_buf0) Serial.println("P4 LVGL buf FAILED");
-    lv_disp_draw_buf_init(&draw_buf, p4_buf0, nullptr, (lv_coord_t)SCREEN_WIDTH * SCREEN_HEIGHT);
+    // P4: LVGL 1280×800, частичная перерисовка (только изменённые области).
+    // Буфер отрисовки во внутренней SRAM — рендер в PSRAM в разы медленнее.
+    const uint32_t p4_buf_px = (uint32_t)SCREEN_WIDTH * P4_DRAW_BUF_LINES;
+    p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_px * sizeof(lv_color_t),
+                                            MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!p4_buf0) {
+        Serial.println("P4 LVGL buf: internal RAM FAILED → PSRAM");
+        p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_px * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    }
+    lv_disp_draw_buf_init(&draw_buf, p4_buf0, nullptr, p4_buf_px);
+    Serial.printf("P4 LVGL buf: %u lines, free internal=%u\n", (unsigned)P4_DRAW_BUF_LINES,
+                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
@@ -5134,7 +5143,6 @@ void setup()
     disp_drv.ver_res      = SCREEN_HEIGHT;  // логических 800
     disp_drv.flush_cb     = my_disp_flush;
     disp_drv.draw_buf     = &draw_buf;
-    disp_drv.full_refresh = 1;
     lv_disp_drv_register(&disp_drv);
 #else
     lv_disp_draw_buf_init(&draw_buf, buf1, NULL, SCREEN_WIDTH * 32);

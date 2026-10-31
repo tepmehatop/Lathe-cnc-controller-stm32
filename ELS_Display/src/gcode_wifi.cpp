@@ -20,7 +20,8 @@ static const char* GCODE_DIR    = "/gcode";
 static const uint16_t HTTP_PORT = 80;
 static bool s_mdns_started = false;
 
-enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
+// GCW_STACK_WAIT: STA ассоциирован, ждём ~2с пока поднимется TCP/IP (без блокировки loop)
+enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_STACK_WAIT, GCW_CONNECTED, GCW_AP };
 static GcWifiSt          s_state      = GCW_INIT;
 static uint32_t          s_conn_t     = 0;
 static uint32_t          s_ap_retry_t = 0;   // повторная попытка STA из AP-режима
@@ -29,6 +30,7 @@ static uint32_t          s_last_client_t = 0; // последний входящ
 static WiFiServer*       s_srv     = nullptr;
 static GCWifiConnectedCb s_conn_cb = nullptr;
 static char              s_ip[20]  = {};
+static char              s_notified_ip[20] = {};  // последний адрес, о котором показан алерт
 
 // ─── HTML ─────────────────────────────────────────────────────────────────────
 
@@ -586,7 +588,10 @@ static void handle_client(WiFiClient& cl) {
 
 // ─── WiFi helpers ─────────────────────────────────────────────────────────────
 
+// Алерт только при смене адреса: повторные циклы STA→AP→STA с тем же IP не всплывают
 static void notify_connected() {
+    if (strcmp(s_notified_ip, s_ip) == 0) return;
+    strncpy(s_notified_ip, s_ip, sizeof(s_notified_ip) - 1);
     if (s_conn_cb) s_conn_cb(s_ip, s_state == GCW_AP);
 }
 
@@ -677,17 +682,22 @@ void GCodeWiFi_Process() {
         if (WiFi.status() == WL_CONNECTED) {
             IPAddress ip = WiFi.localIP();
             if (ip[0] == 0) return;
-            s_state = GCW_CONNECTED;
+            s_state = GCW_STACK_WAIT;
+            s_conn_t = millis();
             WiFi.setSleep(false);
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
-            delay(2000);  // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
-            start_server();
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
             Serial.println("[gcode] STA timeout → AP");
             WiFi.disconnect(true);
             delay(100);
             start_ap();
+        }
+    } else if (s_state == GCW_STACK_WAIT) {
+        // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
+        if (millis() - s_conn_t > 2000) {
+            s_state = GCW_CONNECTED;
+            start_server();
         }
     } else if (s_state == GCW_CONNECTED) {
         if (WiFi.status() != WL_CONNECTED) {

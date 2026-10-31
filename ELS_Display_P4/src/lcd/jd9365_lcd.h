@@ -15,6 +15,9 @@ public:
                          uint16_t x_end, uint16_t y_end, uint16_t *color_data);
     void draw16bitbergbbitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *color_data);
     void fillScreen(uint16_t color);
+    // Внутренний framebuffer DPI-панели (800x1280 RGB565, PSRAM). Запись в него +
+    // lcd_draw_bitmap() с указателем внутрь буфера = только cache writeback, без копии.
+    uint16_t *frame_buffer();
     void te_on();
     void te_off();
     uint16_t width();

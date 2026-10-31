@@ -158,10 +158,11 @@ extern ColorScheme current_color_scheme;
     #define UART_RX_PIN     44  // P1 RX = GPIO44
     #define UART_TX_PIN     43  // P1 TX = GPIO43
 #elif defined(DISPLAY_JC8012P4A1C)
-    // ESP32-P4: UART1 через разъём JC8012P4A1C
-    // TODO: уточнить по схеме модуля (docs/JC8012P4A1C_I_W_Y/5-Schematic/)
-    #define UART_RX_PIN     16
-    #define UART_TX_PIN     17
+    // ESP32-P4: разъём CN2 "INPUT" (MX1.25 4P: VIN, TXD, RXD, GND) = UART0_TXD/RXD
+    // по схеме docs/JC8012P4A1C_I_W_Y/5-Schematic/3_ESP32-P4.png и 4_CONN.png.
+    // GPIO14..19 заняты SDIO до ESP32-C6 (WiFi) — их использовать нельзя.
+    #define UART_RX_PIN     38
+    #define UART_TX_PIN     37
 #else
     // ESP32 UART2 пины (ESP32-2432S024)
     #define UART_RX_PIN     16

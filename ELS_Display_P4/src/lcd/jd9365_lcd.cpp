@@ -129,6 +129,13 @@ void jd9365_lcd::draw16bitbergbbitmap(uint16_t x, uint16_t y, uint16_t w, uint16
     esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_data);
 }
 
+uint16_t *jd9365_lcd::frame_buffer()
+{
+    void *fb = NULL;
+    if (esp_lcd_dpi_panel_get_frame_buffer(panel_handle, 1, &fb) != ESP_OK) return NULL;
+    return (uint16_t *)fb;
+}
+
 void jd9365_lcd::fillScreen(uint16_t color)
 {
     uint16_t *color_data = (uint16_t *)heap_caps_malloc(480 * 272 * 2, MALLOC_CAP_INTERNAL);

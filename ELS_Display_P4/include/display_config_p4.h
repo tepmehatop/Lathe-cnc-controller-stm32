@@ -26,8 +26,12 @@
 #define P4_TP_INT     21
 
 // ─── UART для связи со STM32 ───────────────────────────────────────────────
-// TODO: уточнить по схеме модуля JC8012P4A1C (разъём UART)
-// ESP32-P4: UART1 доступен через GPIO16(RX)/GPIO17(TX) по умолчанию
-#define P4_UART_RX_PIN  16
-#define P4_UART_TX_PIN  17
+// Разъём CN2 "INPUT" (VIN, TXD, RXD, GND) = UART0_RXD GPIO38 / UART0_TXD GPIO37
+// GPIO14..19 — SDIO до ESP32-C6 (WiFi), не использовать
+#define P4_UART_RX_PIN  38
+#define P4_UART_TX_PIN  37
 #define P4_UART_BAUD    57600
+
+// ─── LVGL ──────────────────────────────────────────────────────────────────
+// Высота буфера частичной отрисовки (строк по 1280 px, внутренняя SRAM)
+#define P4_DRAW_BUF_LINES  64

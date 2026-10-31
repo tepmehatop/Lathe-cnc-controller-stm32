@@ -104,11 +104,11 @@ ELS_Display_P4/        ← jc8012p4a1c (ESP32-P4) только драйверы
 | Touch SCL        | 8    | I2C0                                 |
 | Touch Reset      | 22   | Active LOW                           |
 | Touch INT        | 21   | Active LOW                           |
-| UART RX (STM32)  | 16   | **TODO: уточнить по схеме модуля**   |
-| UART TX (STM32)  | 17   | **TODO: уточнить по схеме модуля**   |
+| UART RX (STM32)  | 38   | разъём CN2 "INPUT" (UART0_RXD)      |
+| UART TX (STM32)  | 37   | разъём CN2 "INPUT" (UART0_TXD)      |
 
-⚠️ **UART пины (GPIO16/17) требуют проверки по схеме** `docs/JC8012P4A1C_I_W_Y/5-Schematic/`.
-После уточнения обновить `ELS_Display_P4/include/display_config_p4.h`.
+UART пины сверены со схемой `docs/JC8012P4A1C_I_W_Y/5-Schematic/` (3_ESP32-P4, 4_CONN).
+GPIO14..19 заняты SDIO до ESP32-C6 (WiFi) — для UART их использовать нельзя.
 
 ---
 
