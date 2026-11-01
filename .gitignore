@@ -35,3 +35,6 @@ CLAUDE.md
 tools/screenshot_*.jpg
 tools/screenshots_full/
 tools/test_results_full.jsonl
+
+# Python
+__pycache__/

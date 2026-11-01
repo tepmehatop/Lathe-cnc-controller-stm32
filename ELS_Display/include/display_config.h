@@ -37,6 +37,7 @@
     #define SCREEN_ROTATION 1
 
     #define DISPLAY_NAME "ESP32-2432S024"
+    #define DISPLAY_TYPE_CODE 24
     #define DISPLAY_SIZE "2.4\""
 
     #define SCALE_FACTOR_X 1.0f
@@ -50,6 +51,7 @@
 
     #define DISPLAY_NAME "JC4827W543"
     #define DISPLAY_SIZE "4.3\""
+    #define DISPLAY_TYPE_CODE 43   // = DISPLAY_TYPE_4_3 в els_config.h STM32
 
     // Базовый экран UI — масштаб 1:1
     #define SCALE_FACTOR_X 1.0f
@@ -63,6 +65,7 @@
 
     #define DISPLAY_NAME "JC8012P4A1C"
     #define DISPLAY_SIZE "10.1\""
+    #define DISPLAY_TYPE_CODE 101  // = DISPLAY_TYPE_10_1 в els_config.h STM32
 
     // Масштаб 480×272 → 1280×800
     #define SCALE_FACTOR_X 2.667f  // 1280/480

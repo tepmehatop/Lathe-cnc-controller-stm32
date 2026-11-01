@@ -85,6 +85,20 @@ static void _parse_rx(const char* raw) {
         return;
     }
 
+    // DISP:<код> — тип подключённого дисплея (шлёт вместе с READY), сверка с конфигом
+    if (strcmp(cmd_str, "DISP") == 0) {
+        long code = atol(prm_str);
+        if (code != ELS_DISPLAY_TYPE) {
+            Serial.printf("[DISP] ВНИМАНИЕ: подключён дисплей типа %ld, а в els_config.h "
+                          "ELS_DISPLAY_TYPE = %d — проверьте конфиг или прошивку дисплея\n",
+                          code, (int)ELS_DISPLAY_TYPE);
+            DRV_Display_SendCmd("ALERT", "ДИСПЛЕЙ НЕ СОВПАДАЕТ С КОНФИГОМ STM32");  // без \n: протокол построчный
+        } else {
+            Serial.printf("[DISP] дисплей типа %ld — совпадает с конфигом\n", code);
+        }
+        return;
+    }
+
     // GCODE: строка GCode — передаём в callback для исполнения
     if (strcmp(cmd_str, "GCODE") == 0) {
         DispRxCmd_t rx = {};
@@ -396,6 +410,8 @@ void DRV_Display_Init(void) {
     // Флаг s_need_sendall гарантирует отправку полного состояния при старте STM32
     // вне зависимости от того, перезагружался ли ESP32.
     s_need_sendall = 1;
+    // Дисплей мог включиться раньше STM32 — запросить READY (+ DISP с типом дисплея)
+    DRV_Display_SendCmd("PING", "");
 }
 
 void DRV_Display_Process(void) {
@@ -442,5 +458,6 @@ void DRV_Display_SendSelectMenu(uint8_t m) { (void)m; }
 void DRV_Display_SendAngle(int32_t a) { (void)a; }
 void DRV_Display_SendAll(void) {}
 void DRV_Display_SendLCD2004State(void) {}
+void DRV_Display_SendGCodeAck(bool ok, const char* err) { (void)ok;(void)err; }
 
 #endif

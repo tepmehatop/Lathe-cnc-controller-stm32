@@ -8,6 +8,7 @@
 #include "els_serial.h"
 #include "els_settings.h"
 #include "../Drivers/drv_dro.h"
+#include "../Drivers/drv_scales.h"
 #include "../Drivers/drv_display.h"
 #include "../Drivers/drv_lcd2004.h"
 #include "../Drivers/drv_encoder.h"
@@ -62,6 +63,51 @@ static void _adc_feed_process(void) {
 #endif  // USE_ADC_FEED
 
 // ============================================================
+// Источник координат (ELS_POS_SOURCE): блок DRO / линейки напрямую / шаги мотора
+// ============================================================
+
+#if ELS_POS_SOURCE != POS_SOURCE_DRO_UART
+// Позиция по шагам мотора, 0.001 мм: SCREW_* — шаг винта в 0.01 мм
+static int32_t _steps_to_um(Axis_t axis) {
+    int64_t steps = DRV_Stepper_GetPos(axis);
+    int64_t um_per_rev    = (axis == AXIS_Y) ? (int64_t)SCREW_Y * 10 : (int64_t)SCREW_X * 10;
+    int64_t steps_per_rev = (axis == AXIS_Y) ? (int64_t)MOTOR_Y_STEP_PER_REV * MICROSTEP_Y
+                                             : (int64_t)MOTOR_X_STEP_PER_REV * MICROSTEP_X;
+    return (int32_t)(steps * um_per_rev / steps_per_rev);
+}
+#endif
+
+static void _update_position(void) {
+#if ELS_POS_SOURCE == POS_SOURCE_DRO_UART
+    els.pos_y = -DRV_DRO_GetY();
+    els.pos_x =  DRV_DRO_GetX();
+#elif ELS_POS_SOURCE == POS_SOURCE_SCALES
+    // Ось без линейки (SCALE_NONE) считается по шагам мотора
+    els.pos_y = DRV_Scales_Present(SCALE_AXIS_Z) ? DRV_Scales_GetUm(SCALE_AXIS_Z) : _steps_to_um(AXIS_Y);
+    els.pos_x = DRV_Scales_Present(SCALE_AXIS_X) ? DRV_Scales_GetUm(SCALE_AXIS_X) : _steps_to_um(AXIS_X);
+
+    // Пропала связь с линейкой (протоколы с тактом) — предупредить один раз
+    static uint8_t s_lost[2] = {0, 0};
+    for (uint8_t i = 0; i < 2; i++) {
+        ScaleAxis ax = (ScaleAxis)i;
+        uint8_t lost = DRV_Scales_Present(ax) && !DRV_Scales_IsOk(ax) && millis() > 3000;
+        if (lost && !s_lost[i]) {
+            Serial.printf("[SCALE] ось %s (%s): нет данных от линейки\n",
+                          i == SCALE_AXIS_Z ? "Z" : "X", DRV_Scales_TypeName(ax));
+#if USE_ESP32_DISPLAY
+            DRV_Display_SendCmd("ALERT", i == SCALE_AXIS_Z ? "НЕТ СВЯЗИ С ЛИНЕЙКОЙ Z"
+                                                           : "НЕТ СВЯЗИ С ЛИНЕЙКОЙ X");
+#endif
+        }
+        s_lost[i] = lost;
+    }
+#else
+    els.pos_y = _steps_to_um(AXIS_Y);
+    els.pos_x = _steps_to_um(AXIS_X);
+#endif
+}
+
+// ============================================================
 void ELS_Init(void) {
     ELS_State_Init();
     ELS_Settings_Load();
@@ -75,6 +121,9 @@ void ELS_Init(void) {
 
 #if USE_DRO_HS800
     DRV_DRO_Init();
+#endif
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+    DRV_Scales_Init();
 #endif
 
 #if USE_ESP32_DISPLAY
@@ -95,14 +144,17 @@ void ELS_Init(void) {
 // ============================================================
 void ELS_Loop(void) {
     static uint32_t s_lcd_t   = 0;
+#if USE_ESP32_DISPLAY
     static uint32_t s_disp_t  = 0;
     static uint32_t s_lcd2004_t = 0;
+#endif
 
     ELS_Settings_Process();
 #if USE_ADC_FEED
     _adc_feed_process();
 #endif
     DRV_DRO_Process();
+    DRV_Scales_Process();
     DRV_Display_Process();
     DRV_Encoder_Spindle_Update();
     DRV_Inputs_Process();
@@ -111,11 +163,10 @@ void ELS_Loop(void) {
     ELS_Control_Update();
     ELS_Serial_Process();
 
-    // ── Обновление позиции из DRO в каждом цикле ──────────────────────────
+    // ── Обновление позиции в каждом цикле (источник — ELS_POS_SOURCE) ─────
     // Позиция всегда актуальна: и для LCD, и для ESP32, и для Control.
-    // DRO эталон: по нему же будут работать лимиты и остановы мотора.
-    els.pos_y      = -DRV_DRO_GetY();
-    els.pos_x      =  DRV_DRO_GetX();
+    // Линейки — эталон: по ним же будут работать лимиты и остановы мотора.
+    _update_position();
     els.Size_Z_mm  = els.pos_y / 10;
     els.Size_X_mm  = els.pos_x / 10;
     els.MSize_X_mm = els.pos_x / 5;

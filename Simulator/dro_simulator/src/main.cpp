@@ -1,56 +1,64 @@
 #include <Arduino.h>
 
 /**
- * @file  dro_simulator.ino
- * @brief Симулятор DRO HS800-2 для тестирования STM32 ELS
+ * @file  main.cpp
+ * @brief Симулятор DRO для тестирования STM32 ELS без станка и без линеек.
+ *        Arduino Mega 2560.
  *
- * Запускается на Arduino Mega 2560 или любой другой плате с Serial1.
- * Генерирует корректные 29-байтовые пакеты HS800-2 на 57600/8N1.
+ * Что умеет:
+ *   1. Блок DRO HS800-2: 29-байтовые пакеты по UART 57600 (Serial1 TX pin 18 → PA3).
+ *      Работает всегда, в любом режиме.
+ *   2. Эмуляция линеек, подключённых к STM32 напрямую (ELS_POS_SOURCE = SCALES):
+ *        q — квадратура A/B (стекло/магнит), 5 мкм на импульс
+ *        s — Sylvac 48 бит (ёмкостные китайские), такт от «линейки»
+ *        b — BIN6 24 бит, такт от «линейки»
+ *        i — iGaging 21 бит, такт от STM32
+ *        d — Mitutoyo Digimatic, запрос REQ от STM32
+ *        0 — эмуляция линеек выключена (пины — входы)
  *
- * Подключение к STM32F4DISCOVERY:
- *   Arduino TX1 (pin 18)  →  PA3 (STM32 USART2 RX)
- *   GND                  →  GND
- *   (уровень 3.3В: добавить делитель 1кОм/2кОм если Arduino 5В!)
+ * Подключение к STM32F4DISCOVERY (уровни Mega 5 В — пины STM32 толерантны к 5 В,
+ * для надёжности через резисторы 1 кОм):
+ *   Mega D22 → PA15 (ось Z, A/такт)     Mega D24 → PB4 (ось X, A/такт)
+ *   Mega D23 → PB3  (ось Z, B/данные)   Mega D25 → PB5 (ось X, B/данные)
+ *   Mega D26 ← PE4  (ось Z, REQ)        Mega D27 ← PE5 (ось X, REQ)
+ *   Mega TX1 (18) → PA3 (HS800 по UART), GND → GND
+ *   Без схемы сопряжения: в els_config.h SCALE_*_SIGNAL_INVERT = 0, а REQ
+ *   Digimatic подаётся напрямую (активный уровень STM32 — высокий).
  *
- * Режимы симуляции (выбираются константой MODE):
- *   SIM_STATIC   — неподвижные координаты (проверка парсера)
- *   SIM_SWEEP_Y  — ось Y плавно движется туда/обратно
- *   SIM_SWEEP_XY — обе оси синусоидально
- *   SIM_BUTTON   — периодически нажимает кнопку BTN_A
- *
- * Протокол HS800-2:
- *   byte[0]    = 0xFE (SOF)
- *   byte[1..4] = Header (0x01, 0x00, 0x00, 0x00 или любые)
- *   byte[5]    = 0x00 (axis_id, обычно 0)
- *   byte[6..9] = X позиция, int32 Little-Endian, 0.001мм
- *   byte[10..13]= Y позиция, int32 Little-Endian, 0.001мм
- *   byte[14..17]= Z позиция (не используется ELS)
- *   byte[18]   = кнопки BTN_A (bit 0)
- *   byte[19]   = кнопки BTN_B (bit 0)
- *   byte[20..25]= зарезервированы (0x00)
- *   byte[26..27]= CRC16/MODBUS bytes[1..25]
- *   byte[28]   = 0xEF (EOF)
+ * Команды по USB (115200, строка + Enter):
+ *   m<буква>      — режим эмуляции линеек (mq, ms, mb, mi, md, m0)
+ *   z<мкм>        — позиция оси Z (каретка), например z-12345 = −12.345 мм
+ *   x<мкм>        — позиция оси X (суппорт)
+ *   w<0|1>        — 1 = «качание» позиций (треугольник), 0 = стоят на месте
+ *   ?             — текущее состояние
+ * В ответ печатается строка [SIM] mode=… z=… x=… — её читают автотесты.
  */
 
+// ============================================================
+// Пины эмуляции линеек
+// ============================================================
+struct AxisPins { uint8_t a, b, req; };
+static const AxisPins PINS[2] = { {22, 23, 26}, {24, 25, 27} };   // 0 = Z, 1 = X
+
+// ============================================================
+// Состояние
+// ============================================================
+static char     s_mode  = '0';          // режим эмуляции линеек
+// Позиции, мкм (0 = Z, 1 = X) — ровно то, что покажет дисплей при конфиге по умолчанию
+// (SCALE_*_INVERT = 0). STM32 передаёт на дисплей −pos (наследие Arduino-прошивки),
+// поэтому «линейки» выдают −позицию, а HS800 — Y = z, X = −x.
+static int32_t  s_pos_um[2] = {0, 0};
+static int32_t scale_um(uint8_t ax) { return -s_pos_um[ax]; }
+static bool     s_sweep = true;    // по умолчанию позиции «качаются», как в старом симуляторе
+static int32_t  s_quad_count[2] = {0, 0};
+static const int32_t QUAD_NM_PER_COUNT = 5000;   // 5 мкм
+
+// ============================================================
+// HS800-2 (UART)
+// ============================================================
 #define PACKET_LEN  29
-#define SIM_STATIC   0
-#define SIM_SWEEP_Y  1
-#define SIM_SWEEP_XY 2
-#define SIM_BUTTON   3
+#define PACKET_INTERVAL_MS 20
 
-// ---- ВЫБЕРИ РЕЖИМ ----
-#define MODE  SIM_SWEEP_Y
-
-// Forward declarations
-static void send_packet(int32_t x, int32_t y, uint8_t btn_a, uint8_t btn_b);
-static void debug_print(int32_t x, int32_t y);
-
-// Интервал между пакетами (мс). HS800-2 отправляет ~50 пакетов/сек
-#define PACKET_INTERVAL_MS  20
-
-// ============================================================
-// CRC16/MODBUS
-// ============================================================
 static uint16_t crc16_modbus(const uint8_t* data, uint8_t len) {
     uint16_t crc = 0xFFFF;
     for (uint8_t i = 0; i < len; i++) {
@@ -63,156 +71,221 @@ static uint16_t crc16_modbus(const uint8_t* data, uint8_t len) {
     return crc;
 }
 
-// ============================================================
-// Построить и отправить пакет
-// ============================================================
-static void send_packet(int32_t x_001mm, int32_t y_001mm,
-                        uint8_t btn_a, uint8_t btn_b) {
+static void put_le32(uint8_t* p, int32_t v) {
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+}
+
+// HS800: byte[6..9] = X, byte[10..13] = Y
+static void send_hs800(int32_t x_um, int32_t y_um) {
     uint8_t pkt[PACKET_LEN] = {0};
-
-    pkt[0] = 0xFE;  // SOF
+    pkt[0] = 0xFE;
     pkt[1] = 0x01;
-    pkt[2] = 0x00;
-    pkt[3] = 0x00;
-    pkt[4] = 0x00;
-    pkt[5] = 0x00;  // axis_id
-
-    // X позиция (byte 6..9, LE)
-    pkt[6]  = (uint8_t)(x_001mm      );
-    pkt[7]  = (uint8_t)(x_001mm >>  8);
-    pkt[8]  = (uint8_t)(x_001mm >> 16);
-    pkt[9]  = (uint8_t)(x_001mm >> 24);
-
-    // Y позиция (byte 10..13, LE)
-    pkt[10] = (uint8_t)(y_001mm      );
-    pkt[11] = (uint8_t)(y_001mm >>  8);
-    pkt[12] = (uint8_t)(y_001mm >> 16);
-    pkt[13] = (uint8_t)(y_001mm >> 24);
-
-    // Z = 0 (byte 14..17)
-    // Кнопки
-    pkt[18] = btn_a & 0x01;
-    pkt[19] = btn_b & 0x01;
-    // byte 20..25 = 0x00
-
-    // CRC16/MODBUS bytes[1..25] → записываем в [26..27]
+    put_le32(&pkt[6],  x_um);
+    put_le32(&pkt[10], y_um);
     uint16_t crc = crc16_modbus(&pkt[1], 25);
-    pkt[26] = (uint8_t)(crc & 0xFF);
+    pkt[26] = (uint8_t)crc;
     pkt[27] = (uint8_t)(crc >> 8);
-
-    pkt[28] = 0xEF;  // EOF
-
+    pkt[28] = 0xEF;
     Serial1.write(pkt, PACKET_LEN);
 }
 
 // ============================================================
-// Вывод в Serial Monitor (для отладки самого симулятора)
+// Кадры протоколов (те же форматы, что разбирает Drivers/scale_protocols.cpp)
 // ============================================================
-static void debug_print(int32_t x, int32_t y) {
-    static uint32_t last = 0;
-    uint32_t now = millis();
-    if (now - last < 500) return;
-    last = now;
+static uint64_t frame_sylvac48(int32_t um) {
+    int32_t counts = (int32_t)(((int64_t)um * 20480 + (um >= 0 ? 12700 : -12700)) / 25400);
+    uint64_t w = (uint32_t)counts & 0xFFFFFFUL;
+    return w | (w << 24);
+}
 
-    Serial.print("SIM X=");
-    Serial.print(x / 1000L);
-    Serial.print(".");
-    int32_t ax = abs(x % 1000L);
-    if (ax < 100) Serial.print("0");
-    if (ax < 10)  Serial.print("0");
-    Serial.print(ax);
-    Serial.print("mm  Y=");
-    Serial.print(y / 1000L);
-    Serial.print(".");
-    int32_t ay = abs(y % 1000L);
-    if (ay < 100) Serial.print("0");
-    if (ay < 10)  Serial.print("0");
-    Serial.print(ay);
-    Serial.println("mm");
+static uint32_t frame_bin6(int32_t um) {
+    int32_t v = (um >= 0 ? um + 5 : um - 5) / 10;          // 0.01 мм
+    uint32_t a = (uint32_t)(v < 0 ? -v : v) & 0xFFFFFUL;
+    return a | (v < 0 ? (1UL << 20) : 0);
+}
+
+static uint32_t frame_igaging21(int32_t um) {
+    int32_t counts = (int32_t)(((int64_t)um * 2560 + (um >= 0 ? 12700 : -12700)) / 25400);
+    return (uint32_t)counts & 0x1FFFFFUL;
+}
+
+static uint64_t frame_digimatic(int32_t um) {
+    // мм, 3 знака после точки: 6 цифр BCD = |um|
+    uint8_t n[13];
+    for (uint8_t i = 0; i < 4; i++) n[i] = 0xF;
+    n[4] = um < 0 ? 8 : 0;
+    uint32_t v = (uint32_t)(um < 0 ? -um : um);
+    for (int8_t i = 10; i >= 5; i--) { n[i] = v % 10; v /= 10; }
+    n[11] = 3;
+    n[12] = 0;
+    uint64_t f = 0;
+    for (uint8_t i = 0; i < 13; i++) f |= (uint64_t)n[i] << (4 * i);
+    return f;
+}
+
+// Выдать кадр с тактом от «линейки»: такт в покое высокий, данные выставляются
+// до спада, STM32 читает на спаде (без инверсии в схеме сопряжения).
+static void clock_out_frame(uint8_t axis, uint64_t frame, uint8_t bits) {
+    const AxisPins& p = PINS[axis];
+    for (uint8_t i = 0; i < bits; i++) {
+        digitalWrite(p.b, (frame >> i) & 1 ? HIGH : LOW);
+        delayMicroseconds(4);
+        digitalWrite(p.a, LOW);          // спад — STM32 читает бит
+        delayMicroseconds(6);
+        digitalWrite(p.a, HIGH);
+        delayMicroseconds(6);
+    }
 }
 
 // ============================================================
-// Setup
+// Режимы
+// ============================================================
+static void apply_mode(char m) {
+    for (uint8_t ax = 0; ax < 2; ax++) {
+        const AxisPins& p = PINS[ax];
+        pinMode(p.a, INPUT); pinMode(p.b, INPUT); pinMode(p.req, INPUT);
+        switch (m) {
+            case 'q':
+                pinMode(p.a, OUTPUT); pinMode(p.b, OUTPUT);
+                s_quad_count[ax] = 0;            // STM32 считает от нуля при включении
+                digitalWrite(p.a, LOW); digitalWrite(p.b, LOW);
+                break;
+            case 's': case 'b':
+                pinMode(p.a, OUTPUT); pinMode(p.b, OUTPUT);
+                digitalWrite(p.a, HIGH);
+                break;
+            case 'i':                            // такт — вход от STM32
+                pinMode(p.b, OUTPUT);
+                break;
+            case 'd':                            // REQ — вход от STM32
+                pinMode(p.a, OUTPUT); pinMode(p.b, OUTPUT);
+                digitalWrite(p.a, HIGH);
+                break;
+        }
+    }
+    s_mode = m;
+}
+
+// Квадратура: один шаг кода Грея к цели, 00 → 01 → 11 → 10
+static void quad_step(uint8_t ax) {
+    int32_t target = (int32_t)(((int64_t)scale_um(ax) * 1000) / QUAD_NM_PER_COUNT);
+    if (s_quad_count[ax] == target) return;
+    s_quad_count[ax] += (target > s_quad_count[ax]) ? 1 : -1;
+    static const uint8_t GRAY[4] = {0b00, 0b01, 0b11, 0b10};
+    uint8_t g = GRAY[(uint8_t)(s_quad_count[ax] & 3)];
+    digitalWrite(PINS[ax].a, (g >> 1) & 1);
+    digitalWrite(PINS[ax].b, g & 1);
+}
+
+// iGaging: STM32 даёт такт; на фронте такта выставляем следующий бит
+static volatile uint8_t  s_ig_bit[2];
+static volatile uint32_t s_ig_frame[2];
+static volatile uint32_t s_ig_last_us[2];
+static void ig_edge(uint8_t ax) {
+    uint32_t now = micros();
+    if (now - s_ig_last_us[ax] > 1000) {     // пауза — новый кадр
+        s_ig_bit[ax] = 0;
+        s_ig_frame[ax] = frame_igaging21(scale_um(ax));
+    }
+    s_ig_last_us[ax] = now;
+    uint8_t i = s_ig_bit[ax]++;
+    digitalWrite(PINS[ax].b, i < 21 && ((s_ig_frame[ax] >> i) & 1) ? HIGH : LOW);
+}
+
+static void print_state() {
+    Serial.print("[SIM] mode=");  Serial.print(s_mode);
+    Serial.print(" z=");          Serial.print(s_pos_um[0]);
+    Serial.print(" x=");          Serial.print(s_pos_um[1]);
+    Serial.print(" sweep=");      Serial.println(s_sweep ? 1 : 0);
+}
+
+static void handle_command(const char* c) {
+    switch (c[0]) {
+        case 'm':
+            apply_mode(c[1] ? c[1] : '0');
+            break;
+        case 'z': s_pos_um[0] = atol(c + 1); break;
+        case 'x': s_pos_um[1] = atol(c + 1); break;
+        case 'w': s_sweep = (c[1] == '1'); break;
+    }
+    print_state();
+}
+
+// ============================================================
+// Setup / loop
 // ============================================================
 void setup() {
-    Serial.begin(115200);   // Debug output
-    Serial1.begin(57600);   // DRO output → STM32 PA3
-
-    Serial.println("[SIM] DRO HS800-2 Simulator started");
-    Serial.print("[SIM] Mode: ");
-    Serial.println(MODE);
-    Serial.println("[SIM] Connect Serial1 TX (pin 18) -> STM32 PA3");
+    Serial.begin(115200);
+    Serial1.begin(57600);
+    apply_mode('0');
+    Serial.println("[SIM] DRO simulator: HS800 UART + эмуляция линеек (команды: m<q|s|b|i|d|0>, z<мкм>, x<мкм>, w<0|1>, ?)");
+    print_state();
 }
 
-// ============================================================
-// Loop
-// ============================================================
-static int32_t s_phase = 0;    // фаза анимации (× 100 для целочисленного sin)
-
 void loop() {
-    static uint32_t last_pkt = 0;
-    uint32_t now = millis();
-    if ((now - last_pkt) < PACKET_INTERVAL_MS) return;
-    last_pkt = now;
-
-    int32_t x_pos = 0;
-    int32_t y_pos = 0;
-    uint8_t btn_a = 0;
-    uint8_t btn_b = 0;
-
-    s_phase += 1;  // Инкремент каждые PACKET_INTERVAL_MS мс
-
-#if MODE == SIM_STATIC
-    // Статические координаты для проверки парсера
-    x_pos = 12345;    //  12.345 мм
-    y_pos = -67890;   // -67.890 мм
-
-#elif MODE == SIM_SWEEP_Y
-    // Ось Y: движение 0..100мм и обратно за ~4 секунды
-    // period = 4000ms / 20ms = 200 шагов
-    int32_t period = 200;
-    int32_t half   = period / 2;
-    int32_t phase  = (int32_t)(s_phase % period);
-    if (phase < half) {
-        y_pos = (int32_t)((int64_t)phase * 100000L / half); // 0..100.000 мм
-    } else {
-        y_pos = (int32_t)((int64_t)(period - phase) * 100000L / half);
+    // Команды по USB
+    static char buf[24];
+    static uint8_t len = 0;
+    while (Serial.available()) {
+        char ch = (char)Serial.read();
+        if (ch == '\n' || ch == '\r') {
+            if (len) { buf[len] = 0; handle_command(buf); len = 0; }
+        } else if (len < sizeof(buf) - 1) {
+            buf[len++] = ch;
+        }
     }
-    x_pos = 5000;  // X фиксировано 5.000 мм
 
-#elif MODE == SIM_SWEEP_XY
-    // Обе оси синусоидально (аппроксимация через triangle wave)
-    int32_t period = 300; // ~6 секунд
-    int32_t hp = period / 2;
-    int32_t qp = period / 4;
-    int32_t ph_y = (int32_t)(s_phase % period);
-    int32_t ph_x = (int32_t)((s_phase + qp) % period); // сдвиг 90°
+    uint32_t now = millis();
 
-    // Triangle wave для Y
-    if (ph_y < hp)
-        y_pos = (int32_t)((int64_t)ph_y * 50000L / hp);
-    else
-        y_pos = (int32_t)((int64_t)(period - ph_y) * 50000L / hp);
+    // Качание позиций: Z 0..100 мм за 4 с, X 0..10 мм
+    if (s_sweep) {
+        uint32_t ph = now % 4000;
+        int32_t tri = (int32_t)(ph < 2000 ? ph : 4000 - ph);    // 0..2000
+        s_pos_um[0] = tri * 50;      // 0..100000 мкм
+        s_pos_um[1] = tri * 5;       // 0..10000 мкм
+    }
 
-    // Triangle wave для X
-    if (ph_x < hp)
-        x_pos = (int32_t)((int64_t)ph_x * 30000L / hp);
-    else
-        x_pos = (int32_t)((int64_t)(period - ph_x) * 30000L / hp);
+    // HS800 — всегда
+    static uint32_t t_pkt = 0;
+    if (now - t_pkt >= PACKET_INTERVAL_MS) {
+        t_pkt = now;
+        send_hs800(-s_pos_um[1], s_pos_um[0]);
+    }
 
-    // Добавляем отрицательные значения для проверки знака
-    y_pos -= 25000;   // -25..+25 мм
-    x_pos -= 15000;   // -15..+15 мм
-
-#elif MODE == SIM_BUTTON
-    // Каждые 2 секунды нажимаем кнопку на 200мс
-    y_pos = 0;
-    x_pos = 0;
-    uint32_t t_mod = (uint32_t)(now % 2000);
-    btn_a = (t_mod < 200) ? 1 : 0;
-
-#endif
-
-    send_packet(x_pos, y_pos, btn_a, btn_b);
-    debug_print(x_pos, y_pos);
+    // Эмуляция линеек
+    static uint32_t t_frame = 0;
+    switch (s_mode) {
+        case 'q':
+            quad_step(0);
+            quad_step(1);
+            break;
+        case 's':
+        case 'b':
+            if (now - t_frame >= 20) {      // 50 Гц, как «быстрый» режим линеек
+                t_frame = now;
+                for (uint8_t ax = 0; ax < 2; ax++) {
+                    if (s_mode == 's') clock_out_frame(ax, frame_sylvac48(scale_um(ax)), 48);
+                    else               clock_out_frame(ax, frame_bin6(scale_um(ax)), 24);
+                }
+            }
+            break;
+        case 'i': {
+            // Такт от STM32 опрашиваем программно (D22/D24 не прерывания на Mega)
+            static uint8_t prev[2] = {0, 0};
+            for (uint8_t ax = 0; ax < 2; ax++) {
+                uint8_t lvl = digitalRead(PINS[ax].a);
+                if (lvl && !prev[ax]) ig_edge(ax);
+                prev[ax] = lvl;
+            }
+            break;
+        }
+        case 'd':
+            for (uint8_t ax = 0; ax < 2; ax++) {
+                if (digitalRead(PINS[ax].req) == HIGH) {   // запрос от STM32
+                    clock_out_frame(ax, frame_digimatic(scale_um(ax)), 52);
+                    while (digitalRead(PINS[ax].req) == HIGH && millis() - now < 50) {}
+                }
+            }
+            break;
+    }
 }

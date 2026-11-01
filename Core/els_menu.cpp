@@ -168,7 +168,7 @@ static void _next_thread_category(void) {
 // ============================================================
 // Callback от ESP32: обработка TOUCH команд
 // ============================================================
-static void _on_display_rx(const DispRxCmd_t* rx) {
+static void __attribute__((unused)) _on_display_rx(const DispRxCmd_t* rx) {  // без дисплея не используется
     // Режимы M1-M8
     switch (rx->touch) {
         case TOUCH_M1: _set_mode(MODE_FEED);    return;

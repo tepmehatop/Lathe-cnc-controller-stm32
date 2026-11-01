@@ -349,6 +349,10 @@ void UartProtocol::sendButtonPress(const char* button_name)
 void UartProtocol::sendReady()
 {
     sendCommand("READY");
+    // Тип дисплея: STM32 сверяет его с ELS_DISPLAY_TYPE в els_config.h
+    char code[8];
+    snprintf(code, sizeof(code), "%d", DISPLAY_TYPE_CODE);
+    sendCommand("DISP", code);
 }
 
 void UartProtocol::sendError(const char* message)

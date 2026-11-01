@@ -15,6 +15,7 @@
 #include "../Drivers/drv_encoder.h"
 #include "../Drivers/drv_display.h"
 #include "../Drivers/drv_dro.h"
+#include "../Drivers/drv_scales.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -51,6 +52,8 @@ static void _cmd_help(void) {
     _println("=== ELS STM32 Serial Monitor ===");
     _println("  HELP              List commands");
     _println("  INFO              Show current state");
+    _println("  DRO               Блок DRO HS800-2: пакеты, координаты");
+    _println("  SCALES            Линейки напрямую: тип, позиция, кадры/ошибки");
     _println("--- Режимы ---");
     _println("  MODE:0            FEED (синхронная подача)");
     _println("  MODE:1            AFEED (асинхронная)");
@@ -180,6 +183,24 @@ static void _dispatch(char* line) {
             _println("      Arduino TX1(pin18) -> STM32 PA3");
             _println("      GND -> GND, уровень 3.3В!");
         }
+        _println("-------------------");
+
+    } else if (strcmp(cmd, "SCALES") == 0) {
+        // Диагностика линеек напрямую — вывод для сообщений об ошибках на форуме
+        char buf[96];
+        snprintf(buf, sizeof(buf), "--- Линейки (ELS_POS_SOURCE=%d, 2 = напрямую) ---", (int)ELS_POS_SOURCE);
+        _println(buf);
+        for (uint8_t i = 0; i < 2; i++) {
+            ScaleAxis ax = (ScaleAxis)i;
+            int32_t um = DRV_Scales_GetUm(ax);
+            snprintf(buf, sizeof(buf), "  %s: %-10s %+.3f mm  кадров=%lu ошибок=%lu %s",
+                     i == SCALE_AXIS_Z ? "Z" : "X", DRV_Scales_TypeName(ax), (double)um / 1000.0,
+                     (unsigned long)DRV_Scales_GetFrames(ax), (unsigned long)DRV_Scales_GetErrors(ax),
+                     DRV_Scales_IsOk(ax) ? "OK" : "НЕТ ДАННЫХ");
+            _println(buf);
+        }
+        snprintf(buf, sizeof(buf), "  els.pos_y=%ld els.pos_x=%ld", (long)els.pos_y, (long)els.pos_x);
+        _println(buf);
         _println("-------------------");
 
     } else if (strcmp(cmd, "SENDALL") == 0) {

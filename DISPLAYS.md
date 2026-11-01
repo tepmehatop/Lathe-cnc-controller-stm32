@@ -123,6 +123,13 @@ python3 tools/run_all_tests.py --port /dev/cu.usbmodemXXXX --out <папка>
 python3 tools/ui_tap_tests.py  --port /dev/cu.usbmodemXXXX --out <папка>
 ```
 
+## Выбор дисплея на STM32
+
+В `Core/els_config.h`: `ELS_DISPLAY_TYPE` = `DISPLAY_TYPE_4_3` / `DISPLAY_TYPE_10_1` /
+`DISPLAY_TYPE_NONE` (только LCD2004). Дисплей при старте (и в ответ на `<PING>` от STM32)
+сообщает свой тип `<DISP:43>` / `<DISP:101>`; при несовпадении с конфигом STM32 выводит
+алерт «ДИСПЛЕЙ НЕ СОВПАДАЕТ С КОНФИГОМ STM32».
+
 ## Как добавить фичу/фикс для обоих дисплеев
 
 1. Изменяешь файл в `ELS_Display/src/` (uart_protocol, gcode, UI)
