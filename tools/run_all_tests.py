@@ -184,7 +184,7 @@ def take_screenshot(ser, name):
     ser.write(b'S')
     ser.flush()
     buf = b''
-    deadline = time.time() + 6.0
+    deadline = time.time() + 12.0   # JPEG 800×1280 на 10.1" кодируется дольше
     while time.time() < deadline:
         chunk = ser.read(ser.in_waiting or 1)
         buf += chunk
@@ -206,8 +206,19 @@ def take_screenshot(ser, name):
     if len(buf) < size:
         return None
     path = os.path.join(OUT_DIR, f"{name}.jpg")
+    data = buf[:size]
+    # 10.1" JC8012P4A1C отдаёт физический портретный кадр 800×1280 — разворачиваем в ландшафт
+    try:
+        from PIL import Image
+        import io
+        img = Image.open(io.BytesIO(data))
+        if img.height > img.width:
+            img.rotate(-90, expand=True).save(path, quality=90)
+            return path
+    except ImportError:
+        pass
     with open(path, 'wb') as f:
-        f.write(buf[:size])
+        f.write(data)
     return path
 
 # ─── Verification helpers ─────────────────────────────────────────────────────
@@ -958,7 +969,15 @@ def main():
     ap.add_argument("--port", default=ESP32_PORT)
     ap.add_argument("--cat",  default="all", choices=["A","B","C","all"])
     ap.add_argument("--tc",   default=None)
+    ap.add_argument("--out",  default=None, help="папка для скриншотов, лога и отчёта")
     args = ap.parse_args()
+
+    global OUT_DIR, LOG_FILE, RPT_FILE
+    if args.out:
+        OUT_DIR  = os.path.join(args.out, "screenshots")
+        LOG_FILE = os.path.join(args.out, "test_results_full.jsonl")
+        RPT_FILE = os.path.join(args.out, "TEST_REPORT.md")
+        os.makedirs(OUT_DIR, exist_ok=True)
 
     print(f"ESP32 port: {args.port}")
     print(f"Log:        {LOG_FILE}")

@@ -13,9 +13,14 @@
 
 // ============================================================================
 // ВЫБОР ДИСПЛЕЯ (автоматически из platformio.ini или вручную)
+// Управление сборкой: установить нужный флаг в platformio.ini build_flags:
+//   -DJC4827W543_DISPLAY=1   → 4.3" ESP32-S3 (env:jc4827w543)
+//   -DJC8012P4A1C_DISPLAY=1  → 10.1" ESP32-P4 (env:jc8012p4a1c)
 // ============================================================================
 
-#ifdef JC4827W543_DISPLAY
+#ifdef JC8012P4A1C_DISPLAY
+    #define DISPLAY_JC8012P4A1C
+#elif defined(JC4827W543_DISPLAY)
     #define DISPLAY_JC4827W543
 #else
     #define DISPLAY_ESP32_2432S024
@@ -29,12 +34,12 @@
     // ESP32-2432S024: 2.4" 320x240 (ландшафтная ориентация)
     #define SCREEN_WIDTH  320
     #define SCREEN_HEIGHT 240
-    #define SCREEN_ROTATION 1  // 0=портрет, 1=пейзаж, 2=портрет перевернутый, 3=пейзаж перевернутый
+    #define SCREEN_ROTATION 1
 
     #define DISPLAY_NAME "ESP32-2432S024"
+    #define DISPLAY_TYPE_CODE 24
     #define DISPLAY_SIZE "2.4\""
 
-    // Коэффициенты масштабирования для адаптации UI
     #define SCALE_FACTOR_X 1.0f
     #define SCALE_FACTOR_Y 1.0f
 
@@ -42,22 +47,50 @@
     // JC4827W543: 4.3" 480x272 (ландшафтная ориентация)
     #define SCREEN_WIDTH  480
     #define SCREEN_HEIGHT 272
-    #define SCREEN_ROTATION 1  // Ландшафт
+    #define SCREEN_ROTATION 1
 
     #define DISPLAY_NAME "JC4827W543"
     #define DISPLAY_SIZE "4.3\""
+    #define DISPLAY_TYPE_CODE 43   // = DISPLAY_TYPE_4_3 в els_config.h STM32
 
-    // Коэффициенты для масштабирования UI с 240x320 на 480x272
-    #define SCALE_FACTOR_X 2.0f  // 480/240 = 2.0
-    #define SCALE_FACTOR_Y 0.85f // 272/320 = 0.85
+    // Базовый экран UI — масштаб 1:1
+    #define SCALE_FACTOR_X 1.0f
+    #define SCALE_FACTOR_Y 1.0f
+
+#elif defined(DISPLAY_JC8012P4A1C)
+    // JC8012P4A1C: 10.1" ESP32-P4, физ. 800x1280 (портрет), LVGL 1280×800 нативно
+    // UI масштабируется макросами UX/UY/US, поворот только в flush
+    #define SCREEN_WIDTH  1280
+    #define SCREEN_HEIGHT 800
+
+    #define DISPLAY_NAME "JC8012P4A1C"
+    #define DISPLAY_SIZE "10.1\""
+    #define DISPLAY_TYPE_CODE 101  // = DISPLAY_TYPE_10_1 в els_config.h STM32
+
+    // Масштаб 480×272 → 1280×800
+    #define SCALE_FACTOR_X 2.667f  // 1280/480
+    #define SCALE_FACTOR_Y 2.941f  // 800/272
 
 #else
-    #error "No display selected! Define DISPLAY_ESP32_2432S024 or DISPLAY_JC4827W543"
+    #error "No display selected! Set -DJC4827W543_DISPLAY=1 or -DJC8012P4A1C_DISPLAY=1 in platformio.ini"
 #endif
 
 // ============================================================================
-// МАКРОСЫ ДЛЯ МАСШТАБИРОВАНИЯ (автоматически адаптируют размеры)
+// МАСШТАБИРОВАНИЕ UI
+// Весь UI задаётся в пикселях базового экрана 4.3" (480×272). На другом
+// разрешении размеры пересчитываются пропорционально:
+//   UX(v) — по горизонтали (x, ширина), UY(v) — по вертикали (y, высота),
+//   US(v) — равномерно (рамки, радиусы, отступы, метрики шрифтов) = масштаб по X.
+// На 4.3" все три — тождественные. Шрифты для других экранов генерируются под
+// тем же именем с размером ×(SCREEN_WIDTH/480) — см. tools/gen_p4_fonts.sh.
 // ============================================================================
+#define UI_BASE_W 480
+#define UI_BASE_H 272
+#define UX(v) ((int)(v) * SCREEN_WIDTH  / UI_BASE_W)
+#define UY(v) ((int)(v) * SCREEN_HEIGHT / UI_BASE_H)
+#define US(v) UX(v)
+
+// Устаревшие макросы (используйте UX/UY/US)
 
 // Масштабировать координату X
 #define SCALE_X(x) ((int)((x) * SCALE_FACTOR_X))
@@ -137,17 +170,19 @@ extern ColorScheme current_color_scheme;
 #define UART_BUFFER_SIZE 256
 
 #ifdef DISPLAY_JC4827W543
-    // ESP32-S3 UART пины через P1 разъём платы JC4827W543 — НЕ МЕНЯЮТСЯ
-    // P1 TX = GPIO43 (UART0 TX по умолчанию, выходит на P1 разъём)
-    // P1 RX = GPIO44 (UART0 RX по умолчанию, выходит на P1 разъём)
-    // Подключение: Arduino Pin51(SS_TX) → P1_RX(GPIO44), Arduino Pin52(SS_RX) → P1_TX(GPIO43)
-    // (Пины 18/19 освобождены → возвращены ручному энкодеру Hand Encoder 100Lines)
+    // ESP32-S3: UART через P1 разъём JC4827W543
     #define UART_RX_PIN     44  // P1 RX = GPIO44
     #define UART_TX_PIN     43  // P1 TX = GPIO43
+#elif defined(DISPLAY_JC8012P4A1C)
+    // ESP32-P4: разъём CN2 "INPUT" (MX1.25 4P: VIN, TXD, RXD, GND) = UART0_TXD/RXD
+    // по схеме docs/JC8012P4A1C_I_W_Y/5-Schematic/3_ESP32-P4.png и 4_CONN.png.
+    // GPIO14..19 заняты SDIO до ESP32-C6 (WiFi) — их использовать нельзя.
+    #define UART_RX_PIN     38
+    #define UART_TX_PIN     37
 #else
-    // ESP32 UART2 пины
-    #define UART_RX_PIN     16  // RX2 на ESP32
-    #define UART_TX_PIN     17  // TX2 на ESP32
+    // ESP32 UART2 пины (ESP32-2432S024)
+    #define UART_RX_PIN     16
+    #define UART_TX_PIN     17
 #endif
 
 // ============================================================================

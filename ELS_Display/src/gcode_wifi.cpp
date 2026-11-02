@@ -1,7 +1,12 @@
 /**
  * gcode_wifi.cpp
  * WiFi (STA→AP fallback) + LittleFS + простой HTTP сервер на WiFiServer.
- * Обрабатывает одного клиента за раз прямо в loop() — без отдельных задач.
+ *
+ * WiFi и HTTP работают в отдельной задаче FreeRTOS: вызовы WiFi (подключение, softAP,
+ * таймауты связи с WiFi-чипом) и загрузка файлов длятся секундами и не должны
+ * останавливать отрисовку UI и приём UART в loop(). Всё, что трогает LVGL или
+ * исполнитель G-кода, передаётся в loop() через запросы и выполняется в
+ * GCodeWiFi_Process().
  */
 
 #include "gcode_wifi.h"
@@ -13,6 +18,10 @@
 #include <WiFiServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#if CONFIG_ESP_HOSTED_ENABLED
+#include "esp_hosted.h"
+#include "esp_hosted_host_fw_ver.h"
+#endif
 
 // ─── Состояние ────────────────────────────────────────────────────────────────
 
@@ -20,7 +29,8 @@ static const char* GCODE_DIR    = "/gcode";
 static const uint16_t HTTP_PORT = 80;
 static bool s_mdns_started = false;
 
-enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_CONNECTED, GCW_AP };
+// GCW_STACK_WAIT: STA ассоциирован, ждём ~2с пока поднимется TCP/IP (без блокировки loop)
+enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_STACK_WAIT, GCW_CONNECTED, GCW_AP };
 static GcWifiSt          s_state      = GCW_INIT;
 static uint32_t          s_conn_t     = 0;
 static uint32_t          s_ap_retry_t = 0;   // повторная попытка STA из AP-режима
@@ -29,6 +39,26 @@ static uint32_t          s_last_client_t = 0; // последний входящ
 static WiFiServer*       s_srv     = nullptr;
 static GCWifiConnectedCb s_conn_cb = nullptr;
 static char              s_ip[20]  = {};
+static char              s_notified_ip[20] = {};  // последний адрес, о котором показан алерт
+
+// Запросы из WiFi-задачи в loop() (под s_req_mux)
+enum GcwReq { GCW_REQ_NONE, GCW_REQ_RUN, GCW_REQ_STOP, GCW_REQ_PAUSE };
+static portMUX_TYPE      s_req_mux = portMUX_INITIALIZER_UNLOCKED;
+static GcwReq            s_req = GCW_REQ_NONE;
+static char              s_req_path[96] = {};
+static bool              s_notify_pending = false;
+static char              s_notify_ip[20] = {};
+static bool              s_notify_ap = false;
+
+static void post_exec_request(GcwReq req, const char* path = nullptr) {
+    portENTER_CRITICAL(&s_req_mux);
+    s_req = req;
+    if (path) {
+        strncpy(s_req_path, path, sizeof(s_req_path) - 1);
+        s_req_path[sizeof(s_req_path) - 1] = '\0';
+    }
+    portEXIT_CRITICAL(&s_req_mux);
+}
 
 // ─── HTML ─────────────────────────────────────────────────────────────────────
 
@@ -502,7 +532,8 @@ static void handle_run(WiFiClient& cl, const String& query) {
         return;
     }
     String path = String(GCODE_DIR) + "/" + name;
-    bool ok = GCodeExec_Run(path.c_str());
+    bool ok = LittleFS.exists(path);   // запуск выполнит loop() (GCodeWiFi_Process)
+    if (ok) post_exec_request(GCW_REQ_RUN, path.c_str());
     char buf[80];
     snprintf(buf, sizeof(buf), "{\"ok\":%s,\"file\":\"%s\"}",
              ok ? "true" : "false", name.c_str());
@@ -510,12 +541,12 @@ static void handle_run(WiFiClient& cl, const String& query) {
 }
 
 static void handle_stop(WiFiClient& cl) {
-    GCodeExec_Stop();
+    post_exec_request(GCW_REQ_STOP);
     send_ok_json(cl, "{\"ok\":true}");
 }
 
 static void handle_pause(WiFiClient& cl) {
-    GCodeExec_TogglePause();
+    post_exec_request(GCW_REQ_PAUSE);
     send_ok_json(cl, "{\"ok\":true}");
 }
 
@@ -586,11 +617,18 @@ static void handle_client(WiFiClient& cl) {
 
 // ─── WiFi helpers ─────────────────────────────────────────────────────────────
 
+// Алерт только при смене адреса: повторные циклы STA→AP→STA с тем же IP не всплывают
 static void notify_connected() {
-    if (s_conn_cb) s_conn_cb(s_ip, s_state == GCW_AP);
+    if (strcmp(s_notified_ip, s_ip) == 0) return;
+    strncpy(s_notified_ip, s_ip, sizeof(s_notified_ip) - 1);
+    portENTER_CRITICAL(&s_req_mux);
+    strncpy(s_notify_ip, s_ip, sizeof(s_notify_ip) - 1);
+    s_notify_ap = (s_state == GCW_AP);
+    s_notify_pending = true;          // callback (LVGL-алерт) вызовет loop()
+    portEXIT_CRITICAL(&s_req_mux);
 }
 
-static void start_server() {
+static void start_server(bool notify = true) {
     if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
     s_srv = new WiFiServer(HTTP_PORT);
     if (!s_srv) {
@@ -616,7 +654,7 @@ static void start_server() {
         Serial.printf("[gcode] WiFiServer started: http://%s:%u/  (http://els.local:%u/)\n",
                       s_ip, HTTP_PORT, HTTP_PORT);
     }
-    notify_connected();
+    if (notify) notify_connected();
 }
 
 static void start_ap() {
@@ -633,7 +671,37 @@ static void start_ap() {
 
 void GCodeWiFi_SetConnectedCallback(GCWifiConnectedCb cb) { s_conn_cb = cb; }
 
-void GCodeWiFi_Init() {
+// WiFi через сопроцессор (ESP32-P4 + ESP32-C6, esp_hosted): версии хоста и слейва в лог
+static void log_hosted_versions() {
+#if CONFIG_ESP_HOSTED_ENABLED
+    esp_hosted_coprocessor_fwver_t v = {};
+    int r = esp_hosted_get_coprocessor_fwversion(&v);
+    Serial.printf("[wifi] esp_hosted host=%d.%d.%d, C6 slave: %s %lu.%lu.%lu\n",
+                  ESP_HOSTED_VERSION_MAJOR_1, ESP_HOSTED_VERSION_MINOR_1, ESP_HOSTED_VERSION_PATCH_1,
+                  r == 0 ? "OK" : "нет ответа",
+                  (unsigned long)v.major1, (unsigned long)v.minor1, (unsigned long)v.patch1);
+#endif
+}
+
+// WiFi через сопроцессор: команды до поднятия SDIO-связи с C6 теряются — ждём её (до 10 с)
+static void wait_coprocessor() {
+#if CONFIG_ESP_HOSTED_ENABLED
+    WiFi.mode(WIFI_STA);   // запускает esp_hosted
+    esp_hosted_coprocessor_fwver_t v = {};
+    uint32_t t0 = millis();
+    while (esp_hosted_get_coprocessor_fwversion(&v) != 0 && millis() - t0 < 10000) delay(200);
+    Serial.printf("[wifi] C6 готов через %lu мс\n", (unsigned long)(millis() - t0));
+    log_hosted_versions();
+#endif
+}
+
+static void wifi_init_impl() {
+    // Причина отказа подключения к роутеру — в лог (коды wifi_err_reason_t:
+    // 15/202/204 — пароль/рукопожатие, 201 — сеть не найдена)
+    WiFi.onEvent([](WiFiEvent_t, WiFiEventInfo_t info) {
+        Serial.printf("[wifi] STA disconnected, reason=%d\n",
+                      (int)info.wifi_sta_disconnected.reason);
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     if (!LittleFS.begin(false)) {
         Serial.println("[gcode] LittleFS formatting...");
         LittleFS.begin(true);
@@ -647,6 +715,7 @@ void GCodeWiFi_Init() {
     const char* ssid = WIFI_STA_SSID;
     if (ssid && ssid[0] != '\0') {
         Serial.printf("[gcode] WiFi STA → %s\n", ssid);
+        wait_coprocessor();
         WiFi.persistent(false);
         WiFi.setAutoReconnect(false);
         WiFi.disconnect(true);
@@ -661,7 +730,7 @@ void GCodeWiFi_Init() {
     }
 }
 
-void GCodeWiFi_Process() {
+static void wifi_process_impl() {
     // Обработка клиентов
     if (s_srv && s_srv->hasClient()) {
         WiFiClient cl = s_srv->accept();
@@ -677,17 +746,31 @@ void GCodeWiFi_Process() {
         if (WiFi.status() == WL_CONNECTED) {
             IPAddress ip = WiFi.localIP();
             if (ip[0] == 0) return;
-            s_state = GCW_CONNECTED;
+            s_state = GCW_STACK_WAIT;
+            s_conn_t = millis();
             WiFi.setSleep(false);
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
-            delay(2000);  // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
-            start_server();
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
-            Serial.println("[gcode] STA timeout → AP");
+            Serial.printf("[gcode] STA timeout → AP (status=%d)\n", (int)WiFi.status());
+            {   // диагностика: видна ли сеть роутера (чужие SSID не печатаем)
+                int n = WiFi.scanNetworks();
+                int rssi = 0;
+                for (int i = 0; i < n; i++)
+                    if (WiFi.SSID(i) == WIFI_STA_SSID) { rssi = WiFi.RSSI(i); break; }
+                Serial.printf("[wifi] scan: сетей=%d, сеть роутера %s%s\n", n,
+                              rssi ? "видна, RSSI=" : "не найдена", rssi ? String(rssi).c_str() : "");
+                WiFi.scanDelete();
+            }
             WiFi.disconnect(true);
             delay(100);
             start_ap();
+        }
+    } else if (s_state == GCW_STACK_WAIT) {
+        // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
+        if (millis() - s_conn_t > 2000) {
+            s_state = GCW_CONNECTED;
+            start_server();
         }
     } else if (s_state == GCW_CONNECTED) {
         if (WiFi.status() != WL_CONNECTED) {
@@ -702,13 +785,14 @@ void GCodeWiFi_Process() {
             // Watchdog: сервер запущен >30с, но ни одного клиента → перезапускаем
             Serial.println("[gcode] watchdog: restarting server...");
             s_last_client_t = millis();
-            start_server();
+            start_server(false);  // watchdog — без повторного алерта
         }
     } else if (s_state == GCW_AP) {
         // Повторная попытка STA каждые 60 секунд (если SSID задан)
         const char* ssid = WIFI_STA_SSID;
         if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
             Serial.println("[gcode] AP → retrying STA...");
+            log_hosted_versions();
             if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
             WiFi.softAPdisconnect(true);
             delay(100);
@@ -719,6 +803,39 @@ void GCodeWiFi_Process() {
             s_conn_t = millis();
         }
     }
+}
+
+static void wifi_task(void*) {
+    wifi_init_impl();
+    for (;;) {
+        wifi_process_impl();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+
+void GCodeWiFi_Init() {
+    xTaskCreatePinnedToCore(wifi_task, "gcode_wifi", 8192, nullptr, 1, nullptr, 0);
+}
+
+// Вызывается из loop(): выполнить запросы WiFi-задачи в контексте UI/исполнителя
+void GCodeWiFi_Process() {
+    GcwReq req;
+    char path[sizeof(s_req_path)];
+    bool notify;
+    char ip[sizeof(s_notify_ip)];
+    bool is_ap;
+    portENTER_CRITICAL(&s_req_mux);
+    req = s_req;  s_req = GCW_REQ_NONE;
+    memcpy(path, s_req_path, sizeof(path));
+    notify = s_notify_pending;  s_notify_pending = false;
+    memcpy(ip, s_notify_ip, sizeof(ip));
+    is_ap = s_notify_ap;
+    portEXIT_CRITICAL(&s_req_mux);
+
+    if (req == GCW_REQ_RUN)   GCodeExec_Run(path);
+    if (req == GCW_REQ_STOP)  GCodeExec_Stop();
+    if (req == GCW_REQ_PAUSE) GCodeExec_TogglePause();
+    if (notify && s_conn_cb)  s_conn_cb(ip, is_ap);
 }
 
 const char* GCodeWiFi_GetIP()      { return s_ip; }
