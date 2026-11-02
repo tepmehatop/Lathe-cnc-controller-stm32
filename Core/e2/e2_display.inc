@@ -345,6 +345,8 @@ void Display_On_Position_Change()
   // ИНВЕРСИЯ ЗНАКА — соответствует логике Print.ino
   Display_Send_Int("POS_Z", -(int32_t)Size_Z_mm * 10L);
   Display_Send_Int("POS_X", -(int32_t)Size_X_mm * 10L);
+  // [STM32] диаметр меняется вместе с X (LCD2004 показывает Ø постоянно), у автора слался только в Send_All
+  Display_Send_Int("DIAM_X", -(int32_t)MSize_X_mm * 10L);
 }
 
 void Display_On_Pass_Change()

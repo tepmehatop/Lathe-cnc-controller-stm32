@@ -385,6 +385,8 @@ struct UIHandles {
     lv_obj_t* secondary_val;      // Большое значение green ("1650")
     lv_obj_t* secondary_val_glow; // Glow-слой под secondary_val
     lv_obj_t* secondary_unit;     // Подпись ("RPM")
+    lv_obj_t* diam_unit;          // Подпись "ДИАМЕТР" (Ø на LCD2004)
+    lv_obj_t* diam_val;           // Диаметр заготовки, мм
     lv_obj_t* rpm_bar;            // Прогресс-бар оборотов
 
     // Statusbar
@@ -482,6 +484,7 @@ struct LayoutWidgets {
     lv_obj_t* secondary_val;
     lv_obj_t* secondary_val_glow;
     lv_obj_t* secondary_unit;
+    lv_obj_t* diam_unit; lv_obj_t* diam_val;
     lv_obj_t* rpm_bar;
     lv_obj_t* row1_title; lv_obj_t* row1_val; lv_obj_t* row1_box;
     lv_obj_t* row2_title; lv_obj_t* row2_val; lv_obj_t* row2_box;
@@ -504,6 +507,8 @@ static void apply_layout_widgets(const LayoutWidgets& w) {
     g_ui.secondary_val     = w.secondary_val;
     g_ui.secondary_val_glow= w.secondary_val_glow;
     g_ui.secondary_unit    = w.secondary_unit;
+    g_ui.diam_unit         = w.diam_unit;
+    g_ui.diam_val          = w.diam_val;
     g_ui.rpm_bar           = w.rpm_bar;
     g_ui.row1_title        = w.row1_title;
     g_ui.row1_val          = w.row1_val;
@@ -1177,6 +1182,21 @@ static void create_k_content(lv_obj_t* screen)
     lv_obj_align(s_val, LV_ALIGN_TOP_RIGHT, -UX(8), UY(24));
     g_wk.secondary_val      = s_val;
     g_wk.secondary_val_glow = nullptr;
+
+    // Диаметр (Ø на LCD2004) — левее RPM, во всех режимах кроме делилки
+    lv_obj_t* d_unit = lv_label_create(feat);
+    lv_obj_set_style_text_font(d_unit, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(d_unit, lv_color_hex(0x6a9fb5), 0);
+    lv_label_set_text(d_unit, "\xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0");  // ДИАМЕТР
+    lv_obj_align(d_unit, LV_ALIGN_TOP_RIGHT, -UX(110), UY(5));
+    g_wk.diam_unit = d_unit;
+
+    lv_obj_t* d_val = lv_label_create(feat);
+    lv_obj_set_style_text_font(d_val, &font_tahoma_bold_28, 0);
+    lv_obj_set_style_text_color(d_val, lv_color_hex(0x00ff88), 0);
+    lv_label_set_text(d_val, "+0.00");
+    lv_obj_align(d_val, LV_ALIGN_TOP_RIGHT, -UX(110), UY(24));
+    g_wk.diam_val = d_val;
 
     // RPM bar — invisible stub (removed per user request; kept for API compat)
     lv_obj_t* rbar = lv_bar_create(feat);
@@ -4155,6 +4175,22 @@ static void update_ui_values(const LatheData& data)
 
     // ── RPM bar ──────────────────────────────────────────────────────────────
     lv_bar_set_value(g_ui.rpm_bar, data.rpm, LV_ANIM_OFF);
+
+    // ── Диаметр (как Ø на LCD2004): все режимы, кроме делилки и резерва ─────
+    if (g_ui.diam_val) {
+        bool show = data.mode != MODE_DIVIDER && data.mode != MODE_RESERVE;
+        if (show) {
+            lv_obj_clear_flag(g_ui.diam_unit, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(g_ui.diam_val, LV_OBJ_FLAG_HIDDEN);
+            DisplayFormatter::formatPosition(buf, data.diam_x);
+            lv_label_set_text(g_ui.diam_val, buf);
+            lv_obj_set_style_text_color(g_ui.diam_val,
+                data.diam_x >= 0 ? lv_color_hex(0x00ff88) : lv_color_hex(0xff5555), 0);
+        } else {
+            lv_obj_add_flag(g_ui.diam_unit, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(g_ui.diam_val, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 
     // ── Правая панель: row1 и row2 ───────────────────────────────────────────
     // M7: row1=Делений, row2=Метка; остальные: row1=ПОЗ Z, row2=ПОЗ X
