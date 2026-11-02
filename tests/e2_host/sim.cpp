@@ -100,14 +100,14 @@ static void sample_steps() {
         }
     };
     long before = s_z.count;
-    chk(s_z, E2_ODR(E2_PIN_Z_STEP), E2_ODR(E2_PIN_Z_DIR));
+    chk(s_z, E2_DRV_RD(E2_PIN_Z_STEP), E2_DRV_RD(E2_PIN_Z_DIR));
     if (s_z.count != before) {
         if (t_ns - s_z_last_step > 50000000ull)
-            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_ODR(E2_PIN_Z_DIR)});
+            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR)});
         s_z_last_step = t_ns;
     }
     long xb = s_x.count;
-    chk(s_x, E2_ODR(E2_PIN_X_STEP), E2_ODR(E2_PIN_X_DIR));
+    chk(s_x, E2_DRV_RD(E2_PIN_X_STEP), E2_DRV_RD(E2_PIN_X_DIR));
     static long s_xpos_prev = 0;
     if (s_x.count != xb && Motor_X_Pos == s_xpos_prev && getenv("SIM_XTRACE"))
         printf("      X: спад без счёта t=%.6f en5b=%d en2b=%d en4b=%d en5a=%d jz=%d jx=%d stepX=%d\n", t_ns / 1e9, e2_en_t5b, e2_en_t2b, e2_en_t4b, e2_en_t5a, Joy_Z_flag, Joy_X_flag, Step_X_flag);
@@ -115,7 +115,7 @@ static void sample_steps() {
         printf("      X: счёт без импульса t=%.6f %ld→%ld in_loop=%d ev=%d en3b=%d en4b=%d pin=%u ARR12=%u\n", t_ns / 1e9, s_xpos_prev, Motor_X_Pos, in_loop, s_cur_ev, e2_en_t3b, e2_en_t4b, (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)TIM12->ARR);
     s_xpos_prev = Motor_X_Pos;
     if (s_x.count != xb) {
-        int d = (int)E2_ODR(E2_PIN_X_DIR);
+        int d = (int)E2_DRV_RD(E2_PIN_X_DIR);
         if (s_x_last_dir == 0 && d == 1) s_x_turns.push_back({Motor_Z_Pos, Motor_X_Pos, McStep_Lag});
         s_x_last_dir = d;
     }
@@ -641,6 +641,9 @@ int main() {
     test_cone(55, 1.0 / 20);               // 1:10 (на диаметр)
     test_cone(45, 1.0 / 2 / 19.212);       // KM0 (Морзе 0: 1:19.212)
     test_sphere();
+    CHECK(Serial.out.find("[IO] Джойстик Влево: замкнуто на GND") != std::string::npos, "монитор входов не сообщил о джойстике");
+    CHECK(Serial.out.find("[IO] Энкодер шпинделя:") != std::string::npos, "монитор входов не сообщил об энкодере");
+    CHECK(Serial.out.find("[IO] РГИ:") != std::string::npos, "монитор входов не сообщил о РГИ");
     printf("[step] минимальная длительность уровня STEP: Z %.2f мкс (%ld фронтов), X %.2f мкс (%ld фронтов)\n",
            s_ez.min_cyc / 168.0, s_ez.n, s_ex.min_cyc / 168.0, s_ex.n);
     CHECK(s_ez.min_cyc >= (uint64_t)STEP_PULSE_MIN_US * 168 && s_ex.min_cyc >= (uint64_t)STEP_PULSE_MIN_US * 168,

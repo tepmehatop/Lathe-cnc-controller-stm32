@@ -43,10 +43,11 @@ static HardwareTimer* s_tim12 = nullptr;
 #define IN_PU(...)   pinMode(E2_APIN(__VA_ARGS__), INPUT_PULLUP)
 #define OUT_LO(...)  do { pinMode(E2_APIN(__VA_ARGS__), OUTPUT); E2_CLR(__VA_ARGS__); } while (0)
 
-// Motor_Init(): DDRL = B11111011, PORTL = B0000100 — все выходы в 0
+// Motor_Init(): DDRL = B11111011, PORTL = B0000100 — все выходы в 0 (моторы выключены)
+#define DRV_LO(...)  do { pinMode(E2_APIN(__VA_ARGS__), OUTPUT); E2_DRV_LO(__VA_ARGS__); } while (0)
 void e2_motor_init(void) {
-    OUT_LO(E2_PIN_Z_STEP); OUT_LO(E2_PIN_Z_DIR); OUT_LO(E2_PIN_Z_ENA);
-    OUT_LO(E2_PIN_X_STEP); OUT_LO(E2_PIN_X_DIR); OUT_LO(E2_PIN_X_ENA);
+    DRV_LO(E2_PIN_Z_STEP); DRV_LO(E2_PIN_Z_DIR); DRV_LO(E2_PIN_Z_ENA);
+    DRV_LO(E2_PIN_X_STEP); DRV_LO(E2_PIN_X_DIR); DRV_LO(E2_PIN_X_ENA);
     OUT_LO(E2_PIN_TACHO);
 }
 

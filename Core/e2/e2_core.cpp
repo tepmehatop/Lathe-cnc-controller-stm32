@@ -1733,9 +1733,64 @@ void e2_pos_update(void)
 
 static int _Display_GetSubMode();   // e2_display.inc
 
+// Монитор входов для проверки проводки (IO_MONITOR в els_config.h): каждое изменение
+// кнопки, переключателя или упора, вращение энкодеров — строкой в отладочный порт.
+#if IO_MONITOR
+struct E2InPin { const char* name; GPIO_TypeDef* port; uint16_t bit; };
+#define E2_IN(name, ...) { name, E2_GPIO(__VA_ARGS__), (uint16_t)E2_BIT(__VA_ARGS__) }
+static const E2InPin s_inputs[] = {
+   E2_IN("Режим: Синхронная подача", E2_PIN_MODE_FEED),   E2_IN("Режим: Асинхронная подача", E2_PIN_MODE_AFEED),
+   E2_IN("Режим: Конус <", E2_PIN_MODE_CONE_L),           E2_IN("Режим: Конус >", E2_PIN_MODE_CONE_R),
+   E2_IN("Режим: Резьба", E2_PIN_MODE_THREAD),            E2_IN("Режим: Шар", E2_PIN_MODE_SPHERE),
+   E2_IN("Режим: Делилка", E2_PIN_MODE_DIVIDER),          E2_IN("Режим: Резерв", E2_PIN_MODE_RESERVE),
+   E2_IN("Подрежим: Внутренний", E2_PIN_SUB_INT),         E2_IN("Подрежим: Ручной", E2_PIN_SUB_MAN),
+   E2_IN("Подрежим: Наружный", E2_PIN_SUB_EXT),
+   E2_IN("Кнопка Влево", E2_PIN_BTN_LEFT),  E2_IN("Кнопка Вправо", E2_PIN_BTN_RIGHT),
+   E2_IN("Кнопка Вверх", E2_PIN_BTN_UP),    E2_IN("Кнопка Вниз", E2_PIN_BTN_DOWN),
+   E2_IN("Кнопка Выбор", E2_PIN_BTN_SELECT),
+   E2_IN("Джойстик Влево", E2_PIN_JOY_LEFT), E2_IN("Джойстик Вправо", E2_PIN_JOY_RIGHT),
+   E2_IN("Джойстик Вверх", E2_PIN_JOY_UP),   E2_IN("Джойстик Вниз", E2_PIN_JOY_DOWN),
+   E2_IN("Кнопка ускоренного хода", E2_PIN_JOY_RAPID),
+   E2_IN("Упор Левый", E2_PIN_LIM_LEFT),  E2_IN("Упор Правый", E2_PIN_LIM_RIGHT),
+   E2_IN("Упор Передний", E2_PIN_LIM_FRONT), E2_IN("Упор Задний", E2_PIN_LIM_REAR),
+   E2_IN("РГИ: ось Z", E2_PIN_HAND_AXIS_Z), E2_IN("РГИ: ось X", E2_PIN_HAND_AXIS_X),
+   E2_IN("РГИ: масштаб x1", E2_PIN_HAND_X1), E2_IN("РГИ: масштаб x10", E2_PIN_HAND_X10),
+};
+static void e2_io_monitor(void)
+{
+   static uint8_t s_prev[sizeof(s_inputs) / sizeof(s_inputs[0])];
+   static bool s_init = false;
+   for (size_t i = 0; i < sizeof(s_inputs) / sizeof(s_inputs[0]); i++) {
+      uint8_t v = (s_inputs[i].port->IDR & s_inputs[i].bit) ? 1 : 0;
+      if (s_init && v != s_prev[i])
+         Serial.printf("[IO] %s: %s\n", s_inputs[i].name, v ? "отпущено (1)" : "замкнуто на GND (0)");
+      s_prev[i] = v;
+   }
+   s_init = true;
+
+   static uint32_t s_t = 0, s_edges = 0;
+   static long s_hand = 0;
+   if (millis() - s_t >= 1000) {
+      s_t = millis();
+      uint32_t e = e2_spindle_edges();
+      if (e != s_edges)
+         Serial.printf("[IO] Энкодер шпинделя: %lu фронтов A за 1 с (%lu об/мин), угол %ld.%03ld°, %s\n",
+                       (unsigned long)(e - s_edges), (unsigned long)((e - s_edges) * 60UL / ENC_TICK),
+                       (long)(Spindle_Angle / 1000), (long)(Spindle_Angle % 1000), Spindle_Dir == CW ? "по часовой" : "против часовой");
+      s_edges = e;
+      long h = Hand_Count;
+      if (h != s_hand) Serial.printf("[IO] РГИ: %+ld щелчков (всего %ld)\n", h - s_hand, h);
+      s_hand = h;
+   }
+}
+#endif
+
 // Обороты шпинделя для дисплея ESP32 и строка состояния LCD2004 для автотестов
 void e2_service(void)
 {
+#if IO_MONITOR
+   e2_io_monitor();
+#endif
    static uint32_t s_rpm_t = 0, s_rpm_edges = 0, s_lcd_t = 0;
    uint32_t now = millis();
    if (now - s_rpm_t >= 250) {

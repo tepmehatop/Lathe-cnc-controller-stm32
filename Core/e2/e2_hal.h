@@ -20,6 +20,7 @@
  * Все прерывания движения — одного приоритета и не вытесняют друг друга, как на AVR.
  */
 #include <Arduino.h>
+#include "../els_config.h"
 #include "e2_pins.h"
 
 // ============================================================================
@@ -74,8 +75,24 @@ extern volatile uint8_t Motor_X_Dir, Joy_X_flag, Step_X_flag, Cone_flag;
 #define Beeper_Off()           E2_SET(E2_PIN_BEEPER)     // Pin16 1
 
 // ============================================================================
-// Шаговые двигатели (уровни как у оригинала: импульс — низкий уровень)
+// Шаговые двигатели. Уровни — как у Mega в 7e2, где выходы STEP/DIR/ENA идут на
+// драйвер через NPN-ключ (схема автора): 1 на выводе = ток через оптрон драйвера.
+// При DRIVER_SIGNALS_DIRECT = 1 (вывод STM32 прямо на «−» входа драйвера, «+» общий)
+// уровни на выводах инвертируются, а логика 7e2 остаётся той же.
 // ============================================================================
+#ifndef DRIVER_SIGNALS_DIRECT
+#define DRIVER_SIGNALS_DIRECT 0
+#endif
+#if DRIVER_SIGNALS_DIRECT
+#define E2_DRV_HI(...)         E2_CLR(__VA_ARGS__)
+#define E2_DRV_LO(...)         E2_SET(__VA_ARGS__)
+#define E2_DRV_RD(...)         (E2_ODR(__VA_ARGS__) ^ 1u)
+#else
+#define E2_DRV_HI(...)         E2_SET(__VA_ARGS__)
+#define E2_DRV_LO(...)         E2_CLR(__VA_ARGS__)
+#define E2_DRV_RD(...)         E2_ODR(__VA_ARGS__)
+#endif
+
 void e2_motor_init(void);
 #define Motor_Init()           e2_motor_init()
 
@@ -92,27 +109,27 @@ static inline void e2_step_hold(volatile uint32_t* edge) {
     *edge = e2_cycles();
 }
 
-#define Motor_Z_SetPulse()     do { if (E2_ODR(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_CLR(E2_PIN_Z_STEP); } } while (0)
-#define Motor_Z_RemovePulse()  do { if (!E2_ODR(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_SET(E2_PIN_Z_STEP); } } while (0)
+#define Motor_Z_SetPulse()     do { if (E2_DRV_RD(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_DRV_LO(E2_PIN_Z_STEP); } } while (0)
+#define Motor_Z_RemovePulse()  do { if (!E2_DRV_RD(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_DRV_HI(E2_PIN_Z_STEP); } } while (0)
 #define Motor_Z_InvertPulse()  do { e2_step_hold(&e2_z_edge); E2_TGL(E2_PIN_Z_STEP); } while (0)
-#define Read_Z_State           E2_ODR(E2_PIN_Z_STEP)
+#define Read_Z_State           E2_DRV_RD(E2_PIN_Z_STEP)
 
-#define Motor_X_SetPulse()     do { if (E2_ODR(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_CLR(E2_PIN_X_STEP); } } while (0)
-#define Motor_X_RemovePulse()  do { if (!E2_ODR(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_SET(E2_PIN_X_STEP); } } while (0)
+#define Motor_X_SetPulse()     do { if (E2_DRV_RD(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_DRV_LO(E2_PIN_X_STEP); } } while (0)
+#define Motor_X_RemovePulse()  do { if (!E2_DRV_RD(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_DRV_HI(E2_PIN_X_STEP); } } while (0)
 #define Motor_X_InvertPulse()  do { e2_step_hold(&e2_x_edge); E2_TGL(E2_PIN_X_STEP); } while (0)
-#define Read_X_State           E2_ODR(E2_PIN_X_STEP)
+#define Read_X_State           E2_DRV_RD(E2_PIN_X_STEP)
 
-#define Motor_Z_CW()           E2_CLR(E2_PIN_Z_DIR)
-#define Motor_Z_CCW()          E2_SET(E2_PIN_Z_DIR)
-#define Motor_X_CW()           E2_CLR(E2_PIN_X_DIR)
-#define Motor_X_CCW()          E2_SET(E2_PIN_X_DIR)
+#define Motor_Z_CW()           E2_DRV_LO(E2_PIN_Z_DIR)
+#define Motor_Z_CCW()          E2_DRV_HI(E2_PIN_Z_DIR)
+#define Motor_X_CW()           E2_DRV_LO(E2_PIN_X_DIR)
+#define Motor_X_CCW()          E2_DRV_HI(E2_PIN_X_DIR)
 
-#define Motor_Z_Enable()       do { E2_SET(E2_PIN_Z_ENA); _delay_ms(100); } while (0)
-#define Motor_Z_Disable()      { E2_CLR(E2_PIN_Z_ENA); _delay_ms(100); }
-#define Read_Z_Ena_State       E2_ODR(E2_PIN_Z_ENA)
-#define Motor_X_Enable()       do { E2_SET(E2_PIN_X_ENA); _delay_ms(100); } while (0)
-#define Motor_X_Disable()      { E2_CLR(E2_PIN_X_ENA); _delay_ms(100); }
-#define Read_X_Ena_State       E2_ODR(E2_PIN_X_ENA)
+#define Motor_Z_Enable()       do { E2_DRV_HI(E2_PIN_Z_ENA); _delay_ms(100); } while (0)
+#define Motor_Z_Disable()      { E2_DRV_LO(E2_PIN_Z_ENA); _delay_ms(100); }
+#define Read_Z_Ena_State       E2_DRV_RD(E2_PIN_Z_ENA)
+#define Motor_X_Enable()       do { E2_DRV_HI(E2_PIN_X_ENA); _delay_ms(100); } while (0)
+#define Motor_X_Disable()      { E2_DRV_LO(E2_PIN_X_ENA); _delay_ms(100); }
+#define Read_X_Ena_State       E2_DRV_RD(E2_PIN_X_ENA)
 
 // ============================================================================
 // Тахометр
