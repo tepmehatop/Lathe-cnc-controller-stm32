@@ -24,6 +24,18 @@ int32_t dro_pos_y = 0;
 void e2_pos_update(void);
 void e2_service(void);
 
+// [STM32] Механика, под которую рассчитаны таблицы конусов и резьб ниже. Другая механика
+// в els_config.h → пересчитать таблицы: python3 tools/gen_e2_tables.py --write
+#define E2_TABLES_ENC       1800    // линий энкодера
+#define E2_TABLES_Z_STEPS   800     // шагов мотора Z на оборот винта (с микрошагом)
+#define E2_TABLES_SCREW_Z   200     // шаг винта Z, 0.01 мм
+#define E2_TABLES_X_STEPS   800
+#define E2_TABLES_SCREW_X   100
+static_assert(ENC_LINE_PER_REV == E2_TABLES_ENC &&
+              (long)MOTOR_Z_STEP_PER_REV * McSTEP_Z * E2_TABLES_SCREW_Z == (long)E2_TABLES_Z_STEPS * SCREW_Z &&
+              (long)MOTOR_X_STEP_PER_REV * McSTEP_X * E2_TABLES_SCREW_X == (long)E2_TABLES_X_STEPS * SCREW_X,
+              "Таблицы резьб и конусов рассчитаны под другую механику: запустите python3 tools/gen_e2_tables.py --write");
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // ***** Cone *****
 struct cone_info_type

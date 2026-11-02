@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 OUT=${TMPDIR:-/tmp}/e2_sim
-c++ -std=c++17 -O1 -w -fsigned-char -fsingle-precision-constant \
+c++ -std=c++17 -O1 -w -fsigned-char -fsingle-precision-constant ${SIM_FLAGS:-} \
     -Itests/e2_host/mock -ICore -ICore/e2 -IDrivers \
     tests/e2_host/sim.cpp tests/e2_host/stubs.cpp \
     Core/e2/e2_hal.cpp Core/e2/e2_lcd.cpp \

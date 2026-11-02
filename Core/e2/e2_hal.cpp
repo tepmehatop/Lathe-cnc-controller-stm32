@@ -5,6 +5,7 @@
  * См. e2_hal.h — там соответствие таймеров AVR и STM32.
  */
 #include "e2_hal.h"
+#include "../els_config.h"
 #include <HardwareTimer.h>
 
 // Приоритет всех прерываний движения: одинаковый, поэтому они не вытесняют
@@ -25,6 +26,9 @@ volatile uint8_t Motor_X_Dir, Joy_X_flag, Step_X_flag, Cone_flag;
 volatile uint8_t e2_en_int0, e2_en_int2;
 volatile uint8_t e2_en_t2a, e2_en_t2b, e2_en_t3a, e2_en_t3b;
 volatile uint8_t e2_en_t4a, e2_en_t4b, e2_en_t5a, e2_en_t5b;
+
+uint32_t e2_step_min_cycles = 0;
+volatile uint32_t e2_z_edge = 0, e2_x_edge = 0;
 
 static volatile uint16_t s_t5_cnt = 0;          // TCNT5
 static volatile uint32_t s_spindle_edges = 0;   // все фронты канала A — для оборотов
@@ -122,6 +126,12 @@ static HardwareTimer* _timer_start(TIM_TypeDef* tim, uint32_t hz, uint16_t perio
 }
 
 void e2_timers_init(void) {
+    // Счётчик тактов ядра — для минимальной длительности импульса STEP
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    e2_step_min_cycles = (uint32_t)((uint64_t)SystemCoreClock * STEP_PULSE_MIN_US / 1000000u);
+
     s_tim6  = _timer_start(TIM6,  500000, 240, _tim6_cb);    // Timer2: 16 МГц / 32
     s_tim7  = _timer_start(TIM7,  250000, 250, _tim7_cb);    // Timer3: 16 МГц / 64
     s_tim12 = _timer_start(TIM12, 250000, 1000, _tim12_cb);  // Timer4: 16 МГц / 64

@@ -40,18 +40,30 @@ static inline void delay(uint32_t ms) { sim_delay_us((uint64_t)ms * 1000); }
 static inline void delayMicroseconds(uint32_t us) { sim_delay_us(us); }
 
 // ── GPIO ─────────────────────────────────────────────────────────────────────
+// ODR и BSRR — классы-обёртки: каждая смена выходов сообщается симулятору
+// (sim_gpio_changed) вместе с «тактом ядра», чтобы мерить длительность импульсов STEP.
 struct GPIO_TypeDef;
-struct BsrrReg {
-    void operator=(uint32_t v);
+void sim_gpio_changed(GPIO_TypeDef* g, uint32_t old_odr, uint32_t new_odr);
+struct OdrReg {
+    uint32_t v = 0;
+    GPIO_TypeDef* parent();
+    operator uint32_t() const { return v; }
+    void set(uint32_t n) { uint32_t o = v; v = n; if (o != n) sim_gpio_changed(parent(), o, n); }
+    OdrReg& operator=(uint32_t n) { set(n); return *this; }
+    OdrReg& operator^=(uint32_t m) { set(v ^ m); return *this; }
+    OdrReg& operator|=(uint32_t m) { set(v | m); return *this; }
+    OdrReg& operator&=(uint32_t m) { set(v & m); return *this; }
 };
+struct BsrrReg { void operator=(uint32_t v); };
 struct GPIO_TypeDef {
     volatile uint32_t IDR;
-    volatile uint32_t ODR;
+    OdrReg ODR;
     BsrrReg BSRR;
 };
+inline GPIO_TypeDef* OdrReg::parent() { return reinterpret_cast<GPIO_TypeDef*>(reinterpret_cast<char*>(this) - offsetof(GPIO_TypeDef, ODR)); }
 inline void BsrrReg::operator=(uint32_t v) {
     GPIO_TypeDef* g = reinterpret_cast<GPIO_TypeDef*>(reinterpret_cast<char*>(this) - offsetof(GPIO_TypeDef, BSRR));
-    g->ODR = (g->ODR | (v & 0xFFFF)) & ~(v >> 16);
+    g->ODR.set((g->ODR.v | (v & 0xFFFF)) & ~(v >> 16));
 }
 extern GPIO_TypeDef g_gpio[5];
 #define GPIOA (&g_gpio[0])
@@ -86,6 +98,20 @@ extern TIM_TypeDef g_tim6, g_tim7, g_tim12;
 #define TIM_SR_UIF   0x01u
 enum { EXTI1_IRQn = 7, EXTI9_5_IRQn = 23 };
 static inline void HAL_NVIC_SetPriority(int, int, int) {}
+
+// ── Счётчик тактов ядра (DWT) ────────────────────────────────────────────────
+// Такты = виртуальное время × 168 МГц плюс по 4 такта на каждое чтение
+// (иначе цикл ожидания внутри «прерывания» никогда бы не кончился).
+uint32_t sim_cyccnt_read();
+struct CycReg { operator uint32_t() const { return sim_cyccnt_read(); } CycReg& operator=(uint32_t) { return *this; } };
+struct DWT_Type { CycReg CYCCNT; uint32_t CTRL; };
+struct CoreDebug_Type { uint32_t DEMCR; };
+extern DWT_Type g_dwt; extern CoreDebug_Type g_coredebug;
+#define DWT (&g_dwt)
+#define CoreDebug (&g_coredebug)
+#define CoreDebug_DEMCR_TRCENA_Msk (1u << 24)
+#define DWT_CTRL_CYCCNTENA_Msk 1u
+static const uint32_t SystemCoreClock = 168000000u;
 
 // ── String ───────────────────────────────────────────────────────────────────
 class String {

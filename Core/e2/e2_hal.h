@@ -79,14 +79,27 @@ extern volatile uint8_t Motor_X_Dir, Joy_X_flag, Step_X_flag, Cone_flag;
 void e2_motor_init(void);
 #define Motor_Init()           e2_motor_init()
 
-#define Motor_Z_SetPulse()     E2_CLR(E2_PIN_Z_STEP)
-#define Motor_Z_RemovePulse()  E2_SET(E2_PIN_Z_STEP)
-#define Motor_Z_InvertPulse()  E2_TGL(E2_PIN_Z_STEP)
+// Минимальная длительность уровня на STEP. В 7e2 импульс X иногда снимается в начале
+// прерывания и ставится снова в его конце (конус 45°: шаг X на каждом срабатывании).
+// На Mega между ними несколько микросекунд, STM32 в 10 раз быстрее — драйвер не
+// успел бы заметить паузу. Здесь уровень держится не меньше STEP_PULSE_MIN_US
+// (счётчик тактов ядра DWT); когда пауза и так длиннее, ожидания нет.
+extern uint32_t e2_step_min_cycles;
+extern volatile uint32_t e2_z_edge, e2_x_edge;   // такт последней смены уровня STEP
+static inline uint32_t e2_cycles(void) { return DWT->CYCCNT; }
+static inline void e2_step_hold(volatile uint32_t* edge) {
+    while ((uint32_t)(e2_cycles() - *edge) < e2_step_min_cycles) {}
+    *edge = e2_cycles();
+}
+
+#define Motor_Z_SetPulse()     do { if (E2_ODR(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_CLR(E2_PIN_Z_STEP); } } while (0)
+#define Motor_Z_RemovePulse()  do { if (!E2_ODR(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_SET(E2_PIN_Z_STEP); } } while (0)
+#define Motor_Z_InvertPulse()  do { e2_step_hold(&e2_z_edge); E2_TGL(E2_PIN_Z_STEP); } while (0)
 #define Read_Z_State           E2_ODR(E2_PIN_Z_STEP)
 
-#define Motor_X_SetPulse()     E2_CLR(E2_PIN_X_STEP)
-#define Motor_X_RemovePulse()  E2_SET(E2_PIN_X_STEP)
-#define Motor_X_InvertPulse()  E2_TGL(E2_PIN_X_STEP)
+#define Motor_X_SetPulse()     do { if (E2_ODR(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_CLR(E2_PIN_X_STEP); } } while (0)
+#define Motor_X_RemovePulse()  do { if (!E2_ODR(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_SET(E2_PIN_X_STEP); } } while (0)
+#define Motor_X_InvertPulse()  do { e2_step_hold(&e2_x_edge); E2_TGL(E2_PIN_X_STEP); } while (0)
 #define Read_X_State           E2_ODR(E2_PIN_X_STEP)
 
 #define Motor_Z_CW()           E2_CLR(E2_PIN_Z_DIR)

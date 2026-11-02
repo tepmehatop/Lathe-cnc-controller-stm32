@@ -25,6 +25,23 @@ GPIO_TypeDef g_gpio[5];
 TIM_TypeDef g_tim6, g_tim7, g_tim12;
 HardwareSerial Serial;
 TwoWire Wire;
+DWT_Type g_dwt; CoreDebug_Type g_coredebug;
+static uint64_t t_ns_for_cyc();
+static uint64_t s_cyc_extra = 0;
+uint32_t sim_cyccnt_read() { s_cyc_extra += 4; return (uint32_t)(t_ns_for_cyc() * 168 / 1000 + s_cyc_extra); }
+// Длительности уровней на STEP в тактах ядра (по фактическим записям в регистры)
+struct EdgeLog { uint64_t last = 0; uint64_t min_cyc = ~0ull; long n = 0; };
+static EdgeLog s_ez, s_ex;
+void sim_gpio_changed(GPIO_TypeDef* g, uint32_t o, uint32_t n) {
+    uint64_t c = t_ns_for_cyc() * 168 / 1000 + s_cyc_extra;
+    auto chk = [&](EdgeLog& l, uint32_t bit) {
+        if (((o ^ n) & bit) == 0) return;
+        if (l.last && c - l.last < l.min_cyc) l.min_cyc = c - l.last;
+        l.last = c; l.n++;
+    };
+    if (g == E2_GPIO(E2_PIN_Z_STEP)) chk(s_ez, E2_BIT(E2_PIN_Z_STEP));
+    if (g == E2_GPIO(E2_PIN_X_STEP)) chk(s_ex, E2_BIT(E2_PIN_X_STEP));
+}
 static SimTimer s_timers[3] = {{&g_tim6, 0, nullptr}, {&g_tim7, 0, nullptr}, {&g_tim12, 0, nullptr}};
 SimTimer* sim_timer_slot(TIM_TypeDef* t) { for (auto& s : s_timers) if (s.tim == t) return &s; return nullptr; }
 static void (*s_exti[80])(void);
@@ -40,6 +57,7 @@ static double Thread_Info_Km(int i) { return Thread_Info[i].Km_Div_Z; }
 
 // ── Движок событий (время в нс) ──────────────────────────────────────────────
 static uint64_t t_ns = 0;
+static uint64_t t_ns_for_cyc() { return t_ns; }
 static const uint32_t CNT_SENTINEL = 0xFFFFFFFFu;
 struct TimState { uint64_t t_cnt0; };
 static TimState s_ts[3];
@@ -52,11 +70,20 @@ static long     spindle_lines = 0;    // пройдено линий (со зн�
 static uint64_t loop_next = 0;
 static const uint64_t LOOP_PERIOD_NS = 20000;   // loop() раз в 20 мкс
 static int      in_loop = 0;
+static int      s_cur_ev = -1;
 
 // Фронты STEP
-struct StepLog { long count = 0; uint32_t prev = 1; uint64_t last_edge = 0; uint64_t min_level_ns = ~0ull; };
+struct StepLog { long count = 0; uint32_t prev = 0; uint64_t last_edge = 0; uint64_t min_level_ns = ~0ull; };
 static StepLog s_z, s_x;
 static std::vector<long> s_z_at_rev;   // счётчик шагов Z на каждом обороте шпинделя
+static long spindle_lines_now();
+extern int McStep_Lag;
+struct MoveStart { long line; long x; int dir; };
+static std::vector<MoveStart> s_z_starts;   // начала движений Z (после паузы ≥ 50 мс)
+static uint64_t s_z_last_step = 0;
+struct XTurn { long z; long x; int lag; };
+static std::vector<XTurn> s_x_turns;   // точки, где X сменил направление с «вперёд» на «назад»
+static int s_x_last_dir = -1;
 
 #define PIN_BIT(...) E2_BIT(__VA_ARGS__)
 static void set_in(GPIO_TypeDef* g, uint32_t bit, int level) { if (level) g->IDR |= bit; else g->IDR &= ~bit; }
@@ -72,8 +99,26 @@ static void sample_steps() {
             l.prev = lvl;
         }
     };
+    long before = s_z.count;
     chk(s_z, E2_ODR(E2_PIN_Z_STEP), E2_ODR(E2_PIN_Z_DIR));
+    if (s_z.count != before) {
+        if (t_ns - s_z_last_step > 50000000ull)
+            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_ODR(E2_PIN_Z_DIR)});
+        s_z_last_step = t_ns;
+    }
+    long xb = s_x.count;
     chk(s_x, E2_ODR(E2_PIN_X_STEP), E2_ODR(E2_PIN_X_DIR));
+    static long s_xpos_prev = 0;
+    if (s_x.count != xb && Motor_X_Pos == s_xpos_prev && getenv("SIM_XTRACE"))
+        printf("      X: спад без счёта t=%.6f en5b=%d en2b=%d en4b=%d en5a=%d jz=%d jx=%d stepX=%d\n", t_ns / 1e9, e2_en_t5b, e2_en_t2b, e2_en_t4b, e2_en_t5a, Joy_Z_flag, Joy_X_flag, Step_X_flag);
+    if (s_x.count == xb && Motor_X_Pos != s_xpos_prev && getenv("SIM_XTRACE"))
+        printf("      X: счёт без импульса t=%.6f %ld→%ld in_loop=%d ev=%d en3b=%d en4b=%d pin=%u ARR12=%u\n", t_ns / 1e9, s_xpos_prev, Motor_X_Pos, in_loop, s_cur_ev, e2_en_t3b, e2_en_t4b, (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)TIM12->ARR);
+    s_xpos_prev = Motor_X_Pos;
+    if (s_x.count != xb) {
+        int d = (int)E2_ODR(E2_PIN_X_DIR);
+        if (s_x_last_dir == 0 && d == 1) s_x_turns.push_back({Motor_Z_Pos, Motor_X_Pos, McStep_Lag});
+        s_x_last_dir = d;
+    }
 }
 
 static void check_cnt_resets() {
@@ -90,6 +135,8 @@ static uint64_t tim_next(int i) {
     }
     return n;
 }
+
+static long spindle_lines_now() { return ((spindle_lines % ENC_LINE_PER_REV) + ENC_LINE_PER_REV) % ENC_LINE_PER_REV; }
 
 static void spindle_edge() {
     bool cw = spindle_rpm > 0;
@@ -115,16 +162,21 @@ static void run_until(uint64_t t_end, bool allow_loop) {
         }
         if (spindle_rpm != 0 && spindle_next <= nxt) { nxt = spindle_next; ev = 3; }
         if (allow_loop && loop_next <= nxt) { nxt = loop_next; ev = 4; }
-        if (ev < 0) { t_ns = t_end; sim_now_us = t_ns / 1000; return; }
-        t_ns = nxt; sim_now_us = t_ns / 1000;
+        if (ev < 0) { if (t_end > t_ns) t_ns = t_end; sim_now_us = t_ns / 1000; return; }
+        if (nxt > t_ns) t_ns = nxt;            // событие могло «опоздать» из-за delay() внутри loop()
+        sim_now_us = t_ns / 1000;
+        s_cur_ev = ev;
         if (ev < 3) { s_ts[ev].t_cnt0 = t_ns; s_timers[ev].cb(); }
         else if (ev == 3) {
             spindle_edge();
             double q_ns = 60e9 / (fabs(spindle_rpm) * ENC_LINE_PER_REV * 4);
             spindle_next = t_ns + (uint64_t)q_ns;
         } else {
-            loop_next = t_ns + LOOP_PERIOD_NS;
+            int lag0 = McStep_Lag;
             in_loop++; loop(); in_loop--;
+            loop_next = t_ns + LOOP_PERIOD_NS;
+            if (getenv("SIM_LAG") && McStep_Lag != lag0 && McStep_Lag < 40)
+                printf("      t=%.3f lag=%d Z=%ld X=%ld rear=%ld right=%ld stepZ=%d stepX=%d cyc=%d pass=%ld LP=%ld LPL=%ld OCR5A=%u en5a=%d fz=%d jz=%d dir=%d\n", t_ns / 1e9, McStep_Lag, Motor_Z_Pos, Motor_X_Pos, Limit_Pos_Rear, Limit_Pos_Right, Step_Z_flag, Step_X_flag, cycle_flag, Pass_Nr, (long)Limit_Pos, Limit_Pos_Left, (unsigned)OCR5A, e2_en_t5a, feed_Z_flag, Joy_Z_flag, Motor_Z_Dir);
         }
         check_cnt_resets();
         sample_steps();
@@ -192,7 +244,7 @@ static double steps_per_rev(int n) {
 
 // ============================================================================
 static void test_boot() {
-    printf("[boot] старт, заставка LCD, обмен с дисплеем\n");
+    printf("[%7.1f с] [boot] ", t_ns / 1e9); printf("старт, заставка LCD, обмен с дисплеем\n");
     std::string t = lcd_text();
     CHECK(DISPLAY_UART.out.find("<PING>") != std::string::npos, "нет PING дисплею");
     CHECK(DISPLAY_UART.out.find("<MODE:1>") != std::string::npos, "нет MODE:1 в начальном состоянии");
@@ -201,7 +253,7 @@ static void test_boot() {
 }
 
 static void test_thread(int idx, double pitch_mm, double rpm) {
-    printf("[thread] резьба #%d шаг %.3f мм, %g об/мин\n", idx, pitch_mm, rpm);
+    printf("[%7.1f с] [thread] ", t_ns / 1e9); printf("резьба #%d шаг %.3f мм, %g об/мин\n", idx, pitch_mm, rpm);
     select_mode(3);
     char b[32]; snprintf(b, sizeof b, "THREAD_STEP:%d", idx); touch(b);
     CHECK(Thread_Step == idx, "Thread_Step=%d", Thread_Step);
@@ -225,7 +277,7 @@ static void test_thread(int idx, double pitch_mm, double rpm) {
 
 // Синхронизация заходов: два прохода резьбы должны начинаться с одного угла шпинделя
 static void test_thread_sync() {
-    printf("[thread-sync] повторный проход попадает в ту же нитку\n");
+    printf("[%7.1f с] [thread-sync] ", t_ns / 1e9); printf("повторный проход попадает в ту же нитку\n");
     select_mode(3); touch("THREAD_STEP:13");     // 1.50 мм
     spindle(200); run_ms(200);
     long phase[2];
@@ -246,7 +298,7 @@ static void test_thread_sync() {
 }
 
 static void test_feed(int feed) {
-    printf("[feed] синхронная подача %.2f мм/об\n", feed / 100.0);
+    printf("[%7.1f с] [feed] ", t_ns / 1e9); printf("синхронная подача %.2f мм/об\n", feed / 100.0);
     select_mode(1);
     char b[32]; snprintf(b, sizeof b, "FEED:%d", feed); touch(b);
     CHECK(Feed_mm == feed, "Feed_mm=%d", Feed_mm);
@@ -264,7 +316,7 @@ static void test_feed(int feed) {
 }
 
 static void test_afeed(int afeed) {
-    printf("[afeed] асинхронная подача %d мм/мин\n", afeed);
+    printf("[%7.1f с] [afeed] ", t_ns / 1e9); printf("асинхронная подача %d мм/мин\n", afeed);
     select_mode(2);
     char b[32]; snprintf(b, sizeof b, "AFEED:%d", afeed); touch(b);
     SET_IN(E2_PIN_JOY_LEFT, 0);
@@ -279,7 +331,7 @@ static void test_afeed(int afeed) {
 }
 
 static void test_rapid() {
-    printf("[rapid] ускоренный ход Z с кнопкой\n");
+    printf("[%7.1f с] [rapid] ", t_ns / 1e9); printf("ускоренный ход Z с кнопкой\n");
     select_mode(1);
     spindle(0);
     SET_IN(E2_PIN_JOY_RAPID, 0); SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(1500);
@@ -295,7 +347,7 @@ static void test_rapid() {
 }
 
 static void test_limit() {
-    printf("[limit] упор слева останавливает подачу\n");
+    printf("[%7.1f с] [limit] ", t_ns / 1e9); printf("упор слева останавливает подачу\n");
     select_mode(1); touch("FEED:20");
     long z = Motor_Z_Pos;
     SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(200); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
@@ -319,7 +371,7 @@ static void test_limit() {
 }
 
 static void test_hand() {
-    printf("[hand] РГИ: ось Z, x1, 25 щелчков\n");
+    printf("[%7.1f с] [hand] ", t_ns / 1e9); printf("РГИ: ось Z, x1, 25 щелчков\n");
     select_mode(1);
     SET_IN(E2_PIN_HAND_X1, 0); SET_IN(E2_PIN_HAND_X10, 1); run_ms(100);
     SET_IN(E2_PIN_HAND_AXIS_Z, 0); run_ms(100);
@@ -336,7 +388,7 @@ static void test_hand() {
 }
 
 static void test_modes_touch() {
-    printf("[modes] режимы и подрежимы с дисплея, строка LCD2004\n");
+    printf("[%7.1f с] [modes] ", t_ns / 1e9); printf("режимы и подрежимы с дисплея, строка LCD2004\n");
     controls_neutral(); run_ms(100);
     for (int m = 1; m <= 8; m++) {
         char b[8]; snprintf(b, sizeof b, "M%d", m); touch(b); run_ms(600);
@@ -349,6 +401,211 @@ static void test_modes_touch() {
     CHECK(Sub_Mode_Feed == 2, "S1 без упоров: Sub_Mode_Feed=%d", Sub_Mode_Feed);
     CHECK(lcd_text().find("YCTAHOB") != std::string::npos || DISPLAY_UART.out.rfind("<ALERT:1>") != std::string::npos, "нет предупреждения об упорах");
     touch("S2"); run_ms(100);
+}
+
+// Упоры Z: правый — в текущей точке, левый — на len_ms ускоренного хода левее; суппорт — у правого
+static bool setup_z_limits(double len_ms) {
+    select_mode(1); controls_neutral(); run_ms(100);
+    SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
+    SET_IN(E2_PIN_JOY_RAPID, 0); SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(len_ms); SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
+    SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
+    SET_IN(E2_PIN_JOY_RIGHT, 0); run_ms(len_ms + 3000); SET_IN(E2_PIN_JOY_RIGHT, 1); run_ms(1500);
+    SET_IN(E2_PIN_JOY_RAPID, 1); run_ms(100);
+    return limit_Left_flag && limit_Right_flag && Motor_Z_Pos == Limit_Pos_Right;
+}
+
+static void test_thread_ext_cycle(int idx) {
+    printf("[%7.1f с] [thread-ext] ", t_ns / 1e9); printf("автоцикл «Наружная резьба» #%d (%s)\n", idx, Thread_Info[idx].Thread_Print);
+    bool ok = setup_z_limits(700);
+    CHECK(ok, "упоры: L=%d R=%d Z=%ld упор R=%ld", limit_Left_flag, limit_Right_flag, Motor_Z_Pos, Limit_Pos_Right);
+    long len = Limit_Pos_Left - Limit_Pos_Right;
+    select_mode(3);
+    char b[32]; snprintf(b, sizeof b, "THREAD_STEP:%d", idx); touch(b);
+    SET_IN(E2_PIN_SUB_MAN, 1); SET_IN(E2_PIN_SUB_EXT, 0); run_ms(200);
+    CHECK(Sub_Mode_Thread == 3, "подрежим %d, err1=%d err2=%d", Sub_Mode_Thread, err_1_flag, err_2_flag);
+    long x0 = Motor_X_Pos, z0 = Motor_Z_Pos;
+    spindle(300); run_ms(300);
+    s_z_starts.clear();
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0;
+    while (!Complete_flag && t < 300000) { run_ms(100); t += 100; }
+    bool done = Complete_flag;
+    bool lcd_done = lcd_text().find("O..PA..") != std::string::npos || lcd_text().find("3ABEP") != std::string::npos;
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000);
+    spindle(0); run_ms(100);
+    int expect_passes = Thread_Info[idx].Pass + PASS_FINISH;
+    long first = -1; int passes = 0, bad = 0;
+    for (auto& m : s_z_starts) if (m.dir == 0) {          // DIR = 0 — влево (CW), рабочий ход резьбы
+        passes++;
+        if (first < 0) first = m.line; else if (labs(m.line - first) > 1) bad++;
+    }
+    CHECK(done, "цикл не завершился за %.0f с", t / 1000);
+    CHECK(lcd_done, "на LCD нет «ОПЕРАЦИЯ ЗАВЕРШЕНА»");
+    CHECK(passes == expect_passes, "рабочих проходов %d, ожидалось %d", passes, expect_passes);
+    CHECK(bad == 0, "%d проходов начались не на той линии энкодера", bad);
+    CHECK(Motor_Z_Pos == z0 && Motor_X_Pos == x0, "суппорт не вернулся: Z %ld→%ld, X %ld→%ld", z0, Motor_Z_Pos, x0, Motor_X_Pos);
+    printf("    длина %.2f мм, проходов %d (ожидалось %d), все с линии %ld, время %.1f с\n",
+           len * (SCREW_Z / 100.0) / (MOTOR_Z_STEP_PER_REV * McSTEP_Z), passes, expect_passes, first, t / 1000);
+    // выход из цикла: подрежим «Ручной», снять упоры
+    SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK");
+    select_mode(1);
+    SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
+    SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
+}
+
+static void test_feed_ext_cycle() {
+    printf("[%7.1f с] [feed-ext] ", t_ns / 1e9); printf("автоцикл «Наружная подача»: 3 прохода по 0.20 мм на диаметр\n");
+    bool ok = setup_z_limits(600);
+    CHECK(ok, "упоры не установлены");
+    select_mode(1); touch("FEED:20"); touch("AP:20");
+    SET_IN(E2_PIN_SUB_MAN, 1); SET_IN(E2_PIN_SUB_EXT, 0); run_ms(200);
+    CHECK(Sub_Mode_Feed == 3, "подрежим %d", Sub_Mode_Feed);
+    Pass_Total = 3; Pass_Nr = 1;                      // число проходов (на пульте — кнопками)
+    long x0 = Motor_X_Pos, z0 = Motor_Z_Pos;
+    spindle(600); run_ms(200);
+    s_z_starts.clear();
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0;
+    while (!Complete_flag && t < 120000) { run_ms(100); t += 100; }
+    bool done = Complete_flag;
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000);
+    spindle(0); run_ms(100);
+    long infeed = (int)((float)MOTOR_X_STEP_PER_REV * (20 / 2) / SCREW_X + 0.5) * McSTEP_X;
+    std::vector<long> xs;
+    for (auto& m : s_z_starts) if (m.dir == 0) xs.push_back(m.x - x0);
+    CHECK(done, "цикл не завершился");
+    CHECK(xs.size() == 3, "рабочих проходов %zu", xs.size());
+    for (size_t i = 0; i < xs.size(); i++)
+        CHECK(xs[i] == (long)(i + 1) * infeed, "проход %zu: X %+ld, ожидалось %+ld", i + 1, xs[i], (long)(i + 1) * infeed);
+    CHECK(Motor_Z_Pos == z0, "Z не вернулся: %ld vs %ld", Motor_Z_Pos, z0);
+    printf("    проходов %zu, X на проходах:", xs.size()); for (long v : xs) printf(" %+ld", v);
+    printf(" шагов (по %ld), %.1f с, X в конце %+ld\n", infeed, t / 1000, Motor_X_Pos - x0);
+    SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK");
+    SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
+    SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
+}
+
+// Ось X: подача на себя/от себя и ускоренный ход
+static void test_x_axis() {
+    printf("[%7.1f с] [x-axis] ", t_ns / 1e9); printf("подача X (джойстик вверх/вниз)\n");
+    select_mode(1); touch("FEED:10");
+    spindle(600); run_ms(200);
+    long x0 = Motor_X_Pos, p0 = s_x.count;
+    if (getenv("SIM_DEBUG")) printf("      старт: пин X=%u, dir=%u\n", (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)E2_ODR(E2_PIN_X_DIR));
+    SET_IN(E2_PIN_JOY_UP, 0); run_ms(4000); SET_IN(E2_PIN_JOY_UP, 1); run_ms(800);
+    if (getenv("SIM_DEBUG")) printf("      конец: пин X=%u, по выводу %ld, по счётчику %ld\n", (unsigned)E2_ODR(E2_PIN_X_STEP), s_x.count - p0, Motor_X_Pos - x0);
+    long dx = Motor_X_Pos - x0;
+    CHECK(dx != 0, "X не двигался");
+    // при отпускании джойстика 7e2 округляет позицию до целого шага (±McSTEP/2)
+    CHECK(labs(labs(s_x.count - p0) - labs(dx)) <= McSTEP_X / 2, "по выводу %ld, по счётчику %ld", s_x.count - p0, dx);
+    double per_rev = fabs((double)dx) / (4.0 * 600 / 60);
+    printf("    X %+ld шагов за 4 с (%.1f шаг/об)\n", dx, per_rev);
+    long x1 = Motor_X_Pos;
+    SET_IN(E2_PIN_JOY_DOWN, 0); run_ms(4000); SET_IN(E2_PIN_JOY_DOWN, 1); run_ms(800);
+    CHECK((Motor_X_Pos - x1) * dx < 0, "X вниз не поехал обратно");
+    spindle(0); run_ms(50);
+}
+
+// Резьба при вращении шпинделя против часовой (левая резьба/обратный ход)
+static void test_thread_ccw() {
+    printf("[%7.1f с] [thread-ccw] ", t_ns / 1e9); printf("резьба 1.00 мм, шпиндель против часовой\n");
+    select_mode(3); touch("THREAD_STEP:11");
+    spindle(-300); run_ms(300);
+    s_z_at_rev.clear();
+    long z0 = s_z.count;
+    SET_IN(E2_PIN_JOY_RIGHT, 0); run_ms(60000.0 / 300 * 8);
+    long dz = s_z.count - z0;
+    SET_IN(E2_PIN_JOY_RIGHT, 1); run_ms(500);
+    double revs = 8.0;
+    printf("    шагов %ld за ~%.0f об (%.1f шаг/об)\n", dz, revs, fabs((double)dz) / revs);
+    CHECK(dz != 0, "мотор Z не двигался");
+    spindle(0); run_ms(50);
+}
+
+static void test_hand_x10_x() {
+    printf("[%7.1f с] [hand-x10] ", t_ns / 1e9); printf("РГИ: ось X, x10, 10 щелчков\n");
+    select_mode(1);
+    SET_IN(E2_PIN_HAND_X1, 1); SET_IN(E2_PIN_HAND_X10, 0); run_ms(100);
+    SET_IN(E2_PIN_HAND_AXIS_X, 0); run_ms(100);
+    long x0 = Motor_X_Pos;
+    hand_turn(10, 40); run_ms(3000);
+    long dx = Motor_X_Pos - x0;
+    long expect = 10L * HC_SCALE_10 * MOTOR_X_STEP_PER_REV / 2 * McSTEP_X / SCREW_X;
+    CHECK(labs(dx) == expect, "РГИ X: %ld шагов, ожидалось ±%ld", dx, expect);
+    printf("    X %+ld шагов (ожидалось ±%ld: 10 щелчков × 0.1 мм на диаметр)\n", dx, expect);
+    hand_turn(-10, 40); run_ms(3000);
+    CHECK(Motor_X_Pos == x0, "РГИ X не вернул: %ld vs %ld", Motor_X_Pos, x0);
+    SET_IN(E2_PIN_HAND_AXIS_X, 1); SET_IN(E2_PIN_HAND_X10, 1); run_ms(100);
+}
+
+static void test_divider() {
+    printf("[%7.1f с] [divider] ", t_ns / 1e9); printf("делилка: угол шпинделя на дисплей\n");
+    select_mode(7);
+    touch("DIVN:6"); touch("DIVM:2");
+    spindle(30); run_ms(1000); spindle(0); run_ms(300);
+    char want[32]; snprintf(want, sizeof want, "<ANGLE:%lu>", (unsigned long)Spindle_Angle);
+    CHECK(DISPLAY_UART.out.rfind(want) != std::string::npos, "нет %s", want);
+    long expect_mdeg = (long)Enc_Pos * 360000L / ENC_TICK;
+    CHECK((long)Spindle_Angle == expect_mdeg, "угол %lu, Enc_Pos %d", (unsigned long)Spindle_Angle, Enc_Pos);
+    CHECK(Required_Angle == 60000, "требуемый угол %lu (ожидалось 60000 = 60°)", (unsigned long)Required_Angle);
+    printf("    угол %.3f°, метка 2 из 6 → %.1f°\n", Spindle_Angle / 1000.0, Required_Angle / 1000.0);
+}
+
+// Конус: X (на радиус) ведомая от Z; уклон = 1 / (Cs + Cm/10000) для механики 7e2 (винты 2 и 1 мм)
+static void test_cone(int idx, double slope) {
+    printf("[%7.1f с] [cone] ", t_ns / 1e9); printf("конус #%d (%s), ожидаемый уклон %.4f\n", idx, Cone_Info[idx].Cone_Print, slope);
+    select_mode(4);
+    char b[24]; snprintf(b, sizeof b, "CONE:%d", idx); touch(b);
+    touch("FEED:20");
+    spindle(600); run_ms(200);
+    long z0 = Motor_Z_Pos, x0 = Motor_X_Pos;
+    SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(5000); SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
+    double dz_mm = (Motor_Z_Pos - z0) * (SCREW_Z / 100.0) / (MOTOR_Z_STEP_PER_REV * McSTEP_Z);
+    double dx_mm = (Motor_X_Pos - x0) * (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
+    double k = fabs(dx_mm / dz_mm);
+    double x_step_mm = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
+    CHECK(fabs(fabs(dx_mm) - slope * fabs(dz_mm)) <= 4 * x_step_mm, "уклон %.4f, ожидалось %.4f (X %.4f мм вместо %.4f)", k, slope, fabs(dx_mm), slope * fabs(dz_mm));
+    printf("    Z %.3f мм, X %.3f мм (радиус), уклон %.4f\n", dz_mm, dx_mm, k);
+    spindle(0); run_ms(50);
+}
+
+static void test_sphere() {
+    printf("[%7.1f с] [sphere] ", t_ns / 1e9); printf("шар R=5 мм, ножка 0, резец 2 мм, шаг 0.5 мм\n");
+    select_mode(6); controls_neutral(); run_ms(100);
+    touch("SPHERE:500"); touch("BAR:0");
+    // упоры: правый (Z) и задний (X) — в текущей точке
+    SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
+    SET_IN(E2_PIN_LIM_REAR, 0); run_ms(150); SET_IN(E2_PIN_LIM_REAR, 1); run_ms(100);
+    CHECK(limit_Right_flag && limit_Rear_flag, "упоры R=%d B=%d", limit_Right_flag, limit_Rear_flag);
+    SET_IN(E2_PIN_SUB_MAN, 1); SET_IN(E2_PIN_SUB_EXT, 0); run_ms(200);
+    CHECK(Sub_Mode_Sphere == 3, "подрежим шара %d (err1=%d err2=%d)", Sub_Mode_Sphere, err_1_flag, err_2_flag);
+    long z0 = Motor_Z_Pos, x0 = Motor_X_Pos;
+    spindle(600); run_ms(200);
+    s_x_turns.clear(); s_x_last_dir = -1;
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0;
+    while (!Complete_flag && t < 300000) { run_ms(100); t += 100; }
+    bool done = Complete_flag;
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000);
+    spindle(0); run_ms(100);
+    CHECK(done, "шар не завершён за %.0f с", t / 1000);
+    CHECK((long)s_x_turns.size() == Pass_Total_Sphr + 1, "врезаний X %zu, ожидалось %ld", s_x_turns.size(), Pass_Total_Sphr + 1);
+    // Глубина врезания до экватора: R − √(R² − (R − w·n)²) (на радиус)
+    double R = 5.0, w = Cutting_Width / 100.0, worst = 0;
+    double xs = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
+    for (size_t n = 1; n <= s_x_turns.size() && n <= (size_t)Pass_Total_Sphr / 2; n++) {
+        double depth = (s_x_turns[n - 1].x - x0) * xs;
+        // + авторская поправка на набегающие микрошаги: McStep_Lag − Excess_Lag шагов
+        double expect = R - sqrt(R * R - (R - w * n) * (R - w * n)) + (s_x_turns[n - 1].lag - Excess_Lag) * xs;
+        worst = std::max(worst, fabs(depth - expect));
+        if (getenv("SIM_DEBUG")) printf("      n=%zu lag=%d z=%+.3f depth=%.4f expect=%.4f\n", n, s_x_turns[n - 1].lag, (s_x_turns[n - 1].z - z0) * (SCREW_Z / 100.0) / (MOTOR_Z_STEP_PER_REV * McSTEP_Z), depth, expect);
+    }
+    CHECK(worst <= 2 * xs, "отклонение профиля %.4f мм", worst);
+    printf("    врезаний %zu, отклонение профиля до экватора ≤ %.3f мм, %.1f с\n", s_x_turns.size(), worst, t / 1000);
+    SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK");
 }
 
 int main() {
@@ -373,6 +630,21 @@ int main() {
     test_rapid();
     test_hand();
     test_limit();
+    test_thread_ext_cycle(13);
+    test_feed_ext_cycle();
+    test_x_axis();
+    test_thread_ccw();
+    test_hand_x10_x();
+    test_divider();
+    test_cone(0, 1.0);                     // 45°
+    test_cone(1, tan(30 * M_PI / 180));    // 30°
+    test_cone(55, 1.0 / 20);               // 1:10 (на диаметр)
+    test_cone(45, 1.0 / 2 / 19.212);       // KM0 (Морзе 0: 1:19.212)
+    test_sphere();
+    printf("[step] минимальная длительность уровня STEP: Z %.2f мкс (%ld фронтов), X %.2f мкс (%ld фронтов)\n",
+           s_ez.min_cyc / 168.0, s_ez.n, s_ex.min_cyc / 168.0, s_ex.n);
+    CHECK(s_ez.min_cyc >= (uint64_t)STEP_PULSE_MIN_US * 168 && s_ex.min_cyc >= (uint64_t)STEP_PULSE_MIN_US * 168,
+          "импульс STEP короче %d мкс", STEP_PULSE_MIN_US);
     printf("\nLCD:\n%s", lcd_text().c_str());
     printf("\nИТОГ: %d проверок OK, %d FAIL\n", s_pass, s_fail);
     return s_fail ? 1 : 0;
