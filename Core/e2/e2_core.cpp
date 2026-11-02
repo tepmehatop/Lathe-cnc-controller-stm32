@@ -1800,6 +1800,13 @@ void e2_service(void)
       s_rpm_t = now;
       Display_Send_Int("RPM", rpm);
    }
+   // Число заходов шара Sphere() пересчитывает от диаметра и ширины резца, а UartDisplay
+   // отправлял его только при смене прохода — дисплей показывал устаревшее значение
+   static long s_sphr = -1;
+   if (Pass_Total_Sphr != s_sphr) {
+      s_sphr = Pass_Total_Sphr;
+      Display_Send_Int("PASS_SPHR", Pass_Total_Sphr);
+   }
    if (now - s_lcd_t >= 500) {
       s_lcd_t = now;
       // <LCD2004:mode,sub,sm,feed,afeed,ap,pass_nr,pass_total,ph,pass_fin,thr,tooth_n,tooth_c>, режим и подрежим с 0

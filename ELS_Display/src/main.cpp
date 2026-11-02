@@ -2561,7 +2561,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);  // read-only: dim blue
             // row3: СЪЁМ (Ap) — редактируемый (жёлтое название)
             lv_label_set_text(g_ui.row3_title,
-                "\xD0\xA1\xD0\xAA\xD0\x81\xD0\x9C");                            // СЪЁМ
+                mode == MODE_AFEED ? "\xD0\xA1\xD0\xAA\xD0\x81\xD0\x9C \xD0\xA0\xD0\x90\xD0\x94" : "\xD0\xA1\xD0\xAA\xD0\x81\xD0\x9C \xD0\x94\xD0\x98\xD0\x90\xD0\x9C");                            // СЪЁМ РАД (M2, LCD «Съём R») / СЪЁМ ДИАМ (M1, «Съём Ø»)
             lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0xffaa44), 0);
             // row4: ПРОХОДЫ — read-only (синий)
             lv_label_set_text(g_ui.row4_title,
@@ -2627,7 +2627,7 @@ static void apply_mode_layout(LatheMode mode)
             if (g_ui.thr_type_box) {
                 lv_obj_clear_flag(g_ui.thr_type_box, LV_OBJ_FLAG_HIDDEN);
                 lv_label_set_text(g_ui.thr_type_title,
-                    "\xD0\xA1\xD0\xAA\xD0\x81\xD0\x9C");                         // СЪЁМ
+                    "\xD0\xA1\xD0\xAA\xD0\x81\xD0\x9C \xD0\x94\xD0\x98\xD0\x90\xD0\x9C");                         // СЪЁМ ДИАМ (LCD «Съём Ø»)
                 lv_obj_set_style_text_color(g_ui.thr_type_title, lv_color_hex(0xffaa44), 0);
                 lv_obj_set_style_border_color(g_ui.thr_type_box, lv_color_hex(0xffaa44), 0);
             }
@@ -3940,6 +3940,23 @@ static void update_thread_type_indicators(const char* label)
     }
 }
 
+// Раскладка режима + подэкран SM. Сначала всегда раскладка режима: подэкраны меняют
+// часть подписей (например «УГОЛ °» в M2 SM2), и без сброса они оставались на SM3.
+static void apply_sm_layout(LatheMode mode, uint8_t sm)
+{
+    apply_mode_layout(mode);
+    if (sm == 2) {
+        if (mode == MODE_AFEED)  apply_afeed_sm2_layout();
+        else if (mode == MODE_FEED)   apply_feed_sm2_layout();
+        else if (mode == MODE_THREAD) apply_thread_sm2_layout();
+        else if (mode == MODE_CONE_L || mode == MODE_CONE_R) apply_cone_sm2_layout();
+        else if (mode == MODE_SPHERE) apply_sphere_sm2_layout();
+    } else if (sm == 3) {
+        if (mode == MODE_FEED) apply_feed_sm3_layout();
+        else if (mode != MODE_DIVIDER) apply_common_sm3_layout();
+    }
+}
+
 static void update_ui_values(const LatheData& data)
 {
     if (!g_ui.primary_val) return;  // UI не инициализирован
@@ -3951,35 +3968,11 @@ static void update_ui_values(const LatheData& data)
         s_last_mode = data.mode;
         s_last_select_menu = data.select_menu;
         if (g_alert.active) dismiss_alert();  // Сбросить алерт при смене режима
-        apply_mode_layout(data.mode);
-        // При смене режима применить SM-подэкран если нужно
-        if (data.select_menu == 2) {
-            if (data.mode == MODE_AFEED)  apply_afeed_sm2_layout();
-            else if (data.mode == MODE_FEED)   apply_feed_sm2_layout();
-            else if (data.mode == MODE_THREAD) apply_thread_sm2_layout();
-            else if (data.mode == MODE_CONE_L || data.mode == MODE_CONE_R) apply_cone_sm2_layout();
-            else if (data.mode == MODE_SPHERE) apply_sphere_sm2_layout();
-        } else if (data.select_menu == 3) {
-            if (data.mode == MODE_FEED) apply_feed_sm3_layout();
-            else if (data.mode != MODE_DIVIDER) apply_common_sm3_layout();
-        }
+        apply_sm_layout(data.mode, data.select_menu);
     } else if (data.select_menu != s_last_select_menu) {
         s_last_select_menu = data.select_menu;
         // SM изменился внутри текущего режима
-        if (data.select_menu == 1) {
-            apply_mode_layout(data.mode);  // Восстановить нормальный layout
-        } else if (data.select_menu == 2) {
-            if (data.mode == MODE_AFEED)  apply_afeed_sm2_layout();
-            else if (data.mode == MODE_FEED)   apply_feed_sm2_layout();
-            else if (data.mode == MODE_THREAD) apply_thread_sm2_layout();
-            else if (data.mode == MODE_CONE_L || data.mode == MODE_CONE_R) apply_cone_sm2_layout();
-            else if (data.mode == MODE_SPHERE) apply_sphere_sm2_layout();
-            else apply_mode_layout(data.mode);
-        } else if (data.select_menu == 3) {
-            if (data.mode == MODE_FEED) apply_feed_sm3_layout();
-            else if (data.mode != MODE_DIVIDER) apply_common_sm3_layout();
-            else apply_mode_layout(data.mode);
-        }
+        apply_sm_layout(data.mode, data.select_menu);
     }
 
     // ── Statusbar: режим, подрежим и лимиты ─────────────────────────────────
@@ -4145,9 +4138,10 @@ static void update_ui_values(const LatheData& data)
                 lv_label_set_text(g_ui.row4_val, buf);
                 break;
             case MODE_SPHERE:
-                // M6: ЗАХОДОВ — total/pass_nr (как M1/M2); total = Pass_Total_Sphr + 2
+                // M6: ЗАХОДОВ — total/pass_nr (как M1/M2); total = Pass_Total_Sphr + 1
+                // (Sphere.ino идёт, пока Pass_Nr <= Pass_Total_Sphr + 1; LCD2004 — остаток total+1-nr)
                 if (data.pass_total_sphr > 0) {
-                    int sphr_total = (int)data.pass_total_sphr + 2;
+                    int sphr_total = (int)data.pass_total_sphr + 1;
                     snprintf(buf, sizeof(buf), "#00ff88 %d#/#ffcc00 %d#",
                              sphr_total, (int)data.pass_nr);
                 } else {
@@ -4452,9 +4446,16 @@ static void update_ui_values(const LatheData& data)
                 lv_obj_set_style_text_color(g_ui.row3_val,
                     data.pos_z >= 0 ? lv_color_hex(0x00ff88) : lv_color_hex(0xff5555), 0);
             } else if (data.select_menu == 2) {
-                // M4/M5 SM=2: "---"
-                lv_label_set_text(g_ui.row3_val, "---");
-                lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(0x555555), 0);
+                // M4/M5 SM=2: при включённой конической резьбе — подсказка LCD2004 «В режиме резьба»
+                if (data.cone_thr) {
+                    lv_label_set_text(g_ui.row3_title, "\xD0\x92 \xD0\xA0\xD0\x95\xD0\x96\xD0\x98\xD0\x9C\xD0\x95");  // В РЕЖИМЕ
+                    lv_label_set_text(g_ui.row3_val, "\xD0\xA0\xD0\x95\xD0\x97\xD0\xAC\xD0\x91\xD0\x90");                // РЕЗЬБА
+                    lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(0xffcc00), 0);
+                } else {
+                    lv_label_set_text(g_ui.row3_title, "");
+                    lv_label_set_text(g_ui.row3_val, "---");
+                    lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(0x555555), 0);
+                }
             } else if (!(g_sub_edit.active && g_sub_edit.row == 2)) {
                 // M4/M5 SM=1: КОНУС (тип конуса, пропустить если редактируется)
                 int idx = constrain((int)data.cone_idx, 0, CONE_COUNT - 1);
@@ -5076,6 +5077,7 @@ static void ui_dump()
         {"row3_title", g_ui.row3_title}, {"row3_val", g_ui.row3_val},
         {"row4_title", g_ui.row4_title}, {"row4_val", g_ui.row4_val},
         {"thr_type_title", g_ui.thr_type_title}, {"thr_type_val", g_ui.thr_type_val},
+        {"diam_title", g_ui.diam_unit}, {"diam_val", g_ui.diam_val},
         {"sm_row6", g_ui.sm_row6}, {"s2_lbl", g_ui.s2_lbl}, {"alert_msg", g_ui.alert_msg},
     };
     Serial.print("[UI]");
@@ -5104,6 +5106,7 @@ static void ui_dump()
     if (g_ui.pwr_bg)
         Serial.printf(" pwr_bg=%06X",
                       (unsigned)(lv_color_to32(lv_obj_get_style_bg_color(g_ui.pwr_bg, 0)) & 0xFFFFFF));
+    Serial.printf(" diam_box=%d", !hidden(g_ui.diam_box));
     if (g_ui.row1_val) Serial.printf(" row1_color=%06X", color(g_ui.row1_val, 0));
     if (g_ui.row2_val) Serial.printf(" row2_color=%06X", color(g_ui.row2_val, 0));
     Serial.println();
