@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Электронная гитара на STM32 — сборка и подключение</title>
+<style>
+:root {
+  --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1f23; --muted: #5d636d; --line: #dcd8cf;
+  --accent: #1d70b8; --warn-bg: #fff4e0; --warn-line: #e3a33b; --ok-bg: #eaf6ea; --ok-line: #6a994e;
+  --code-bg: #f1eee8; --img-bg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16181c; --panel: #1f2228; --ink: #e8e6e1; --muted: #a3a8b0; --line: #343840;
+    --accent: #6cb0ff; --warn-bg: #3a2d14; --warn-line: #b8862b; --ok-bg: #1d3220; --ok-line: #6a994e;
+    --code-bg: #2a2e35; --img-bg: #ffffff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16181c; --panel: #1f2228; --ink: #e8e6e1; --muted: #a3a8b0; --line: #343840;
+  --accent: #6cb0ff; --warn-bg: #3a2d14; --warn-line: #b8862b; --ok-bg: #1d3220; --ok-line: #6a994e;
+  --code-bg: #2a2e35; --img-bg: #ffffff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+.wrap { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1280px; margin: 0 auto; }
+nav { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; padding: 28px 18px; border-right: 1px solid var(--line); font-size: 15px; }
+nav a { display: block; color: var(--muted); text-decoration: none; padding: 4px 0; }
+nav a:hover { color: var(--accent); }
+nav .brand { color: var(--ink); font-weight: 700; margin-bottom: 12px; display: block; }
+main { padding: 28px 40px 80px; min-width: 0; overflow-wrap: break-word; }
+h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 25px; margin: 56px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+h3 { font-size: 19px; margin: 28px 0 8px; }
+p, li { max-width: 820px; }
+a { color: var(--accent); }
+.lead { color: var(--muted); font-size: 18px; max-width: 820px; }
+.fig { background: var(--img-bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin: 14px 0 6px; }
+.fig img { display: block; width: 100%; height: auto; }
+.cap { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+.box { border-left: 4px solid var(--accent); background: var(--panel); padding: 12px 16px; border-radius: 6px; margin: 16px 0; max-width: 860px; }
+.warn { border-left-color: var(--warn-line); background: var(--warn-bg); }
+.ok { border-left-color: var(--ok-line); background: var(--ok-bg); }
+code, pre { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; max-width: 860px; }
+table { border-collapse: collapse; width: 100%; max-width: 960px; font-size: 15px; margin: 12px 0; }
+th, td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; vertical-align: top; }
+th { background: var(--panel); }
+.tbl { overflow-x: auto; }
+ol.steps > li { margin-bottom: 10px; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 10px; background: var(--code-bg); color: var(--muted); }
+.theme { position: fixed; right: 14px; top: 10px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+@media (max-width: 900px) {
+  .wrap { display: block; }
+  table { display: block; overflow-x: auto; }
+  code { overflow-wrap: anywhere; }
+  .theme { top: auto; bottom: 12px; }
+  nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; columns: 2; }
+  main { padding: 18px 16px 60px; }
+  h1 { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+<button class="theme" onclick="var r=document.documentElement;r.dataset.theme=(r.dataset.theme==='dark'||(!r.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark'">тема</button>
+<div class="wrap">
+<nav>
+  <span class="brand">Гитара на STM32</span>
+  <a href="#what">1. Что это</a>
+  <a href="#buy">2. Что купить</a>
+  <a href="#flash">3. Что куда прошить</a>
+  <a href="#config">4. Настройка под свой станок</a>
+  <a href="#pinout">5. Какой провод куда</a>
+  <a href="#blocks">6. Схемы по блокам</a>
+  <a href="#bench">7. Сборка на макетке без шилда</a>
+  <a href="#emulator">8. Стенд без станка (эмулятор)</a>
+  <a href="#scales">9. Линейки</a>
+  <a href="#displays">10. Дисплеи</a>
+  <a href="#shield">11. Шилд (плата)</a>
+  <a href="#trouble">12. Если не работает</a>
+</nav>
+<main>
+<h1>Электронная гитара на STM32: сборка и подключение</h1>
+<p class="lead">Пошаговое руководство: что купить, что куда прошить, какой провод куда подключить и как проверить, что всё работает. Знания электроники не нужны — достаточно уметь паять и держать отвёртку.</p>
+<p class="lead">Логика станка — прошивка «7e2» автора с форума chipmaker.ru, перенесённая с Arduino Mega на плату STM32F4DISCOVERY без изменений в расчётах. Добавлены сенсорный дисплей и подключение цифровых линеек.</p>
+
+<h2 id="what">1. Что это и из чего состоит</h2>
+<div class="fig"><img src="wiring/overview.svg" alt="Общая схема системы"></div>
+<p>Плата STM32 — «мозг»: смотрит на энкодер шпинделя и крутит моторы ходовых винтов так, чтобы получилась нужная резьба, подача или конус. Всё остальное — органы управления и показаний:</p>
+<ul>
+  <li><b>Сенсорный дисплей</b> — показывает режим, координаты, обороты; на нём же кнопки. Два варианта: 4.3" и 10.1".</li>
+  <li><b>Пульт</b> — как у оригинальной 7e2: переключатель режимов, переключатель подрежимов, 5 кнопок меню, джойстик с кнопкой ускоренного хода, 4 кнопки упоров со светодиодами, РГИ (маховичок), запасной текстовый экран LCD2004.</li>
+  <li><b>Координаты</b> — от блока DRO HS800-2 или от линеек напрямую. Можно и без них: тогда положение считается по шагам моторов.</li>
+  <li><b>Энкодер шпинделя</b>, <b>драйверы и моторы</b> осей Z (каретка) и X (суппорт), <b>питание</b>.</li>
+</ul>
+<div class="box">Физические кнопки пульта и кнопки на экране работают одинаково — можно пользоваться и тем, и другим.</div>
+
+<h2 id="buy">2. Что купить</h2>
+<h3>Обязательно</h3>
+<table>
+<tr><th>Что</th><th>Сколько</th><th>Зачем</th></tr>
+<tr><td>Плата STM32F4DISCOVERY (STM32F407VG, MB997)</td><td>1</td><td>основной контроллер</td></tr>
+<tr><td>Кабель mini-USB</td><td>1</td><td>прошивка и питание платы на столе</td></tr>
+<tr><td>Сенсорный дисплей JC4827W543 (4.3") или JC8012P4A1C (10.1")</td><td>1</td><td>экран и кнопки</td></tr>
+<tr><td>Резисторы 1 кОм (0.25 Вт)</td><td>~40</td><td>подтяжки кнопок и переключателей, база транзисторов</td></tr>
+<tr><td>Резисторы 10 кОм</td><td>~8</td><td>транзисторные ключи</td></tr>
+<tr><td>Резисторы 220 Ом</td><td>4</td><td>светодиоды упоров</td></tr>
+<tr><td>Транзисторы BC547 или 2N2222 (NPN)</td><td>7</td><td>6 сигналов драйверов + зуммер</td></tr>
+<tr><td>Конденсаторы 10 нФ и 1 нФ</td><td>по 2</td><td>помехи на линиях РГИ и энкодера</td></tr>
+<tr><td>Блок питания 5 В 2 А</td><td>1</td><td>плата, пульт, LCD</td></tr>
+</table>
+<h3>Пульт (как у оригинальной 7e2)</h3>
+<p>Галетный переключатель на 8 положений (режимы), переключатель на 3 положения (подрежимы), 5 кнопок меню, джойстик на 4 направления + кнопка ускоренного хода, 4 кнопки упоров и 4 светодиода, маховичок-РГИ на 100 линий с переключателем оси (Z — выкл — X) и масштаба (×1/×10), активный зуммер 5 В, по желанию — LCD2004 с I2C-модулем и переменный резистор 10 кОм для подачи.</p>
+<h3>Для проверки на столе (по желанию)</h3>
+<p>Макетная плата, провода «папа–мама», Arduino Mega 2560 — она изображает блок DRO и линейки, если станка рядом нет (раздел 8). USB-UART переходник (CP2102/CH340) — читать сообщения платы.</p>
+
+<h2 id="flash">3. Что куда прошить</h2>
+<p>Нужен компьютер с <b>VS Code</b> и расширением <b>PlatformIO</b>. Откройте папку проекта — PlatformIO сам скачает всё нужное.</p>
+<table>
+<tr><th>Устройство</th><th>Как подключить к компьютеру</th><th>Команда (или кнопка в PlatformIO)</th></tr>
+<tr><td>Плата STM32 (контроллер)</td><td>mini-USB в разъём ST-Link (вверху платы)</td><td><code>pio run -e stm32f407_discovery -t upload</code></td></tr>
+<tr><td>Дисплей 4.3" JC4827W543</td><td>USB-C дисплея</td><td><code>pio run -e jc4827w543 -t upload</code></td></tr>
+<tr><td>Дисплей 10.1" JC8012P4A1C</td><td>USB-C дисплея</td><td><code>pio run -e jc8012p4a1c -t upload</code></td></tr>
+<tr><td>Arduino Mega — эмулятор (по желанию)</td><td>USB Mega</td><td>в папке <code>Simulator/dro_simulator</code>: <code>pio run -t upload</code></td></tr>
+</table>
+<div class="box warn">Перед прошивкой STM32 выберите в <code>Core/els_config.h</code> свой дисплей и источник координат (раздел 4). Если тип дисплея в настройках и реально подключённый не совпадут — на экране появится предупреждение.</div>
+
+<h2 id="config">4. Настройка под свой станок</h2>
+<p>Все настройки — в одном файле <code>Core/els_config.h</code>. Пины (какой провод куда) — в <code>Core/e2/e2_pins.h</code>, менять их обычно не нужно. Главное:</p>
+<div class="tbl"><table>
+<tr><th>Параметр</th><th>По умолчанию</th><th>Что это простыми словами</th></tr>
+<tr><td><code>ELS_POS_SOURCE</code></td><td>DRO_UART</td><td>откуда брать координаты: блок DRO (<code>POS_SOURCE_DRO_UART</code>), линейки напрямую (<code>POS_SOURCE_SCALES</code>) или шаги моторов (<code>POS_SOURCE_STEPS</code>)</td></tr>
+<tr><td><code>ELS_DISPLAY_TYPE</code></td><td>10.1"</td><td>какой сенсорный дисплей: <code>DISPLAY_TYPE_4_3</code>, <code>DISPLAY_TYPE_10_1</code> или <code>DISPLAY_TYPE_NONE</code></td></tr>
+<tr><td><code>ENC_LINE_PER_REV</code></td><td>1800</td><td>сколько линий у энкодера шпинделя на оборот</td></tr>
+<tr><td><code>MOTOR_Z_STEP_PER_REV</code>, <code>McSTEP_Z</code></td><td>200, 4</td><td>шагов мотора каретки на оборот и микрошаг на драйвере (200 × 4 = 800)</td></tr>
+<tr><td><code>SCREW_Z</code></td><td>200</td><td>шаг ходового винта каретки в сотках мм (200 = 2 мм)</td></tr>
+<tr><td><code>MOTOR_X_STEP_PER_REV</code>, <code>McSTEP_X</code>, <code>SCREW_X</code></td><td>200, 4, 100</td><td>то же для поперечной подачи (винт 1 мм)</td></tr>
+<tr><td><code>MIN_FEED</code>, <code>MAX_FEED</code></td><td>1, 25</td><td>диапазон синхронной подачи, сотки мм на оборот (0.01–0.25)</td></tr>
+<tr><td><code>MIN_aFEED</code>, <code>MAX_aFEED</code></td><td>10, 400</td><td>диапазон асинхронной подачи, мм/мин</td></tr>
+<tr><td><code>REBOUND_X</code>, <code>REBOUND_Z</code></td><td>200, 200</td><td>отскок резца в автоциклах, микрошаги (больше люфта винта)</td></tr>
+<tr><td><code>PASS_FINISH</code></td><td>2</td><td>чистовых проходов после резьбы</td></tr>
+<tr><td><code>HC_X_DIR</code>, <code>HC_Z_DIR</code></td><td>1, 0</td><td>направление вращения маховичка РГИ для каждой оси</td></tr>
+<tr><td><code>DRIVER_SIGNALS_DIRECT</code></td><td>0</td><td>как подключены драйверы: через транзисторы (0, как на схеме) или напрямую (1)</td></tr>
+<tr><td><code>STEP_PULSE_MIN_US</code></td><td>3</td><td>минимальная длина импульса шага, мкс (из паспорта драйвера)</td></tr>
+<tr><td><code>BEEPER_ON_LEVEL</code></td><td>1</td><td>зуммер через транзистор (1) или напрямую (0)</td></tr>
+<tr><td><code>USE_FEED_POT</code></td><td>0</td><td>есть ли ручка-переменник подачи на пульте</td></tr>
+<tr><td><code>IO_MONITOR</code></td><td>1</td><td>писать в отладочный порт каждое нажатие и поворот — для проверки проводки</td></tr>
+</table></div>
+<div class="box warn"><b>Таблицы резьб и конусов</b> автора рассчитаны под энкодер 1800 линий, винт Z 2 мм, винт X 1 мм и 800 шагов на оборот. Если у вас другая механика — прошивка не соберётся и попросит пересчитать таблицы одной командой: <code>python3 tools/gen_e2_tables.py --write</code>.</div>
+
+<h2 id="pinout">5. Какой провод куда</h2>
+<p>На плате Discovery два длинных двухрядных разъёма: <b>P1</b> (слева) и <b>P2</b> (справа), по 50 штырьков. На картинке — что подключается к каждому штырьку; номер штырька написан внутри кружка, штырёк 1 на плате отмечен квадратом.</p>
+<div class="fig"><img src="wiring/discovery_pinout.svg" alt="Карта разъёмов P1 и P2"></div>
+<p class="cap">Серые — свободные или служебные штырьки. Цвета — группы, как в легенде внизу картинки.</p>
+<div class="tbl">{{PINS_TABLE}}</div>
+<div class="box">Синяя кнопка USER на самой плате соединена с PA0 — это вход «Упор Задний». Нажатие на неё работает как нажатие кнопки заднего упора.</div>
+<div class="box"><b>Питание.</b> <b>3V</b> (P2-5, P2-6) — для подтяжек и светодиодов, не больше 100 мА. <b>5V</b> (P2-3, P2-4) — сюда можно подать 5 В от блока питания, когда плата не подключена к компьютеру по USB. <b>GND</b> — любой из помеченных. Драйверы моторов, LCD2004 и дисплей от платы не питать.</div>
+
+<h2 id="blocks">6. Схемы по блокам</h2>
+<h3>Кнопки, переключатели, концевики, джойстик</h3>
+<div class="fig"><img src="wiring/input_button.svg" alt="Подключение кнопки"></div>
+<p>Все кнопки и переключатели подключаются одинаково: один контакт — на GND, второй — на вывод платы, и от вывода резистор 1 кОм на 3V. Так было и у автора 7e2 (только у него резисторы шли на +5 В).</p>
+<div class="box warn">У автора 7e2 на схеме подрежимы подписаны «Наружный — A13, Внутренний — A15», а в его же прошивке наоборот. Здесь всё по прошивке: <b>Внутренний — PC8, Ручной — PC9, Наружный — PC11</b>. Если на пульте перепутано — поменяйте местами два провода.</div>
+<div class="box">Упоры кнопками ставятся только когда переключатель подрежима стоит в «Ручной» — так задумано автором. Если переключателя подрежимов нет, соедините вывод «Ручной» (PC9) с GND.</div>
+
+<h3>Энкодер шпинделя</h3>
+<div class="fig"><img src="wiring/spindle_encoder.svg" alt="Энкодер шпинделя"></div>
+
+<h3>РГИ — ручной маховичок</h3>
+<div class="fig"><img src="wiring/hand_encoder.svg" alt="РГИ"></div>
+
+<h3>Драйверы моторов</h3>
+<div class="fig"><img src="wiring/drivers.svg" alt="Драйверы моторов"></div>
+
+<h3>Светодиоды, зуммер, тахометр, переменник</h3>
+<div class="fig"><img src="wiring/outputs.svg" alt="Выходы"></div>
+
+<h3>Дисплей, LCD2004, блок DRO, отладка</h3>
+<div class="fig"><img src="wiring/links.svg" alt="Связь"></div>
+<p>Дисплей 4.3" (JC4827W543): провода UART — на разъёме P1 дисплея, <b>RX дисплея = GPIO44, TX дисплея = GPIO43</b>. Дисплей 10.1" (JC8012P4A1C): разъём CN2, <b>RX дисплея = GPIO38, TX дисплея = GPIO37</b>. TX платы STM32 (PB10) — на RX дисплея, RX платы (PB11) — на TX дисплея, и обязательно общий GND.</p>
+
+<h2 id="bench">7. Сборка на макетке без шилда</h2>
+<p>Пока нет готовой платы-шилда, всё можно собрать на макетной плате и проверить по частям. Каждый шаг проверяется <b>монитором входов</b>: плата сама пишет в отладочный порт, что вы нажали или повернули.</p>
+<ol class="steps">
+<li><b>Прошейте STM32</b> (раздел 3). Подключите USB-UART переходник: его RX — к PA9 (P2-44), TX — к PA10 (P2-41), GND — к GND. Откройте монитор порта на 115200 (в PlatformIO: значок вилки «Serial Monitor»). Должно появиться «SETUP() ЗАВЕРШЕН».</li>
+<li><b>Шина 3V и GND.</b> На макетке сделайте две длинные шины: 3V (от P2-5) и GND (от P1-1). Все подтяжки 1 кОм — к шине 3V, все кнопки — к шине GND.</li>
+<li><b>Одна кнопка.</b> Подключите кнопку «Влево» (PB13, P1-37) по схеме из раздела 6. Нажмите — в мониторе: <code>[IO] Кнопка Влево: замкнуто на GND (0)</code>, отпустите — <code>отпущено (1)</code>. Если сообщения нет — проверьте провод и номер штырька.</li>
+<li><b>Остальные кнопки, джойстик, переключатели, упоры</b> — по одной, проверяя каждую в мониторе. Переключатель режимов: при каждом повороте на дисплее и LCD меняется режим, раздаётся короткий сигнал.</li>
+<li><b>Светодиоды упоров.</b> При включении платы они пробегают «волной» 2.4 секунды — значит, подключены верно.</li>
+<li><b>Зуммер.</b> Пикает при смене режима.</li>
+<li><b>РГИ.</b> Покрутите маховичок — <code>[IO] РГИ: +5 щелчков</code>. Переключатель оси и масштаба — тоже видны в мониторе.</li>
+<li><b>Энкодер шпинделя.</b> Покрутите шпиндель рукой — раз в секунду <code>[IO] Энкодер шпинделя: … об/мин, угол …°, по часовой</code>. Направление должно совпадать с реальным; если нет — поменяйте местами провода A и B.</li>
+<li><b>Драйверы.</b> Сначала без моторов: к выходу ключа STEP вместо драйвера можно подключить светодиод с резистором 1 кОм на +5 В — при подаче джойстиком он мерцает. Потом — драйвер и мотор, ток драйвера по паспорту мотора.</li>
+<li><b>Дисплей.</b> Три провода (TX, RX, GND). После включения на дисплее появляются режим и координаты; нажатия на экране меняют режим на LCD2004 тоже.</li>
+</ol>
+<div class="box ok">Монитор входов можно выключить в <code>els_config.h</code> (<code>IO_MONITOR 0</code>), но он не мешает работе станка.</div>
+
+<h2 id="emulator">8. Стенд без станка: эмулятор на Arduino Mega</h2>
+<p>Arduino Mega изображает блок DRO HS800-2 (координаты «качаются» туда-обратно) или любую линейку. Так можно проверить дисплей и расчёты, не подходя к станку.</p>
+<div class="fig"><img src="wiring/emulator.svg" alt="Эмулятор на Mega"></div>
+<ol class="steps">
+<li>Прошейте Mega (раздел 3).</li>
+<li>Для режима «блок DRO» достаточно двух проводов: TX1 (вывод 18) Mega → PA3 (P1-13) через резистор 1 кОм, и GND — GND. В <code>els_config.h</code>: <code>ELS_POS_SOURCE = POS_SOURCE_DRO_UART</code>.</li>
+<li>Для линеек подключите все провода по картинке, в <code>els_config.h</code> выберите <code>POS_SOURCE_SCALES</code> и тип линеек, а в мониторе порта Mega (115200) наберите режим: <code>mq</code> — квадратура, <code>ms</code> — Sylvac, <code>mb</code> — BIN6, <code>mi</code> — iGaging, <code>md</code> — Digimatic.</li>
+<li>Команды Mega: <code>z12345</code> — поставить ось Z на 12.345 мм, <code>x-500</code> — ось X на −0.5 мм, <code>w0</code>/<code>w1</code> — остановить/включить «качание», <code>?</code> — состояние. Дисплей должен показать ровно те же числа.</li>
+</ol>
+
+<h2 id="scales">9. Линейки</h2>
+<div class="fig"><img src="scales/connection_options.svg" alt="Два способа подключения линеек"></div>
+<p>Два способа: через блок DRO (он сам читает линейки и передаёт координаты) или напрямую к STM32 — тогда блок DRO не нужен. Поддерживаются стеклянные и магнитные линейки (квадратура TTL и RS-422), ёмкостные китайские (Sylvac, BIN6), iGaging и Mitutoyo Digimatic. Как узнать свою линейку, схемы сопряжения и настройки — в отдельном руководстве: <a href="scales/README.md">docs/scales/README.md</a>.</p>
+
+<h2 id="displays">10. Дисплеи</h2>
+<table>
+<tr><th></th><th>JC4827W543</th><th>JC8012P4A1C</th></tr>
+<tr><td>Размер</td><td>4.3", 480×272</td><td>10.1", 1280×800</td></tr>
+<tr><td>Чип</td><td>ESP32-S3</td><td>ESP32-P4 (+ ESP32-C6 для WiFi)</td></tr>
+<tr><td>Прошивка</td><td><code>pio run -e jc4827w543 -t upload</code></td><td><code>pio run -e jc8012p4a1c -t upload</code></td></tr>
+<tr><td>UART к STM32</td><td>GPIO44 (RX), GPIO43 (TX)</td><td>GPIO38 (RX), GPIO37 (TX), разъём CN2</td></tr>
+<tr><td>В <code>els_config.h</code></td><td><code>DISPLAY_TYPE_4_3</code></td><td><code>DISPLAY_TYPE_10_1</code></td></tr>
+</table>
+<p>Оба дисплея работают одинаково, разница — только размер. 7" — в планах. Подробности — <a href="../DISPLAYS.md">DISPLAYS.md</a>.</p>
+
+<h2 id="shield">11. Шилд — плата под Discovery</h2>
+<p>Шилд — это плата, на которую сверху вставляется Discovery, а все провода пульта, драйверов, энкодеров и дисплея подключаются к винтовым клеммникам. На ней те же резисторы, транзисторы и конденсаторы, что на схемах выше. Файлы для заказа — <a href="../hardware/shield/README.md">hardware/shield</a>.</p>
+
+<h2 id="trouble">12. Если не работает</h2>
+<table>
+<tr><th>Что видно</th><th>Что проверить</th></tr>
+<tr><td>На LCD «ВНИМАНИЕ. Установите джойстик в нейтральное положение»</td><td>при включении джойстик был отклонён, или один из его проводов замкнут на GND. Все 4 направления в нейтрали должны давать 1 (см. монитор входов).</td></tr>
+<tr><td>«УСТАНОВИТЕ УПОРЫ!»</td><td>для подрежимов «Внутренний»/«Наружный» нужны два упора — левый и правый (или передний и задний).</td></tr>
+<tr><td>«УСТАНОВИТЕ СУППОРТ В ИСХОДНУЮ ПОЗИЦИЮ»</td><td>перед автоциклом суппорт должен стоять ровно на одном из упоров: подведите его джойстиком до остановки.</td></tr>
+<tr><td>Мотор не крутится, хотя импульсы есть</td><td>перепутан ENA: поменяйте <code>DRIVER_SIGNALS_DIRECT</code> или проверьте ключ ENA.</td></tr>
+<tr><td>Ось едет не в ту сторону</td><td>поменяйте местами провода одной обмотки мотора (A+ и A−) — это быстрее всего.</td></tr>
+<tr><td>Резьба «гуляет» по шагу</td><td>помехи на энкодере шпинделя: экранированный кабель, экран на GND с одной стороны, конденсаторы 1 нФ у платы.</td></tr>
+<tr><td>Ложные щелчки РГИ</td><td>конденсаторы 10 нФ на линиях A и B (совет автора 7e2).</td></tr>
+<tr><td>На дисплее «ДИСПЛЕЙ НЕ СОВПАДАЕТ С КОНФИГОМ STM32»</td><td>в <code>els_config.h</code> выбран другой <code>ELS_DISPLAY_TYPE</code>.</td></tr>
+</table>
+<p>Чтобы спросить на форуме, приложите: что сделали, что видите, текст из монитора порта (последние 30 строк) и фото проводки.</p>
+</main>
+</div>
+</body>
+</html>

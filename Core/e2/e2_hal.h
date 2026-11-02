@@ -71,8 +71,13 @@ extern volatile uint8_t Motor_X_Dir, Joy_X_flag, Step_X_flag, Cone_flag;
 // Зуммер
 // ============================================================================
 #define Beeper_Init()          do { pinMode(E2_APIN(E2_PIN_BEEPER), OUTPUT); } while (0)
+#if BEEPER_ON_LEVEL                                    // зуммер через NPN-ключ: 1 = звук
+#define Beeper_On()            E2_SET(E2_PIN_BEEPER)
+#define Beeper_Off()           E2_CLR(E2_PIN_BEEPER)
+#else                                                   // как у 7e2: зуммер между питанием и выводом, 0 = звук
 #define Beeper_On()            E2_CLR(E2_PIN_BEEPER)     // Pin16 0
 #define Beeper_Off()           E2_SET(E2_PIN_BEEPER)     // Pin16 1
+#endif
 
 // ============================================================================
 // Шаговые двигатели. Уровни — как у Mega в 7e2, где выходы STEP/DIR/ENA идут на

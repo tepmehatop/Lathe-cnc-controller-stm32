@@ -79,6 +79,12 @@
 #define DRIVER_SIGNALS_DIRECT   0
 #endif
 
+/** Зуммер: 1 — через NPN-ключ (шилд и макетка из docs/), звучит при «1» на выводе;
+ *  0 — как у 7e2: зуммер между +3.3 В и выводом, звучит при «0». */
+#ifndef BEEPER_ON_LEVEL
+#define BEEPER_ON_LEVEL         1
+#endif
+
 /** Минимальная длительность импульса и паузы на STEP, мкс (из паспорта драйвера:
  *  DM542/DM556 — 2.5, TB6600 — 2.2, A4988/DRV8825 — 1–2). С запасом на оптрон драйвера. */
 #ifndef STEP_PULSE_MIN_US
@@ -175,13 +181,13 @@
  *  Для квадратуры пины фиксированы таймерами (TIM2 — Z, 32 бит; TIM3 — X).
  *  Все сигнальные пины толерантны к 5 В. PA15/PB3/PB4 — пины JTAG:
  *  прошивка через SWD (ST-Link) ими не пользуется.
- *  REQ (только Digimatic) — на выводах блока DRO: в режиме линеек он не нужен. */
+ *  REQ — только для Digimatic (выход STM32). */
 #define SCALE_Z_PIN_A           PA15    // TIM2_CH1 / такт
 #define SCALE_Z_PIN_B           PB3     // TIM2_CH2 / данные
-#define SCALE_Z_PIN_REQ         PA2     // REQ (только Digimatic)
+#define SCALE_Z_PIN_REQ         PC6     // REQ (только Digimatic)
 #define SCALE_X_PIN_A           PB4     // TIM3_CH1 / такт
 #define SCALE_X_PIN_B           PB5     // TIM3_CH2 / данные
-#define SCALE_X_PIN_REQ         PA3     // REQ (только Digimatic)
+#define SCALE_X_PIN_REQ         PC7     // REQ (только Digimatic)
 
 // ============================================================================
 // 5. СВЯЗЬ

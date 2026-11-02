@@ -88,9 +88,10 @@
 #define E2_PIN_LCD_SDA      B, 7     // I2C1 SDA
 #define E2_PIN_DISP_TX      B, 10    // USART3 TX → дисплей ESP32 (RX)
 #define E2_PIN_DISP_RX      B, 11    // USART3 RX ← дисплей ESP32 (TX)
-#define E2_PIN_DRO_RX       A, 3     // USART2 RX ← блок DRO HS800-2 (TX); в режиме линеек — REQ оси X
-#define E2_PIN_DRO_TX       A, 2     // USART2 TX — не подключается; в режиме линеек — REQ оси Z
+#define E2_PIN_DRO_RX       A, 3     // USART2 RX ← блок DRO HS800-2 (TX)
+#define E2_PIN_DRO_TX       A, 2     // USART2 TX — не подключается
 #define E2_PIN_DBG_TX       A, 9     // USART1 TX — отладочный порт (Serial)
 #define E2_PIN_DBG_RX       A, 10    // USART1 RX
-// Линейки напрямую (Core/els_config.h): Z — PA15/PB3 (TIM2), X — PB4/PB5 (TIM3)
+// Линейки напрямую (Core/els_config.h): Z — PA15/PB3 (TIM2), X — PB4/PB5 (TIM3),
+// REQ для Digimatic: Z — PC6, X — PC7
 #define E2_PIN_AUDIO_RESET  D, 4     // сброс аудио-ЦАП платы: держим 0, чтобы ЦАП не мешал

@@ -20,7 +20,7 @@
  * для надёжности через резисторы 1 кОм):
  *   Mega D22 → PA15 (ось Z, A/такт)     Mega D24 → PB4 (ось X, A/такт)
  *   Mega D23 → PB3  (ось Z, B/данные)   Mega D25 → PB5 (ось X, B/данные)
- *   Mega D26 ← PE4  (ось Z, REQ)        Mega D27 ← PE5 (ось X, REQ)
+ *   Mega D26 ← PC6  (ось Z, REQ)        Mega D27 ← PC7 (ось X, REQ)
  *   Mega TX1 (18) → PA3 (HS800 по UART), GND → GND
  *   Без схемы сопряжения: в els_config.h SCALE_*_SIGNAL_INVERT = 0, а REQ
  *   Digimatic подаётся напрямую (активный уровень STM32 — высокий).
