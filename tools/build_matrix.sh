@@ -24,7 +24,7 @@ fail=0
 for cfg in "${CONFIGS[@]}"; do
   out=$(PLATFORMIO_BUILD_FLAGS="$cfg" "$PIO" run -e stm32f407_discovery 2>&1)
   if echo "$out" | grep -q "\[SUCCESS\]"; then
-    warn=$(echo "$out" | grep -E "Core/|drv_scales|scale_protocols|drv_display" | grep -c "warning:")
+    warn=$(echo "$out" | grep -E "Core/e2/e2_|drv_scales|drv_dro|scale_protocols" | grep -c "warning:")
     echo "OK    ($warn предупр.)  $cfg"
   else
     echo "FAIL  $cfg"; echo "$out" | grep -E "error" | head -5; fail=1

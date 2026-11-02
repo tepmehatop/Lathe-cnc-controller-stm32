@@ -45,10 +45,10 @@ static const AxisPins PINS[2] = { {22, 23, 26}, {24, 25, 27} };   // 0 = Z, 1 = 
 // ============================================================
 static char     s_mode  = '0';          // режим эмуляции линеек
 // Позиции, мкм (0 = Z, 1 = X) — ровно то, что покажет дисплей при конфиге по умолчанию
-// (SCALE_*_INVERT = 0). STM32 передаёт на дисплей −pos (наследие Arduino-прошивки),
-// поэтому «линейки» выдают −позицию, а HS800 — Y = z, X = −x.
+// (SCALE_*_INVERT = 0): ядро 7e2 выводит показания блока DRO / линеек как есть.
+// HS800: Y = z, X = x.
 static int32_t  s_pos_um[2] = {0, 0};
-static int32_t scale_um(uint8_t ax) { return -s_pos_um[ax]; }
+static int32_t scale_um(uint8_t ax) { return s_pos_um[ax]; }
 static bool     s_sweep = true;    // по умолчанию позиции «качаются», как в старом симуляторе
 static int32_t  s_quad_count[2] = {0, 0};
 static const int32_t QUAD_NM_PER_COUNT = 5000;   // 5 мкм
@@ -249,7 +249,7 @@ void loop() {
     static uint32_t t_pkt = 0;
     if (now - t_pkt >= PACKET_INTERVAL_MS) {
         t_pkt = now;
-        send_hs800(-s_pos_um[1], s_pos_um[0]);
+        send_hs800(s_pos_um[1], s_pos_um[0]);
     }
 
     // Эмуляция линеек
