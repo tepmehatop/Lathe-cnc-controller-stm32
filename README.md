@@ -92,7 +92,7 @@ bash tools/run_unit_tests.sh    # декодеры протоколов лине
 bash tools/build_matrix.sh      # сборка во всех вариантах настроек
 ```
 
-Что перенесено и как проверено — [docs/PORT_AUDIT.md](docs/PORT_AUDIT.md).
+Что перенесено и как проверено — [docs/PORT_AUDIT.md](docs/PORT_AUDIT.md); полная сверка с оригиналом по пунктам — [docs/CHECKLIST_7e2.md](docs/CHECKLIST_7e2.md).
 История работ — [history.md](history.md), задачи — [BACKLOG.md](BACKLOG.md).
 
 ## Лицензия

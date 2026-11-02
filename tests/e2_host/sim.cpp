@@ -32,6 +32,7 @@ uint32_t sim_cyccnt_read() { s_cyc_extra += 4; return (uint32_t)(t_ns_for_cyc() 
 // Длительности уровней на STEP в тактах ядра (по фактическим записям в регистры)
 struct EdgeLog { uint64_t last = 0; uint64_t min_cyc = ~0ull; long n = 0; };
 static EdgeLog s_ez, s_ex;
+static long s_tacho_rises = 0;
 void sim_gpio_changed(GPIO_TypeDef* g, uint32_t o, uint32_t n) {
     uint64_t c = t_ns_for_cyc() * 168 / 1000 + s_cyc_extra;
     auto chk = [&](EdgeLog& l, uint32_t bit) {
@@ -41,6 +42,7 @@ void sim_gpio_changed(GPIO_TypeDef* g, uint32_t o, uint32_t n) {
     };
     if (g == E2_GPIO(E2_PIN_Z_STEP)) chk(s_ez, E2_BIT(E2_PIN_Z_STEP));
     if (g == E2_GPIO(E2_PIN_X_STEP)) chk(s_ex, E2_BIT(E2_PIN_X_STEP));
+    if (g == E2_GPIO(E2_PIN_TACHO) && (n & E2_BIT(E2_PIN_TACHO)) && !(o & E2_BIT(E2_PIN_TACHO))) s_tacho_rises++;
 }
 static SimTimer s_timers[3] = {{&g_tim6, 0, nullptr}, {&g_tim7, 0, nullptr}, {&g_tim12, 0, nullptr}};
 SimTimer* sim_timer_slot(TIM_TypeDef* t) { for (auto& s : s_timers) if (s.tim == t) return &s; return nullptr; }
@@ -78,7 +80,7 @@ static StepLog s_z, s_x;
 static std::vector<long> s_z_at_rev;   // счётчик шагов Z на каждом обороте шпинделя
 static long spindle_lines_now();
 extern int McStep_Lag;
-struct MoveStart { long line; long x; int dir; };
+struct MoveStart { long line; long x; int dir; long z; };
 static std::vector<MoveStart> s_z_starts;   // начала движений Z (после паузы ≥ 50 мс)
 static uint64_t s_z_last_step = 0;
 struct XTurn { long z; long x; int lag; };
@@ -103,7 +105,7 @@ static void sample_steps() {
     chk(s_z, E2_DRV_RD(E2_PIN_Z_STEP), E2_DRV_RD(E2_PIN_Z_DIR));
     if (s_z.count != before) {
         if (t_ns - s_z_last_step > 50000000ull)
-            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR)});
+            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR), Motor_Z_Pos});
         s_z_last_step = t_ns;
     }
     long xb = s_x.count;
@@ -406,6 +408,11 @@ static void test_modes_touch() {
 // Упоры Z: правый — в текущей точке, левый — на len_ms ускоренного хода левее; суппорт — у правого
 static bool setup_z_limits(double len_ms) {
     select_mode(1); controls_neutral(); run_ms(100);
+    // снять оставшиеся от прошлых проверок упоры
+    if (limit_Left_flag)  { SET_IN(E2_PIN_LIM_LEFT, 0);  run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1);  run_ms(100); }
+    if (limit_Right_flag) { SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100); }
+    if (limit_Front_flag) { SET_IN(E2_PIN_LIM_FRONT, 0); run_ms(150); SET_IN(E2_PIN_LIM_FRONT, 1); run_ms(100); }
+    if (limit_Rear_flag)  { SET_IN(E2_PIN_LIM_REAR, 0);  run_ms(150); SET_IN(E2_PIN_LIM_REAR, 1);  run_ms(100); }
     SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
     SET_IN(E2_PIN_JOY_RAPID, 0); SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(len_ms); SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
     SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
@@ -608,6 +615,91 @@ static void test_sphere() {
     touch("ALERT_OK");
 }
 
+// Общий прогон автоцикла: упоры Z, режим, подрежим (пины переключателя), джойстик влево до «ЗАВЕРШЕНА»
+struct CycleResult { bool done; int passes; std::vector<MoveStart> starts; long dz, dx; double secs; };
+static CycleResult run_cycle(const char* name, int mode, bool internal, std::function<void()> prep, double rpm) {
+    printf("[%7.1f с] [cycle] %s\n", t_ns / 1e9, name);
+    bool ok = setup_z_limits(600);
+    CHECK(ok, "%s: упоры не установлены", name);
+    select_mode(mode);
+    prep();
+    SET_IN(E2_PIN_SUB_MAN, 1); if (internal) SET_IN(E2_PIN_SUB_INT, 0); else SET_IN(E2_PIN_SUB_EXT, 0); run_ms(200);
+    long x0 = Motor_X_Pos, z0 = Motor_Z_Pos;
+    spindle(rpm); run_ms(300);
+    s_z_starts.clear();
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0;
+    while (!Complete_flag && t < 400000) { run_ms(100); t += 100; }
+    CycleResult r{Complete_flag, 0, {}, Motor_Z_Pos - z0, Motor_X_Pos - x0, t / 1000};
+    for (auto& m : s_z_starts) if (m.dir == 0) { r.passes++; r.starts.push_back(m); }
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000);
+    spindle(0); run_ms(100);
+    // выход: подрежим «Ручной», снять упоры
+    SET_IN(E2_PIN_SUB_INT, 1); SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK");
+    select_mode(1);
+    if (limit_Left_flag)  { SET_IN(E2_PIN_LIM_LEFT, 0);  run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1);  run_ms(100); }
+    if (limit_Right_flag) { SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100); }
+    CHECK(r.done, "%s: цикл не завершился за %.0f с", name, r.secs);
+    printf("    завершён=%d, рабочих проходов %d, %.1f с, Z %+ld X %+ld шагов\n", r.done, r.passes, r.secs, r.dz, r.dx);
+    return r;
+}
+
+static long line_of(const MoveStart& m) { return m.line; }
+
+static void test_more_cycles() {
+    // Внутренняя резьба 1.5 мм
+    auto r1 = run_cycle("резьба «Внутренний» 1.50 мм", 3, true, [] { touch("THREAD_STEP:13"); }, 300);
+    CHECK(r1.passes == Thread_Info[13].Pass + PASS_FINISH, "внутр. резьба: проходов %d", r1.passes);
+    for (auto& m : r1.starts) CHECK(labs(line_of(m) - line_of(r1.starts[0])) <= 1, "внутр. резьба: проход не в нитку");
+    // Двухзаходная резьба 1.5 мм: вторая нитка смещена на пол-оборота
+    auto r2 = run_cycle("резьба «Наружный», 2 захода (Ph=2)", 3, false, [] { touch("THREAD_STEP:13"); touch("PH:2"); }, 300);
+    // 7e2: второй заход — тот же угол шпинделя, старт по Z сдвинут на шаг резьбы
+    std::vector<long> zs;
+    for (auto& m : r2.starts) if (std::find(zs.begin(), zs.end(), m.z) == zs.end()) zs.push_back(m.z);
+    std::sort(zs.begin(), zs.end());
+    long pitch_steps = lround(1.5 / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z);
+    printf("    старты по Z (шаги):"); for (long z : zs) printf(" %ld", z); printf("; шаг резьбы = %ld шагов\n", pitch_steps);
+    CHECK(r2.passes == (Thread_Info[13].Pass + PASS_FINISH) * 2, "2 захода: проходов %d", r2.passes);
+    CHECK(zs.size() == 2 && zs[1] - zs[0] == pitch_steps, "2 захода: старты по Z не сдвинуты на шаг");
+    for (auto& m : r2.starts) CHECK(labs(line_of(m) - line_of(r2.starts[0])) <= 1, "2 захода: разный угол шпинделя на старте");
+    touch("PH:1");
+    // Подача «Внутренний»
+    auto r3 = run_cycle("подача «Внутренний», 2 прохода по 0.20", 1, true, [] { touch("FEED:20"); touch("AP:20"); Pass_Total = 2; Pass_Nr = 1; }, 600);
+    CHECK(r3.passes == 2, "внутр. подача: проходов %d", r3.passes);
+    // Асинхронная подача «Наружный»
+    auto r4 = run_cycle("асинхр. подача «Наружный», 2 прохода по 0.20", 2, false, [] { touch("AFEED:200"); touch("AP:20"); Pass_Total = 2; Pass_Nr = 1; }, 0);
+    CHECK(r4.passes == 2, "асинхр. автоцикл: проходов %d", r4.passes);
+    // Конус «Наружный»
+    auto r5 = run_cycle("конус 30° «Наружный», 2 прохода", 4, false, [] { touch("CONE:1"); touch("FEED:20"); touch("AP:20"); Pass_Total = 2; Pass_Nr = 1; }, 600);
+    CHECK(r5.passes == 2, "конус автоцикл: проходов %d", r5.passes);
+}
+
+// Ход многозаходной резьбы: Ph × шаг за оборот
+static void test_thread_multistart() {
+    printf("[%7.1f с] [thread-ph] резьба 1.00 мм, 2 захода: ход за оборот\n", t_ns / 1e9);
+    controls_neutral(); select_mode(3); touch("THREAD_STEP:11"); touch("PH:2");
+    spindle(200); run_ms(300); s_z_at_rev.clear();
+    SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(60000.0 / 200 * 10);
+    double spr = steps_per_rev(5);
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800); spindle(0); run_ms(50); touch("PH:1");
+    printf("    шагов/об %.2f (ожидалось %d — ход 2.00 мм)\n", spr, 800);
+    CHECK(fabs(spr - 800) < 0.5, "2 захода: шагов/об %.2f", spr);
+}
+
+// Тахометр: в режиме резьбы (INT0) — импульс на каждый оборот шпинделя
+static void test_tacho() {
+    printf("[%7.1f с] [tacho] выход тахометра в режиме «Резьба»\n", t_ns / 1e9);
+    controls_neutral(); select_mode(3);
+    spindle(300); run_ms(500);
+    long t0 = s_tacho_rises, l0 = spindle_lines; run_ms(4000);
+    double revs = (spindle_lines - l0) / (double)ENC_LINE_PER_REV;
+    long pulses = s_tacho_rises - t0;
+    printf("    импульсов %ld за %.1f об\n", pulses, revs);
+    CHECK(labs(pulses - lround(revs)) <= 1, "тахометр: %ld импульсов на %.1f об", pulses, revs);
+    spindle(0); run_ms(50);
+}
+
 int main() {
     controls_neutral();
     setup();
@@ -641,6 +733,9 @@ int main() {
     test_cone(55, 1.0 / 20);               // 1:10 (на диаметр)
     test_cone(45, 1.0 / 2 / 19.212);       // KM0 (Морзе 0: 1:19.212)
     test_sphere();
+    test_thread_multistart();
+    test_tacho();
+    test_more_cycles();
     CHECK(Serial.out.find("[IO] Джойстик Влево: замкнуто на GND") != std::string::npos, "монитор входов не сообщил о джойстике");
     CHECK(Serial.out.find("[IO] Энкодер шпинделя:") != std::string::npos, "монитор входов не сообщил об энкодере");
     CHECK(Serial.out.find("[IO] РГИ:") != std::string::npos, "монитор входов не сообщил о РГИ");

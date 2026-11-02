@@ -87,6 +87,6 @@ GPIO37 (TX). TX платы STM32 (PB10) → RX дисплея, RX платы (PB
 
 ## 12. Для разработчиков
 
-- Как перенесено ядро 7e2 и что проверено: [PORT_AUDIT.md](PORT_AUDIT.md).
+- Как перенесено ядро 7e2 и что проверено: [PORT_AUDIT.md](PORT_AUDIT.md); сверка с оригиналом по пунктам — [CHECKLIST_7e2.md](CHECKLIST_7e2.md).
 - Пересобрать схемы и эту документацию: `python3 tools/docs_gen/build_docs.py`.
 - Проверка ядра без платы: `bash tools/run_e2_sim.sh`.
