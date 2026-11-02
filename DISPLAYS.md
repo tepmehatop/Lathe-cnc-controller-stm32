@@ -123,6 +123,19 @@ python3 tools/run_all_tests.py --port /dev/cu.usbmodemXXXX --out <папка>
 python3 tools/ui_tap_tests.py  --port /dev/cu.usbmodemXXXX --out <папка>
 ```
 
+## Подключение к STM32
+
+UART 57600 8N1, уровни 3.3 В, три провода:
+
+| STM32F4DISCOVERY | 4.3" JC4827W543 (разъём P1) | 10.1" JC8012P4A1C (разъём CN2) |
+|---|---|---|
+| PB10 (TX, штырёк P1-34) | GPIO44 (RX) | GPIO38 (RX) |
+| PB11 (RX, штырёк P1-35) | GPIO43 (TX) | GPIO37 (TX) |
+| GND | GND | GND |
+
+Питание дисплея — от его USB-C или отдельных 5 В, не от платы Discovery.
+Схема — [docs/wiring/links.svg](docs/wiring/links.svg).
+
 ## Выбор дисплея на STM32
 
 В `Core/els_config.h`: `ELS_DISPLAY_TYPE` = `DISPLAY_TYPE_4_3` / `DISPLAY_TYPE_10_1` /
