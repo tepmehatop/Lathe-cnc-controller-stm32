@@ -3556,13 +3556,9 @@
         (size 1 1))
       (justify right bottom))
     (uuid "2596f9a3-66b6-5440-b31a-dd8c2c571bf0"))
-  (label "JOY_UP"
-    (at 60.96 66.04 0)
-    (effects
-      (font
-        (size 1 1))
-      (justify left bottom))
-    (uuid "f34004f6-c25e-5a30-9b67-284aee446a27"))
+  (no_connect
+    (at 60.96 66.04)
+    (uuid "62d6f011-52d3-5942-9651-b3d6ae8dd98b"))
   (label "HAND_A"
     (at 48.26 68.58 180)
     (effects
@@ -3949,9 +3945,13 @@
         (size 1 1))
       (justify right bottom))
     (uuid "c837ef0b-15c6-502a-a57f-0014bd474d25"))
-  (no_connect
-    (at 116.84 55.88)
-    (uuid "68bf64fc-db6a-5476-b411-0ed3027d5659"))
+  (label "JOY_UP"
+    (at 116.84 55.88 0)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "44da9bd1-f98c-501b-9a94-19549a639d3f"))
   (no_connect
     (at 104.14 58.42)
     (uuid "e0c22342-fad5-550b-be8b-343fd541497c"))
