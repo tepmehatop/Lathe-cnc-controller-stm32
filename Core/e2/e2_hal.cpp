@@ -127,6 +127,10 @@ static HardwareTimer* _timer_start(TIM_TypeDef* tim, uint32_t hz, uint16_t perio
 }
 
 void e2_timers_init(void) {
+    // Аудиочип платы (CS43L22) — в сбросе: он сидит на той же шине I2C, что LCD2004,
+    // и на выводах, занятых пультом
+    OUT_LO(E2_PIN_AUDIO_RESET);
+
     // Счётчик тактов ядра — для минимальной длительности импульса STEP
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;

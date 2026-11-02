@@ -38,3 +38,10 @@ tools/test_results_full.jsonl
 
 # Python
 __pycache__/
+
+# Шилд: промежуточные файлы сборки (в .dsn пишется абсолютный путь)
+hardware/shield/build/
+hardware/shield/*-backups/
+hardware/shield/fp-info-cache
+hardware/shield/__pycache__/
+hardware/shield/*.kicad_prl
