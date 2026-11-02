@@ -395,7 +395,12 @@ void Display_UART_Process()
         _Display_ParseRx(s_disp_rx_buf);
         s_disp_rx_buf = "";
       }
-    } else {
+    } else if (c == '<') {
+      // [STM32] '<' всегда начинает новую команду: ESP32-P4 при загрузке печатает лог ROM
+      // в этот же UART (GPIO37/38 = UART0) на другой скорости, и без сброса мусор
+      // приклеивался к <READY> — STM32 не отвечал полным состоянием
+      s_disp_rx_buf = "<";
+    } else if (s_disp_rx_buf.length() < 128) {
       s_disp_rx_buf += c;
     }
   }
