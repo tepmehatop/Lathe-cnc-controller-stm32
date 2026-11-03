@@ -696,6 +696,16 @@ static const int THREAD_IDX_INCH   = 20;  // Дюймовая: entries 20-46
 static const int THREAD_IDX_GPIPE  = 47;  // G-труб: entries 47-56
 static const int THREAD_IDX_KPIPE  = 57;  // K-труб: entries 57-66
 
+// Диапазон категории (метрич./дюйм./G/K), в которую входит idx: барабан и ▲/▼ листают только её,
+// чтобы после смены типа не попадать на резьбы соседней категории
+static void thread_cat_range(int idx, int& lo, int& hi)
+{
+    if      (idx < THREAD_IDX_INCH)  { lo = THREAD_IDX_METRIC; hi = THREAD_IDX_INCH - 1; }
+    else if (idx < THREAD_IDX_GPIPE) { lo = THREAD_IDX_INCH;   hi = THREAD_IDX_GPIPE - 1; }
+    else if (idx < THREAD_IDX_KPIPE) { lo = THREAD_IDX_GPIPE;  hi = THREAD_IDX_KPIPE - 1; }
+    else                             { lo = THREAD_IDX_KPIPE;  hi = THREAD_TABLE_SIZE - 1; }
+}
+
 // ============================================================================
 // Состояние режима редактирования основного параметра (тап на большое значение)
 // В режиме edit: UP/DOWN → локальная навигация по таблице + <TOUCH:PARAM_UP/DN>
@@ -869,7 +879,8 @@ static void handle_up_btn_click()
         g_edit_param.last_ms = millis();
         char buf[32];
         if (s_last_mode == MODE_THREAD) {
-            if (g_edit_param.local_step < THREAD_TABLE_SIZE - 1) g_edit_param.local_step++;
+            { int lo, hi; thread_cat_range(g_edit_param.local_step, lo, hi);
+              if (g_edit_param.local_step < hi) g_edit_param.local_step++; }
             const char* lbl = s_thread_table[g_edit_param.local_step].label;
             char fbuf[32]; char* fdst = fbuf;
             for (const char* fsrc = lbl; *fsrc && fdst < fbuf + sizeof(fbuf) - 1; fsrc++) {
@@ -941,7 +952,8 @@ static void handle_dn_btn_click()
         g_edit_param.last_ms = millis();
         char buf[32];
         if (s_last_mode == MODE_THREAD) {
-            if (g_edit_param.local_step > 0) g_edit_param.local_step--;
+            { int lo, hi; thread_cat_range(g_edit_param.local_step, lo, hi);
+              if (g_edit_param.local_step > lo) g_edit_param.local_step--; }
             const char* lbl = s_thread_table[g_edit_param.local_step].label;
             char fbuf[32]; char* fdst = fbuf;
             for (const char* fsrc = lbl; *fsrc && fdst < fbuf + sizeof(fbuf) - 1; fsrc++) {
@@ -2608,7 +2620,8 @@ static void enter_edit_mode()
                     "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xB0\xD1\x87\xD0\xB0 \xD0\xBC\xD0\xBC/\xD0\xBC\xD0\xB8\xD0\xBD" };
                 break;
             case MODE_THREAD:
-                rc = { RT_THREAD, 0, (int32_t)(THREAD_TABLE_SIZE - 1), 1, "\xD0\xA0\xD0\xB5\xD0\xB7\xD1\x8C\xD0\xB1\xD0\xB0" };
+                { int lo, hi; thread_cat_range(g_edit_param.local_step, lo, hi);
+                  rc = { RT_THREAD, lo, hi, 1, "\xD0\xA0\xD0\xB5\xD0\xB7\xD1\x8C\xD0\xB1\xD0\xB0" }; }
                 break;
             case MODE_CONE_L:
             case MODE_CONE_R:
@@ -3203,6 +3216,9 @@ static void jump_to_thread_type(int first_idx)
     g_edit_param.local_step = first_idx;
     g_edit_param.last_ms    = millis();
     if (g_roller.active) {
+        int lo, hi; thread_cat_range(first_idx, lo, hi);   // барабан — на диапазон новой категории
+        g_roller.cfg.val_min = lo;
+        g_roller.cfg.val_max = hi;
         g_roller.pending_val = first_idx;
         roller_update_labels();
     }
