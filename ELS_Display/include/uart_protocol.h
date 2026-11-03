@@ -214,6 +214,9 @@ public:
     void setAlertDismissCallback(AlertDismissCallback callback) {
         alert_dismiss_callback_ = callback;
     }
+    // true во время вызова AlertCallback для алертов-флагов ядра (типы 1–4): они горят,
+    // пока STM32 не пришлёт ALERT:0 — как надписи на LCD2004
+    bool alertFromCore() const { return alert_from_core_; }
 
     void setGCodeResponseCallback(GCodeResponseCallback callback) {
         gcode_response_callback_ = callback;
@@ -230,6 +233,7 @@ private:
     ScreenChangeCallback screen_change_callback_;
     AlertCallback alert_callback_;
     AlertDismissCallback alert_dismiss_callback_;
+    bool alert_from_core_ = false;
     GCodeResponseCallback gcode_response_callback_;
 
     bool data_dirty_;  // true when data_ changed but callback not yet fired

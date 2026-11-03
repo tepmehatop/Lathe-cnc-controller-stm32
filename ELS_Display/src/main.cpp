@@ -742,8 +742,9 @@ static SubEdit g_sub_edit = {false, -1, 0, 0, 1, 0, 1, 1, 0, 1000, 1, nullptr};
 struct AlertState {
     bool     active;
     uint32_t show_ms;  // millis() когда показан → авто-скрытие через 5с
+    bool     sticky;   // флаг ошибки ядра: без авто-скрытия, закрывает ALERT:0 от STM32
 };
-static AlertState g_alert = {false, 0};
+static AlertState g_alert = {false, 0, false};
 
 // ============================================================================
 // Состояние джойстик-оверлея (US-013)
@@ -1342,7 +1343,7 @@ static void create_k_content(lv_obj_t* screen)
         lv_label_set_long_mode(dlbl, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(dlbl, UX(130));
         lv_obj_set_style_text_align(dlbl, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(dlbl, LV_ALIGN_TOP_RIGHT, -UX(100), UY(20));
+        lv_obj_align(dlbl, LV_ALIGN_RIGHT_MID, -UX(100), 0);   // по центру панели при 1–3 строках
         lv_label_set_text(dlbl, "--");
         g_ui.sm_row6 = dlbl;
     }
@@ -3832,6 +3833,7 @@ static void show_alert(const char* message)
     lv_obj_move_foreground(g_ui.alert_box);
     g_alert.active  = true;
     g_alert.show_ms = millis();
+    g_alert.sticky  = uart_protocol.alertFromCore();
     // Кружок ⚠ → оранжевый
     if (g_ui.warn_bg) {
         lv_obj_set_style_bg_color(g_ui.warn_bg, lv_color_hex(0xff8800), 0);
@@ -3845,6 +3847,7 @@ static void dismiss_alert()
 {
     if (!g_ui.alert_box) return;
     g_alert.active = false;
+    g_alert.sticky = false;
     lv_obj_add_flag(g_ui.alert_box, LV_OBJ_FLAG_HIDDEN);
     // Кружок ⚠ → серый
     if (g_ui.warn_bg) {
@@ -3967,7 +3970,7 @@ static void update_ui_values(const LatheData& data)
     if (data.mode != s_last_mode) {
         s_last_mode = data.mode;
         s_last_select_menu = data.select_menu;
-        if (g_alert.active) dismiss_alert();  // Сбросить алерт при смене режима
+        if (g_alert.active && !g_alert.sticky) dismiss_alert();  // флаги ядра переживают смену режима, как на LCD2004
         apply_sm_layout(data.mode, data.select_menu);
     } else if (data.select_menu != s_last_select_menu) {
         s_last_select_menu = data.select_menu;
@@ -5344,8 +5347,8 @@ void loop()
         exit_sub_edit();
     }
 
-    // Авто-скрытие алерта через 5 секунд
-    if (g_alert.active && (millis() - g_alert.show_ms > 5000)) {
+    // Авто-скрытие алерта через 5 секунд (кроме флагов ошибки ядра — их закрывает STM32)
+    if (g_alert.active && !g_alert.sticky && (millis() - g_alert.show_ms > 5000)) {
         dismiss_alert();
     }
 

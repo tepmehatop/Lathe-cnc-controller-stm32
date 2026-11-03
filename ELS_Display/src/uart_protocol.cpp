@@ -471,6 +471,7 @@ void UartProtocol::parseAlert(const char* params)
     }
 
     int type = atoi(params);
+    alert_from_core_ = (type >= 1 && type <= 4);
     switch (type) {
         case 0: // Скрыть алерт (Arduino сбросил флаги ошибки)
                 if (alert_dismiss_callback_) alert_dismiss_callback_();
@@ -491,6 +492,7 @@ void UartProtocol::parseAlert(const char* params)
             Serial.printf("Unknown alert type: %d\n", type);
             break;
     }
+    alert_from_core_ = false;
 }
 
 void UartProtocol::parseThreadName(const char* params)

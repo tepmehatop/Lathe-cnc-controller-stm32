@@ -896,6 +896,11 @@ void setup()
   Serial.println(F("===== SETUP() ЗАВЕРШЕН! ================"));
   Serial.println(F("Система готова. Введите HELP"));
   Serial.println(F(""));
+
+  // [STM32] Display_UART_Init() в начале setup() шлёт состояние до того, как заданы подачи
+  // (дисплей получал 0.00). Повторно — уже с готовыми значениями, на случай если
+  // перезапустился только STM32 и дисплей не пришлёт READY.
+  Display_Send_All();
 }
 
 
@@ -1785,6 +1790,19 @@ static void e2_io_monitor(void)
 }
 #endif
 
+// Сообщение, которое сейчас горит на LCD2004 (порядок как в Print.ino): 4 — джойстик в нейтраль,
+// 1 — установите упоры, 2 — суппорт в исходное, 3 — операция завершена, 0 — нет.
+// -1 — отправить заново (Display_Send_All, в т.ч. по READY дисплея).
+int8_t e2_alert_sent = -1;
+static int8_t e2_alert_now(void)
+{
+   if (err_0_flag)    return 4;
+   if (err_1_flag)    return 1;
+   if (err_2_flag)    return 2;
+   if (Complete_flag) return 3;
+   return 0;
+}
+
 // Обороты шпинделя для дисплея ESP32 и строка состояния LCD2004 для автотестов
 void e2_service(void)
 {
@@ -1806,6 +1824,13 @@ void e2_service(void)
    if (Pass_Total_Sphr != s_sphr) {
       s_sphr = Pass_Total_Sphr;
       Display_Send_Int("PASS_SPHR", Pass_Total_Sphr);
+   }
+   // Сообщения на новом дисплее горят ровно столько же, сколько на LCD2004: ядро ставит и снимает
+   // флаги ошибок в разных местах и не везде шлёт ALERT — отправляем по изменению флагов
+   int8_t al = e2_alert_now();
+   if (al != e2_alert_sent) {
+      e2_alert_sent = al;
+      Display_Send_Alert(al);
    }
    if (now - s_lcd_t >= 500) {
       s_lcd_t = now;

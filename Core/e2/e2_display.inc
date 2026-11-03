@@ -220,6 +220,7 @@ static void _Display_SendThread()
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void Display_Send_All()
 {
+  e2_alert_sent = -1;                 // [STM32] e2_service() перешлёт текущее сообщение LCD2004
   // 1. Режим (MODE_FEED=1 .. MODE_RESERVE=8)
   Display_Send_Int("MODE", (int)Mode);
 
