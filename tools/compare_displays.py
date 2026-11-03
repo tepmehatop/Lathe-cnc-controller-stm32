@@ -7,8 +7,9 @@
 (те же Switch_*/Key_* ядра, что и у кнопок пульта) и нажатия физических входов —
 вывод STM32 временно переводится в выход с низким уровнем через SWD.
 
-Проверка: каждое число со старого экрана должно быть на новом (с точностью до
-формата: «0.13» = «+0.13», «45°» = «45»). Все пары экранов — в отчёт.
+Проверка: каждая подпись старого экрана (таблица RULES) — в ячейке нового с тем же
+значением; строки без правила и одинаковые подписи в двух ячейках — расхождение.
+Все пары экранов — в отчёт.
 
 Нужно: STM32 по ST-Link, дисплей по USB, Mega-эмулятор (позиции фиксируются командами
 w0/z/x). Запуск из корня проекта:
@@ -152,41 +153,165 @@ def parse_ui(line):
 
 
 # ─── Сравнение ───────────────────────────────────────────────────────────────
-NUM = re.compile(r'\d+(?:[.,]\d+)?')
+# LCD2004 пишет кириллицу латинскими двойниками (A, B, C, ... из знакогенератора) — приводим
+# обе стороны к кириллице верхнего регистра. Оси X/Y: X → Х (кириллица) с обеих сторон.
+_LAT2CYR = str.maketrans('ABCEHKMOPTXaceopxymb', 'АВСЕНКМОРТХасеорхумь')
 
-def numbers(text):
+def norm(t):
+    t = re.sub(r'#[0-9a-fA-F]{6} ([^#]*)#', r'\1', t or '')
+    return t.translate(_LAT2CYR).upper().replace('\\N', ' ').strip()
+
+NUM_RE = re.compile(r'[+-]?\d+(?:\.\d+)?')
+
+# Ячейки нового дисплея: (ключ видимости, заголовок, значение)
+CELLS = (('', 'primary_unit', 'primary_val'), ('', 'secondary_unit', 'secondary_val'),
+         ('row1_box', 'row1_title', 'row1_val'), ('row2_box', 'row2_title', 'row2_val'),
+         ('row3_box', 'row3_title', 'row3_val'), ('row4_box', 'row4_title', 'row4_val'),
+         ('thr_type_box', 'thr_type_title', 'thr_type_val'), ('diam_box', 'diam_title', 'diam_val'))
+
+def ui_cells(ui):
     out = []
-    for m in NUM.finditer(text):
-        try:
-            out.append(float(m.group().replace(',', '.')))
-        except ValueError:
-            pass
+    for box, t, v in CELLS:
+        if t not in ui or (box and ui.get(box) == '0'):
+            continue
+        out.append((norm(ui[t]), norm(ui.get(v, ''))))
     return out
 
-VISIBLE_KEYS = ('mode_lbl', 'submode_lbl', 'primary_unit', 'primary_val', 'thread_tag', 'secondary_unit',
-                'secondary_val', 'row1_title', 'row1_val', 'row2_title', 'row2_val', 'row3_title', 'row3_val',
-                'row4_title', 'row4_val', 'thr_type_title', 'thr_type_val', 'diam_title', 'diam_val',
-                'sm_row6', 's2_lbl', 'alert_msg')
+# Правила: подпись LCD2004 → где и как она должна быть на новом дисплее.
+#   где: 'cell' (ячейка с заголовком по регулярке), 'mode', 'sub', 'sm', 'alert', 'any' (любой текст), 'skip'
+#   как: 'num' — число, 'snum' — число со знаком (группа 1 — минус LCD), 'first' — первое целое ячейки,
+#        'text' — текст, None — только наличие
+R = lambda name, lcd, where, title=None, kind=None: (name, re.compile(lcd), where, title and re.compile(title), kind)
+RULES = [
+    R('Ø (диаметр)',      r'^Ø(-?)\s*([\d.]+)\s',            'cell', r'^⌀ ДИАМЕТР$', 'snum'),
+    R('Ось X',            r'^Х(-?)\s*([\d.]+)\s',            'cell', r'^(ПОЗИЦИЯ|ОСЬ) Х$', 'snum'),
+    R('Ось Y',            r'^Y(-?)\s*([\d.]+)\s',            'cell', r'^(ПОЗИЦИЯ|ОСЬ) Y$', 'snum'),
+    R('Подача',           r'ПОДАЧА:\s*([\d.]+)',             'cell', r'^ПОДАЧА$', 'num'),
+    R('Циклов',           r'ЦИКЛОВ:\s*(\d+)',                'cell', r'^(ПРОХОДЫ|ЦИКЛОВ)$', 'first'),
+    R('Съём Ø',           r'СЪЁМ Ø:\s*([\d.]+)',             'cell', r'^СЪЁМ ⌀$', 'num'),
+    R('Съём R',           r'СЪЁМ R:\s*([\d.]+)',             'cell', r'^СЪЁМ R$', 'num'),
+    R('Шаг',              r'ШАГ:\s*([\d.]+)',                'cell', r'^(ШАГ ММ|ДЮЙМ|G-ТРУБ|K-ТРУБ|К-ТРУБ)$', 'num'),
+    R('Об/мин',           r'ОБ/МИН:\s*(\d+)',                'cell', r'^ОБ/МИН$', 'num'),
+    R('Ножка',            r'НОЖКА:Ø([\d.]+)',                'cell', r'^НОЖКА ⌀$', 'num'),
+    R('Заходов',          r'ЗАХОДОВ:\s*(\d+)',               'cell', r'^ЗАХОДОВ$', 'first'),
+    R('Шар Ø',            r'ШАР Ø([\d.]+)ММ',                'cell', r'^ШАР ⌀$', 'num'),
+    R('Шар: состояние',   r'ШАР Ø[\d.]+ММ\s+(\S+)',          'sub',  None, 'text'),
+    R('Подрежим',         r'^(РУЧНО\S*|РУЧНА\S*|ВНУТР\S*|НАРУЖ\S*)\s', 'sub', None, 'prefix4'),
+    R('Режим Синхрон',    r'(?<!А)(СИНХРОН)\s*$',            'mode', None, 'text'),
+    R('Режим Асинхрон',   r'(АСИНХРОН)\s*$',                 'mode', None, 'text'),
+    R('Режим Резьба',     r'→\s+(РЕЗЬБА)\s*$',               'mode', None, 'text'),
+    R('Режим Конус',      r'([<>])\s*\S+\s+(КОНУС)\s*$',     'mode', None, 'cone'),
+    R('Угол конуса',      r'[<>]\s*(\S+?)°?\s+КОНУС\s*$',    'cell', r'^КОНУС$', 'text'),
+    R('Ввод Ø/Сброс',     r'ВВОД Ø\s+СБРОС_ОСЕЙ',            'sm',   r'ВВОД ⌀', None),
+    R('Диаметр (ввод)',   r'ДИАМЕТР ←→ (-?)\s*([\d.]+)ММ',   'cell', r'^⌀ ДИАМЕТР$', 'snum'),
+    R('Ось X (ввод)',     r'ОСЬ Х:.*?(-?)\s*([\d.]+)ММ',     'cell', r'^(ПОЗИЦИЯ|ОСЬ) Х$', 'snum'),
+    R('Ось Y (ввод)',     r'ОСЬ Y:.*?(-?)\s*([\d.]+)ММ',     'cell', r'^(ПОЗИЦИЯ|ОСЬ) Y$', 'snum'),
+    R('Чист проходов',    r'ЧИСТ ПРОХОДОВ:.*?(\d+)\s*$',     'cell', r'ЧИСТ', 'num'),
+    R('Колич заходов',    r'КОЛИЧ ЗАХОДОВ:.*?(\d+)\s*$',     'cell', r'ЗАХОД', 'num'),
+    R('Ход резьбы',       r'ХОД РЕЗЬБЫ:\s*([\d.]+)',         'cell', r'^ХОД', 'num'),
+    R('Шаг резьбы',       r'ШАГ РЕЗЬБЫ:\s*([\d.]+)',         'cell', r'^(ШАГ ММ|ДЮЙМ|G-ТРУБ|K-ТРУБ|К-ТРУБ)$', 'num'),
+    R('Текущий угол',     r'ТЕКУЩИЙ\s+УГОЛ:\s*([\d.]+)°',    'cell', r'^УГОЛ', 'num'),
+    R('Делим круг на',    r'ДЕЛИМ КРУГ НА:\s*(\d+)',         'cell', r'^ДЕЛЕНИЙ$', 'num'),
+    R('Выбор отметки',    r'ВЫБОР ОТМЕТКИ:\s*(\d+)',         'cell', r'^МЕТКА$', 'num'),
+    R('Угол сектора',     r'УГОЛ\s+СЕКТОРА:\s*([\d.]+)°',    'cell', r'СЕКТОР', 'num'),
+    R('Конус (экран 2)',  r'^КОНУС\s+[<>]\s+(\S+?)°?\s',     'cell', r'.', 'text'),
+    R('Кон. резьба',      r'РЕЗЬБА:\s+(ВКЛ|ВЫКЛ)',           'cell', r'.', 'text'),
+    R('Коническая',       r'^КОНИЧЕСКАЯ',                    'skip'),
+    R('В режиме резьба',  r'В РЕЖИМЕ РЕЗЬБА',                'cell', r'^В РЕЖИМЕ$', None),
+    R('Ширина резца',     r'ШИРИНА РЕЗЦА:\s*([\d.]+)',       'cell', r'ШИРИН', 'num'),
+    R('Шаг по оси Y',     r'ШАГ ПО ОСИ Y:\s*([\d.]+)',       'cell', r'ШАГ.*Y', 'num'),
+    R('Делилка: заголовок', r'^ТЕКУЩИЙ УГОЛ$',               'cell', r'^УГОЛ', None),
+    R('Делилка: угол',    r'^([\d.]+)°$',                    'cell', r'^УГОЛ', 'num'),
+    R('Сброс кнопкой Селект', r'СБРОС КНОПКОЙ СЕЛЕКТ',       'any',  r'СБРОС', None),
+    R('Отскок Y',         r'ОТСКОК Y:.*?([\d.]+)ММ',        'cell', r'^ОТСКОК Y$', 'num'),
+    R('Ослабление',       r'^ОСЛАБЛЕНИЕ',                    'skip'),
+    R('…натяга Y',        r'НАТЯГА Y:.*?([\d.]+)ММ',        'cell', r'НАТЯГА Y$', 'num'),
+    R('Режим невозможен', r'РЕЖИМ НЕВОЗМОЖЕН',               'alert', r'НЕВОЗМОЖЕН', None),
+    R('ВНИМАНИЕ',         r'^ВНИМАНИЕ:?$',                   'alert'),
+    R('Установите упоры', r'УСТАНОВИТЕ УПОРЫ',               'alert', r'УПОРЫ', None),
+    R('Установите джойстик', r'УСТАНОВИТЕ ДЖОЙСТИК',         'alert', r'ДЖОЙСТИК', None),
+    R('…в нейтральное',   r'^В НЕЙТРАЛЬНОЕ$|^ПОЛОЖЕНИЕ$',    'alert'),
+    R('Суппорт',          r'СУППОРТ|ИСХОДН',                 'alert', r'СУППОРТ', None),
+    R('Операция завершена', r'ОПЕРАЦИЯ [3З]АВЕРШЕНА',        'alert', r'ЗАВЕРШЕНА', None),
+]
 
-def ui_visible_text(ui):
-    keys = [k for k in VISIBLE_KEYS if k in ui]
-    if ui.get('thr_type_box') == '0':
-        keys = [k for k in keys if not k.startswith('thr_type')]
-    if ui.get('diam_box') == '0':
-        keys = [k for k in keys if not k.startswith('diam')]
-    if ui.get('alert') == '0':
-        keys = [k for k in keys if k != 'alert_msg']
-    return {k: ui[k] for k in keys}
+def _num(text):
+    m = NUM_RE.search(text.replace(',', '.'))
+    return float(m.group()) if m else None
+
+def _value_ok(kind, m, val):
+    if kind is None:
+        return True, ''
+    if kind == 'snum':
+        want = float(m.group(1) + m.group(2))
+        got = _num(val)
+        return got is not None and abs(got - want) < 0.006, f'{want:g}'
+    if kind in ('num', 'first'):
+        want = float(m.group(1))
+        got = _num(val)
+        return got is not None and abs(got - want) < 0.006, f'{want:g}'
+    want = m.group(1).replace('°', '')
+    v = val.replace('°', '')
+    if kind == 'prefix4':
+        return v[:4] == want[:4], want
+    return want in v, want
 
 def compare(lcd_rows, ui):
-    vis = ui_visible_text(ui)
-    ui_nums = numbers(' '.join(vis.values()))
-    missing = []
-    for row in lcd_rows:
-        for n in numbers(row):
-            if not any(abs(n - u) < 0.006 for u in ui_nums):
-                missing.append(n)
-    return missing
+    """Список проблем: (подпись LCD, что не так)."""
+    issues = []
+    cells = ui_cells(ui)
+    alert_on = ui.get('alert') == '1'
+    alert_txt = norm(ui.get('alert_msg', ''))
+    all_txt = ' '.join([t + ' ' + v for t, v in cells] +
+                       [norm(ui.get(k, '')) for k in ('mode_lbl', 'submode_lbl', 'sm_row6')] +
+                       ([alert_txt] if alert_on else []))
+    for raw in lcd_rows:
+        row = norm(raw)
+        if not row:
+            continue
+        matched = False
+        for name, rx, where, title, kind in RULES:
+            m = rx.search(row)
+            if not m:
+                continue
+            matched = True
+            if where == 'skip':
+                continue
+            if where == 'cell':
+                cand = [(t, v) for t, v in cells if title.search(t)]
+                if not cand:
+                    issues.append((name, f'нет ячейки «{title.pattern}» на новом'))
+                    continue
+                res = [_value_ok(kind, m, v) for t, v in cand]
+                if not any(ok for ok, _ in res):
+                    issues.append((name, f'LCD {res[0][1]}, новый: ' + '; '.join(f'{t}={v}' for t, v in cand)))
+            elif where in ('mode', 'sub', 'sm'):
+                key = {'mode': 'mode_lbl', 'sub': 'submode_lbl', 'sm': 'sm_row6'}[where]
+                val = norm(ui.get(key, ''))
+                if kind == 'cone':
+                    ok = ('КОНУС ' + m.group(1)) in val
+                elif title is not None and kind is None:
+                    ok = bool(title.search(val))
+                else:
+                    ok = _value_ok(kind, m, val)[0]
+                if not ok:
+                    issues.append((name, f'LCD «{m.group(0).strip()}», новый {key}={val}'))
+            elif where == 'alert':
+                if not alert_on:
+                    issues.append((name, 'на новом нет сообщения'))
+                elif title is not None and not title.search(alert_txt):
+                    issues.append((name, f'на новом другое сообщение: {alert_txt}'))
+            elif where == 'any':
+                if not title.search(all_txt):
+                    issues.append((name, 'текста нет на новом'))
+        if not matched:
+            issues.append(('строка LCD', f'нет правила сверки: «{raw.strip()}»'))
+    # одна и та же подпись в двух ячейках
+    titles = [t for t, v in cells if t and v not in ('', '--', '---')]
+    for t in sorted(set(titles)):
+        if titles.count(t) > 1:
+            issues.append(('дубль', f'«{t}» в {titles.count(t)} ячейках'))
+    return issues
 
 
 # ─── Сценарий ────────────────────────────────────────────────────────────────
@@ -212,9 +337,19 @@ def build_steps():
     steps.append(('джойстик отпущен', [('release', 'JOY_RIGHT')]))
     # Упоры работают только при физическом переключателе подрежима в «Ручной» (BACKLOG-022):
     # держим SUB_MAN на GND, ставим 4 упора и проходим Внутр./Наруж. во всех режимах
-    steps.append(('переключатель подрежима «Ручной» (физ.), M1', [('press', 'SUB_MAN'), ('btn', 'M1'), ('btn', 'S2')]))
-    for lim in ('LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT', 'LIM_REAR'):
-        steps.append((f'упор {lim} установлен (физ.)', [('press', lim), ('wait', 0.3), ('release', lim)]))
+    steps.append(('переключатель подрежима «Ручной» (физ.), M2', [('press', 'SUB_MAN'), ('btn', 'M2'), ('btn', 'S2')]))
+    # Левый упор ставится правее правого и наоборот (Menu.ino) — между нажатиями отгоняем
+    # каретку джойстиком (в аПодаче мотор идёт без вращения шпинделя)
+    for pin, flag in (('LIM_LEFT', 'limit_Left_flag'), ('LIM_RIGHT', 'limit_Right_flag'),
+                      ('LIM_FRONT', 'limit_Front_flag'), ('LIM_REAR', 'limit_Rear_flag')):
+        steps.append((f'упор {pin} снят перед установкой', [('lim', (pin, flag, 0))]))
+    steps.append(('упор LIM_LEFT установлен (физ.)', [('lim', ('LIM_LEFT', 'limit_Left_flag', 1))]))
+    steps.append(('джойстик Вправо 3 с',   [('press', 'JOY_RIGHT'), ('wait', 3), ('release', 'JOY_RIGHT')]))
+    steps.append(('упор LIM_RIGHT установлен (физ.)', [('lim', ('LIM_RIGHT', 'limit_Right_flag', 1))]))
+    steps.append(('упор LIM_FRONT установлен (физ.)', [('lim', ('LIM_FRONT', 'limit_Front_flag', 1))]))
+    # Передний упор встаёт в текущей точке и запрещает движение к нему (Вверх) — отгон Вниз
+    steps.append(('джойстик Вниз 3 с',     [('press', 'JOY_DOWN'), ('wait', 3), ('release', 'JOY_DOWN')]))
+    steps.append(('упор LIM_REAR установлен (физ.)', [('lim', ('LIM_REAR', 'limit_Rear_flag', 1))]))
     for m in range(1, 7):
         steps.append((f'[упоры] M{m} {MODE_NAMES[m]}', [('btn', f'M{m}')]))
         for s, sname in ((1, 'Внутр.'), (3, 'Наруж.')):
@@ -225,10 +360,34 @@ def build_steps():
                 steps.append((f'[упоры] M{m} S{s} SM{sm} Вниз', [('btn', 'KEY:DN')]))
         steps.append((f'[упоры] M{m} S2 возврат', [('btn', 'S2')]))
     steps.append(('[упоры] M1 S2', [('btn', 'M1'), ('btn', 'S2')]))
-    for lim in ('LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT', 'LIM_REAR'):
-        steps.append((f'упор {lim} снят (физ.)', [('press', lim), ('wait', 0.3), ('release', lim)]))
+    for pin, flag in (('LIM_LEFT', 'limit_Left_flag'), ('LIM_RIGHT', 'limit_Right_flag'),
+                      ('LIM_FRONT', 'limit_Front_flag'), ('LIM_REAR', 'limit_Rear_flag')):
+        steps.append((f'упор {pin} снят (физ.)', [('lim', (pin, flag, 0))]))
     steps.append(('переключатель подрежима отпущен', [('release', 'SUB_MAN')]))
     return steps
+
+
+def run_actions(stm, esp, actions):
+    """Выполнить действия; вернуть список проблем сценария (например, упор не встал)."""
+    problems = []
+    for act, arg in actions:
+        if act == 'btn':
+            esp.btn(arg); time.sleep(0.25)
+        elif act == 'press':
+            stm.press(arg)
+        elif act == 'release':
+            stm.release(arg)
+        elif act == 'wait':
+            time.sleep(arg)
+        elif act == 'lim':                      # кнопка упора переключает — жмём, только если нужно
+            pin, flag, want = arg
+            for _ in range(3):
+                if stm.var(flag) == want:
+                    break
+                stm.press(pin); time.sleep(0.3); stm.release(pin); time.sleep(0.4)
+            if stm.var(flag) != want:
+                problems.append(f'{flag} не стал {want} после 3 нажатий {pin}')
+    return problems
 
 
 def main():
@@ -237,7 +396,7 @@ def main():
     ap.add_argument('--mega', default='/dev/cu.usbserial-1410')
     ap.add_argument('--out', required=True)
     ap.add_argument('--settle', type=float, default=0.8, help='пауза после действия, с')
-    ap.add_argument('--only', default=None, help='только шаги, содержащие подстроку')
+    ap.add_argument('--only', default=None, help='только шаги, содержащие одну из подстрок (через |)')
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
 
@@ -253,33 +412,37 @@ def main():
     fails, total = [], 0
     try:
         for name, actions in build_steps():
-            if a.only and a.only not in name:
+            if a.only and not any(x in name for x in a.only.split('|')):
                 continue
-            for act, arg in actions:
-                if act == 'btn':
-                    esp.btn(arg); time.sleep(0.25)
-                elif act == 'press':
-                    stm.press(arg)
-                elif act == 'release':
-                    stm.release(arg)
-                elif act == 'wait':
-                    time.sleep(arg)
+            scen = run_actions(stm, esp, actions)
             time.sleep(a.settle)
             rows = [dec(r) for r in stm.lcd_codes()]
             ui = esp.uidump()
-            core = {v: stm.var(v) for v in ('Mode', 'SelectMenu') if v in stm.sym}
-            missing = compare(rows, ui)
+            if compare(rows, ui):
+                # снимок мог попасть на перерисовку одного из экранов — пересъёмка через 0.5 с
+                time.sleep(0.5)
+                rows = [dec(r) for r in stm.lcd_codes()]
+                ui = esp.uidump()
+            core = {v: stm.var(v) for v in ('Mode', 'SelectMenu', 'limit_Left_flag', 'limit_Right_flag',
+                                            'limit_Front_flag', 'limit_Rear_flag') if v in stm.sym}
+            issues = [('сценарий', p) for p in scen] + compare(rows, ui)
             total += 1
-            status = 'OK' if not missing else 'НЕТ НА НОВОМ: ' + ', '.join(f'{n:g}' for n in missing)
-            if missing:
-                fails.append((name, missing))
+            status = 'OK' if not issues else f'{len(issues)} расхожд.'
+            if issues:
+                fails.append((name, issues))
             print(f'[{total:3}] {name:45} {status}')
-            vis = ui_visible_text(ui)
+            for n, why in issues:
+                print(f'        - {n}: {why}')
             report += [f'## {total}. {name} — {status}', '',
-                       f'Ядро: Mode={core.get("Mode")} SelectMenu={core.get("SelectMenu")}', '',
-                       '| LCD2004 | новый дисплей |', '|---|---|']
-            ui_lines = [f'{k}: {v}' for k, v in vis.items() if v not in ('', '--', '---')]
-            flags = ' '.join(f'{k}={ui[k]}' for k in ('alert', 'mode_menu', 'joystick', 'edit', 'sub_edit') if ui.get(k) not in (None, '0'))
+                       'Ядро: ' + ' '.join(f'{k}={v}' for k, v in core.items()), '']
+            report += [f'- ❗ {n}: {why}' for n, why in issues] + ([''] if issues else [])
+            report += ['| LCD2004 | новый дисплей (видимые ячейки: заголовок = значение) |', '|---|---|']
+            ui_lines = [f'{k}: {norm(ui.get(k, ""))}' for k in ('mode_lbl', 'submode_lbl', 'sm_row6')
+                        if norm(ui.get(k, '')) not in ('', '--')]
+            ui_lines += [f'{t} = {v}' for t, v in ui_cells(ui) if (t or v) and v not in ('---',)]
+            if ui.get('alert') == '1':
+                ui_lines.append(f'СООБЩЕНИЕ: {norm(ui.get("alert_msg", ""))}')
+            flags = ' '.join(f'{k}={ui[k]}' for k in ('mode_menu', 'joystick', 'edit', 'sub_edit') if ui.get(k) not in (None, '0'))
             if flags:
                 ui_lines.append(flags)
             for i in range(max(4, len(ui_lines))):
@@ -288,7 +451,7 @@ def main():
                 report.append(f'| `{l}` | {r} |')
             report.append('')
     finally:
-        for p in ('JOY_LEFT', 'JOY_RIGHT', 'SUB_MAN', 'LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT', 'LIM_REAR'):
+        for p in ('JOY_LEFT', 'JOY_RIGHT', 'JOY_DOWN', 'SUB_MAN', 'LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT', 'LIM_REAR'):
             try:
                 stm.release(p)
             except Exception:
@@ -296,9 +459,9 @@ def main():
         stm.close()
         mega.write(b'w1\n'); mega.close()
 
-    report[3:3] = [f'**Итог: {total - len(fails)} из {total} состояний — все числа старого экрана есть на новом.**', '']
+    report[3:3] = [f'**Итог: {total - len(fails)} из {total} состояний — каждая подпись и значение LCD2004 есть на новом, без дублей.**', '']
     if fails:
-        report[5:5] = ['Расхождения:', ''] + [f'- {n}: {", ".join(f"{x:g}" for x in m)}' for n, m in fails] + ['']
+        report[5:5] = ['Расхождения:', ''] + [f'- {n}: ' + '; '.join(f'{a} — {b}' for a, b in m) for n, m in fails] + ['']
     path = os.path.join(a.out, 'compare_report.md')
     open(path, 'w', encoding='utf-8').write('\n'.join(report))
     print(f'\nИТОГ: {total - len(fails)}/{total} без расхождений; отчёт: {path}')

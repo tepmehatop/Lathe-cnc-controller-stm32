@@ -80,7 +80,7 @@ static StepLog s_z, s_x;
 static std::vector<long> s_z_at_rev;   // счётчик шагов Z на каждом обороте шпинделя
 static long spindle_lines_now();
 extern int McStep_Lag;
-struct MoveStart { long line; long x; int dir; long z; };
+struct MoveStart { long line; long x; int dir; long z; long pass_nr; std::string lcd_row2; std::string disp_pass; };
 static std::vector<MoveStart> s_z_starts;   // начала движений Z (после паузы ≥ 50 мс)
 static uint64_t s_z_last_step = 0;
 struct XTurn { long z; long x; int lag; };
@@ -90,6 +90,12 @@ static int s_x_last_dir = -1;
 #define PIN_BIT(...) E2_BIT(__VA_ARGS__)
 static void set_in(GPIO_TypeDef* g, uint32_t bit, int level) { if (level) g->IDR |= bit; else g->IDR &= ~bit; }
 #define SET_IN(pin, lvl) set_in(E2_GPIO(pin), E2_BIT(pin), (lvl))
+
+// Огибающая движения за автоцикл: крайние положения кареток на каждом шаге (проверка упоров)
+static bool s_env_on = false;
+static long s_env_zmin, s_env_zmax, s_env_xmin, s_env_xmax;
+static std::string lcd_row(int r);
+static std::string last_disp_pass();
 
 static void sample_steps() {
     auto chk = [](StepLog& l, uint32_t lvl, uint32_t dir_ccw) {
@@ -105,7 +111,8 @@ static void sample_steps() {
     chk(s_z, E2_DRV_RD(E2_PIN_Z_STEP), E2_DRV_RD(E2_PIN_Z_DIR));
     if (s_z.count != before) {
         if (t_ns - s_z_last_step > 50000000ull)
-            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR), Motor_Z_Pos});
+            s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR), Motor_Z_Pos,
+                                  Pass_Nr, lcd_row(2), last_disp_pass()});
         s_z_last_step = t_ns;
     }
     long xb = s_x.count;
@@ -116,6 +123,12 @@ static void sample_steps() {
     if (s_x.count == xb && Motor_X_Pos != s_xpos_prev && getenv("SIM_XTRACE"))
         printf("      X: счёт без импульса t=%.6f %ld→%ld in_loop=%d ev=%d en3b=%d en4b=%d pin=%u ARR12=%u\n", t_ns / 1e9, s_xpos_prev, Motor_X_Pos, in_loop, s_cur_ev, e2_en_t3b, e2_en_t4b, (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)TIM12->ARR);
     s_xpos_prev = Motor_X_Pos;
+    if (s_env_on) {
+        if (Motor_Z_Pos < s_env_zmin) s_env_zmin = Motor_Z_Pos;
+        if (Motor_Z_Pos > s_env_zmax) s_env_zmax = Motor_Z_Pos;
+        if (Motor_X_Pos < s_env_xmin) s_env_xmin = Motor_X_Pos;
+        if (Motor_X_Pos > s_env_xmax) s_env_xmax = Motor_X_Pos;
+    }
     if (s_x.count != xb) {
         int d = (int)E2_DRV_RD(E2_PIN_X_DIR);
         if (s_x_last_dir == 0 && d == 1) s_x_turns.push_back({Motor_Z_Pos, Motor_X_Pos, McStep_Lag});
@@ -205,6 +218,20 @@ static void touch(const char* cmd) { DISPLAY_UART.inject(std::string("<TOUCH:") 
 // ── Мини-фреймворк ───────────────────────────────────────────────────────────
 static int s_pass = 0, s_fail = 0;
 #define CHECK(cond, ...) do { if (cond) { s_pass++; } else { s_fail++; printf("  FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
+
+static std::string lcd_row(int r) {
+    std::string t;
+    for (int c = 0; c < 20; c++) { uint8_t ch = lcd.row(r)[c]; t += (ch >= 32 && ch < 127) ? (char)ch : '.'; }
+    return t;
+}
+// Последний счётчик проходов, отправленный новому дисплею: <PASS:nr,total> или <THREAD_CYCL:n>
+static std::string last_disp_pass() {
+    const std::string& o = DISPLAY_UART.out;
+    size_t p = o.rfind("<PASS:");
+    if (p == std::string::npos) return "";
+    size_t e = o.find('>', p);
+    return o.substr(p + 6, e == std::string::npos ? std::string::npos : e - p - 6);
+}
 
 static std::string lcd_text() {
     std::string t;
@@ -700,12 +727,244 @@ static void test_tacho() {
     spindle(0); run_ms(50);
 }
 
+// ============================================================================
+// Матрица автоциклов (SIM_CYCLES=1): упоры, число и глубина проходов, счётчики на LCD2004
+// и новом дисплее по ходу цикла, завершение и возврат в исходную точку.
+// SIM_CYC_ONLY=<подстрока> — только случаи с этой подстрокой в названии.
+// ============================================================================
+static int thread_idx(const char* print) {               // индекс резьбы по надписи таблицы ("1.50mm", "18tpi"…)
+    for (int i = 0; i < (int)TOTAL_THREADS; i++) {
+        std::string t = Thread_Info[i].Thread_Print;
+        t.erase(0, t.find_first_not_of(' ')); t.erase(t.find_last_not_of(' ') + 1);
+        if (t == print) return i;
+    }
+    return -1;
+}
+static long trailing_num(const std::string& s) {         // число в конце строки LCD («Циклов:   5»)
+    size_t e = s.find_last_of("0123456789");
+    if (e == std::string::npos) return -1;
+    size_t b = s.find_last_not_of("0123456789", e);
+    return atol(s.substr(b + 1, e - b).c_str());
+}
+static void press_key(const char* k, int n) { for (int i = 0; i < n; i++) { touch(k); run_ms(60); } }
+
+// Длина между упорами задаётся временем ускоренного хода; с разгоном это прямая со смещением —
+// калибруем по двум точкам
+static double s_rapid_k = 0, s_rapid_b = 0;              // мм = k·мс + b
+static double z_len_mm() { return (Limit_Pos_Left - Limit_Pos_Right) * (SCREW_Z / 100.0) / (MOTOR_Z_STEP_PER_REV * McSTEP_Z); }
+static bool setup_z_len(double mm) {
+    if (s_rapid_k == 0) {
+        bool ok1 = setup_z_limits(800);  double a = z_len_mm();
+        bool ok2 = setup_z_limits(1600); double b = z_len_mm();
+        printf("    калибровка ускоренного хода: 800 мс → %.2f мм, 1600 мс → %.2f мм\n", a, b);
+        CHECK(ok1 && ok2 && b > a, "калибровка длины между упорами не удалась");
+        s_rapid_k = (b - a) / 800.0; s_rapid_b = a - s_rapid_k * 800;
+    }
+    return setup_z_limits(std::max(800.0, (mm - s_rapid_b) / s_rapid_k));
+}
+
+struct CycCase {
+    std::string name; int mode; bool internal; double len_mm; double rpm;
+    std::function<void()> prep;          // параметры в «Ручном» (кнопки/касания)
+    int expect_passes;                    // рабочих проходов Z (с чистовыми и заходами)
+    std::function<long(int)> infeed;      // X рабочего прохода k (1..) от старта, шаги (nullptr — не проверять)
+};
+
+static void run_cyc(const CycCase& c) {
+    printf("[%7.1f с] [cyc] %s\n", t_ns / 1e9, c.name.c_str());
+    bool ok = setup_z_len(c.len_mm);
+    CHECK(ok, "%s: упоры Z не установлены", c.name.c_str());
+    long L = Limit_Pos_Left, R = Limit_Pos_Right;
+    select_mode(c.mode);
+    c.prep();
+    long pt_set = Pass_Total;
+    SET_IN(E2_PIN_SUB_MAN, 1); if (c.internal) SET_IN(E2_PIN_SUB_INT, 0); else SET_IN(E2_PIN_SUB_EXT, 0); run_ms(300);
+    CHECK(!err_1_flag && !err_2_flag, "%s: подрежим не включился (err1=%d err2=%d)", c.name.c_str(), err_1_flag, err_2_flag);
+    long x0 = Motor_X_Pos, z0 = Motor_Z_Pos;
+    size_t mark = DISPLAY_UART.out.size();
+    spindle(c.rpm); run_ms(300);
+    s_z_starts.clear();
+    s_env_zmin = s_env_zmax = z0; s_env_xmin = s_env_xmax = x0; s_env_on = true;
+    SET_IN(E2_PIN_JOY_LEFT, 0);                           // старт: джойстик в сторону реза и держать
+    double t = 0;
+    while (!Complete_flag && t < 900000) { run_ms(100); t += 100; }
+    bool done = Complete_flag;
+    run_ms(200);
+    std::string lcd_end = lcd_text();
+    s_env_on = false;
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000);
+    spindle(0); run_ms(100);
+    std::string disp = DISPLAY_UART.out.substr(mark);
+
+    // рабочие проходы (влево) и возвраты (вправо); счётчики снимаем в начале возврата — к этому
+    // моменту LCD2004 (перерисовка 40 мс) и новый дисплей уже обновлены
+    std::vector<MoveStart> work, back;
+    for (auto& m : s_z_starts) (m.dir == 0 ? work : back).push_back(m);
+    const long tolZ = 4, tolX = McSTEP_X * 2;
+    long pitch = c.mode == 3 ? lround(Thread_Info[Thread_Step].Step / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z) : 0;
+    long xmax_in = 0;
+    for (int k = 1; c.infeed && k <= c.expect_passes; k++) xmax_in = std::max(xmax_in, c.infeed(k));
+    int sgn = c.internal ? -1 : 1;
+
+    CHECK(done, "%s: цикл не завершился за %.0f с", c.name.c_str(), t / 1000);
+    CHECK((int)work.size() == c.expect_passes, "%s: рабочих проходов %zu, ожидалось %d", c.name.c_str(), work.size(), c.expect_passes);
+    // упоры Z: ни шага за левый; за правый — только на сдвиг заходов многозаходной резьбы
+    CHECK(s_env_zmax <= L + tolZ, "%s: Z ушёл за левый упор на %ld шагов", c.name.c_str(), s_env_zmax - L);
+    CHECK(s_env_zmin >= R - pitch * (Ph - 1) - tolZ, "%s: Z ушёл за правый упор на %ld шагов", c.name.c_str(), R - s_env_zmin);
+    // X: от отскока за старт до полной глубины, не дальше
+    if (c.infeed) {
+        long lo = sgn > 0 ? x0 - REBOUND_X - tolX : x0 - xmax_in - tolX;
+        long hi = sgn > 0 ? x0 + xmax_in + tolX : x0 + REBOUND_X + tolX;
+        CHECK(s_env_xmin >= lo && s_env_xmax <= hi, "%s: X вне [%+ld..%+ld]: %+ld..%+ld", c.name.c_str(), lo - x0, hi - x0, s_env_xmin - x0, s_env_xmax - x0);
+    }
+    // каждый проход дошёл до левого упора (возврат начинается у него)
+    int short_cut = 0;
+    for (auto& b : back) if (labs(b.z - L) > tolZ) short_cut++;
+    CHECK(short_cut == 0, "%s: %d возвратов начались не у левого упора", c.name.c_str(), short_cut);
+    // врезание по формуле 7e2
+    if (c.infeed) {
+        int bad = 0;
+        for (size_t i = 0; i < work.size(); i++) {
+            long want = c.infeed((int)(i / Ph) + 1);
+            long got = (work[i].x - x0) * sgn;
+            if (labs(got - want) > McSTEP_X) { if (bad++ < 3) printf("      проход %zu: X %+ld, по формуле %+ld\n", i + 1, got, want); }
+        }
+        CHECK(bad == 0, "%s: %d проходов с неверным врезанием", c.name.c_str(), bad);
+    }
+    // счётчик «осталось» на LCD2004 и на новом дисплее совпадает и не растёт
+    int mism = 0, nonmono = 0; long prev = 1 << 30;
+    long cycl = Thread_Info[Thread_Step].Pass + PASS_FINISH + Pass_Fin + Thr_Pass_Summ;
+    {
+        size_t p = disp.rfind("<THREAD_CYCL:");
+        if (p != std::string::npos) cycl = atol(disp.c_str() + p + 13);
+    }
+    for (auto& b : back) {
+        long lcd_left = trailing_num(b.lcd_row2);
+        long nr = -1, tot = -1;
+        sscanf(b.disp_pass.c_str(), "%ld,%ld", &nr, &tot);
+        if (c.mode == 3) tot = cycl;
+        long disp_left = tot - nr + 1;
+        if (lcd_left != disp_left) { if (mism++ < 3) printf("      LCD «%s» (осталось %ld), дисплей PASS %s → %ld\n", b.lcd_row2.c_str(), lcd_left, b.disp_pass.c_str(), disp_left); }
+        if (lcd_left > prev) nonmono++;
+        prev = lcd_left;
+    }
+    CHECK(mism == 0, "%s: счётчик проходов LCD и нового дисплея разошёлся %d раз", c.name.c_str(), mism);
+    CHECK(nonmono == 0, "%s: счётчик «осталось» на LCD рос %d раз", c.name.c_str(), nonmono);
+    CHECK(lcd_end.find("3ABEP") != std::string::npos, "%s: на LCD нет «ОПЕРАЦИЯ ЗАВЕРШЕНА»", c.name.c_str());
+    CHECK(disp.find("<ALERT:3>") != std::string::npos, "%s: новый дисплей не получил «ОПЕРАЦИЯ ЗАВЕРШЕНА»", c.name.c_str());
+    // Конец цикла (7e2): Z — к правому упору (старт). X: резьба и аподача — в ноль; подача и конус —
+    // резец остаётся на глубине последнего прохода (Feed.ino: Limit_Pos_Rear + REBOUND_X), видно итоговый размер
+    CHECK(Motor_Z_Pos == z0, "%s: Z не вернулся к старту: %+ld", c.name.c_str(), Motor_Z_Pos - z0);
+    if (c.mode == 3 || c.mode == 2) CHECK(Motor_X_Pos == x0, "%s: X не вернулся в ноль: %+ld", c.name.c_str(), Motor_X_Pos - x0);
+    else if (c.infeed) CHECK(labs((Motor_X_Pos - x0) * sgn - c.infeed(c.expect_passes)) <= McSTEP_X,
+                             "%s: X в конце %+ld, глубина последнего прохода %+ld", c.name.c_str(), Motor_X_Pos - x0, c.infeed(c.expect_passes) * sgn);
+    printf("    длина %.1f мм, проходов %zu/%d (Pass_Total %ld), X %+ld..%+ld, %.0f с; LCD «осталось»:",
+           (L - R) * (SCREW_Z / 100.0) / (MOTOR_Z_STEP_PER_REV * McSTEP_Z), work.size(), c.expect_passes, pt_set,
+           s_env_xmin - x0, s_env_xmax - x0, t / 1000);
+    for (auto& b : back) printf(" %ld", trailing_num(b.lcd_row2));
+    printf("\n");
+
+    // выход: «Ручной», снять упоры, вернуть заходы
+    SET_IN(E2_PIN_SUB_INT, 1); SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK"); touch("PH:1");
+    select_mode(1);
+    if (limit_Left_flag)  { SET_IN(E2_PIN_LIM_LEFT, 0);  run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1);  run_ms(100); }
+    if (limit_Right_flag) { SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100); }
+}
+
+// Врезание 7e2: подача/аподача — Ap/2 на проход (Ap на диаметр, целочисленное деление как в Feed.ino)
+static std::function<long(int)> feed_infeed(int ap) {
+    long v = (int)((float)MOTOR_X_STEP_PER_REV * (ap / 2) / SCREW_X + 0.5) * McSTEP_X;
+    return [v](int k) { return k * v; };
+}
+// Асинхронная подача (aFeed.ino): съём на радиус («Съём R») — Ap целиком, k-й проход на k·Ap от нуля
+static std::function<long(int)> afeed_infeed(int ap) {
+    long v = (int)(((float)MOTOR_X_STEP_PER_REV * ap / SCREW_X + 0.5) * McSTEP_X);
+    return [v](int k) { return k * v; };
+}
+// Резьба: глубина k-го прохода по Thread.ino (√-закон, первый — √0.3); чистовые — на полной глубине.
+// Рабочая высота профиля: наружная P·0.866·(1−1/6−1/8), внутренняя P·0.866·(1−1/4−1/18)
+static std::function<long(int)> thread_infeed(int idx, bool internal) {
+    return [idx, internal](int k) {
+        int N = Thread_Info[idx].Pass + Thr_Pass_Summ;
+        if (k > N) k = N;
+        float Step_mm = Thread_Info[idx].Step;
+        float H = internal ? (Step_mm * 0.866) - (Step_mm * 0.866 / 4) - (Step_mm * 0.866 / 18)
+                           : (Step_mm * 0.866) - (Step_mm * 0.866 / 6) - (Step_mm * 0.866 / 8);
+        float d = k == 1 ? H / sqrt(N - 1) * sqrt(0.3) : H / sqrt(N - 1) * sqrt(k - 1);
+        return long(d / ((float)SCREW_X / 100 / MOTOR_X_STEP_PER_REV) + 0.5) * McSTEP_X + McSTEP_X;
+    };
+}
+
+static void set_passes(int n) {   // число проходов кнопками «Влево»/«Вправо» в экране 1 (как на пульте)
+    for (int i = 0; i < 20 && Pass_Total > 1; i++) { touch("KEY:LEFT"); run_ms(60); }
+    press_key("KEY:RIGHT", n - 1);
+}
+
+static void test_cycle_matrix() {
+    std::vector<CycCase> cs;
+    // ── Подача (синхронная): число проходов × съём, наружная и внутренняя ──
+    for (bool in : {false, true})
+        for (int n : {1, 3, 5})
+            for (int ap : {10, 50}) {
+                char nm[96]; snprintf(nm, sizeof nm, "подача %s, %d прох. × съём %.2f мм, 30 мм", in ? "внутр." : "наружн.", n, ap / 100.0);
+                cs.push_back({nm, 1, in, 30, 600, [n, ap] { char b[24]; touch("FEED:20"); snprintf(b, sizeof b, "AP:%d", ap); touch(b); set_passes(n); },
+                              n, feed_infeed(ap)});
+            }
+    // ── Асинхронная подача (без вращения шпинделя) ──
+    for (bool in : {false, true})
+        for (int n : {2, 4}) {
+            char nm[96]; snprintf(nm, sizeof nm, "аподача %s, %d прох. × 0.20 мм, 20 мм", in ? "внутр." : "наружн.", n);
+            cs.push_back({nm, 2, in, 20, 0, [n] { touch("AFEED:300"); touch("AP:20"); set_passes(n); }, n, afeed_infeed(20)});
+        }
+    // ── Конусы ──
+    for (int m : {4, 5})
+        for (bool in : {false, true}) {
+            char nm[96]; snprintf(nm, sizeof nm, "конус %s 30° %s, 3 прохода × 0.20 мм", m == 4 ? "<" : ">", in ? "внутр." : "наружн.");
+            cs.push_back({nm, m, in, 15, 600, [] { touch("CONE:1"); touch("FEED:20"); touch("AP:20"); set_passes(3); }, 3, nullptr});
+        }
+    // ── Резьба: шаги, длина 70 мм, внутренняя, 2 захода, +1 чистовой, дюймовая ──
+    struct T { const char* p; double len; bool in; int ph; int fin; double rpm; };
+    for (T t : std::vector<T>{ {"0.50mm", 20, false, 1, 0, 600}, {"1.00mm", 20, false, 1, 0, 500}, {"1.50mm", 70, false, 1, 0, 400},
+                               {"2.00mm", 20, false, 1, 0, 300}, {"3.00mm", 20, false, 1, 0, 200}, {"1.50mm", 20, true, 1, 0, 400},
+                               {"1.00mm", 20, true, 1, 1, 500}, {"1.50mm", 20, false, 2, 0, 300}, {"18tpi", 20, false, 1, 0, 400} }) {
+        int idx = thread_idx(t.p);
+        if (idx < 0) { CHECK(false, "нет резьбы %s в таблице", t.p); continue; }
+        char nm[128]; snprintf(nm, sizeof nm, "резьба %s %s, %.0f мм%s%s", t.p, t.in ? "внутр." : "наружн.", t.len,
+                               t.ph > 1 ? ", 2 захода" : "", t.fin ? ", +1 чистовой" : "");
+        int fin = t.fin, ph = t.ph;
+        int passes = (Thread_Info[idx].Pass + Thr_Pass_Summ + PASS_FINISH + Pass_Fin + fin) * ph;
+        cs.push_back({nm, 3, t.in, t.len, t.rpm, [idx, fin, ph] {
+                          char b[32]; snprintf(b, sizeof b, "THREAD_STEP:%d", idx); touch(b);
+                          snprintf(b, sizeof b, "PH:%d", ph); touch(b);
+                          if (fin) { touch("PARAM_OK"); run_ms(100); press_key("KEY:RIGHT", fin); touch("PARAM_OK"); touch("PARAM_OK"); run_ms(100); }
+                      }, passes, thread_infeed(idx, t.in)});
+    }
+    const char* only = getenv("SIM_CYC_ONLY");
+    for (auto& c : cs) {
+        if (only && c.name.find(only) == std::string::npos) continue;
+        int fin0 = Pass_Fin;
+        run_cyc(c);
+        if (Pass_Fin != fin0) {                     // вернуть число чистовых
+            select_mode(3); touch("PARAM_OK"); run_ms(100);
+            for (int i = 0; i < 10 && Pass_Fin > fin0; i++) { touch("KEY:LEFT"); run_ms(60); }
+            touch("PARAM_OK"); touch("PARAM_OK"); select_mode(1);
+        }
+    }
+}
+
 int main() {
     controls_neutral();
     setup();
     check_cnt_resets();
     run_ms(500);
     test_boot();
+    if (getenv("SIM_CYCLES")) {                      // только матрица автоциклов
+        controls_neutral(); run_ms(200);
+        test_cycle_matrix();
+        printf("\nИТОГ: %d проверок OK, %d FAIL\n", s_pass, s_fail);
+        return s_fail ? 1 : 0;
+    }
     test_modes_touch();
     controls_neutral(); run_ms(100);
     test_thread(11, 1.00, 300);

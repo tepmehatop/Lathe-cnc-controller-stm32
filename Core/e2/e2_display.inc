@@ -307,6 +307,66 @@ void Display_Send_All()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// [STM32] ***** ОТПРАВКА ПО ИЗМЕНЕНИЮ ***** /////////////////////////////////////////////////////////////////////////////////////////
+// UartDisplay автора шлёт многие значения только в Display_Send_All (по READY и части кнопок), поэтому после
+// кнопок пульта и части касаний новый дисплей показывал устаревшее (натяг, отскок, заходы шара, угол делилки…).
+// Здесь — всё, что есть в Display_Send_All, кроме позиций (у них свой хук): при изменении шлём только его.
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Display_Watch()
+{
+  struct W { int32_t last; };
+  static W w[24];
+  static bool s_init = false;
+  int i = 0;
+  auto chg = [&](int32_t v) {
+    bool c = !s_init || w[i].last != v;
+    w[i++].last = v;
+    return c;
+  };
+  if (chg(Mode))                        Display_Send_Int("MODE", (int)Mode);
+  if (chg(_Display_GetSubMode()))       Display_Send_Int("SUBMODE", _Display_GetSubMode());
+  if (chg(SelectMenu))                  Display_Send_Int("SELECTMENU", SelectMenu);
+  if (chg(Feed_mm))                     Display_Send_Int("FEED", Feed_mm);
+  if (chg(aFeed_mm))                    Display_Send_Int("AFEED", aFeed_mm);
+  if (chg(((int32_t)Thread_Step << 16) ^ (Ph << 8) ^ (PASS_FINISH + Pass_Fin) ^ ((int32_t)Mode << 24)))
+                                        _Display_SendThread();
+  if (chg(Sph_R_mm))                    Display_Send_Int("SPHERE", Sph_R_mm);
+  if (chg(((int32_t)Pass_Nr << 16) ^ Pass_Total)) Display_Send_Int2("PASS", Pass_Nr, Pass_Total);
+  if (chg(Ap))                          Display_Send_Int("AP", Ap);
+  if (chg(Ph))                          Display_Send_Int("PH", Ph);
+  if (chg(Cone_Step)) {
+    Display_Send_Int("CONE", Cone_Step);
+    int cs = constrain((int)Cone_Step, 0, (int)(sizeof(s_cone_angle_x10)/sizeof(s_cone_angle_x10[0])) - 1);
+    Display_Send_Int("CONE_ANGLE", s_cone_angle_x10[cs]);
+  }
+  if (chg(Total_Tooth))                 Display_Send_Int("DIVN", Total_Tooth);
+  if (chg(Current_Tooth))               Display_Send_Int("DIVM", Current_Tooth);
+  if (chg(Bar_R_mm))                    Display_Send_Int("BAR", Bar_R_mm);
+  if (chg(Pass_Total_Sphr))             Display_Send_Int("PASS_SPHR", Pass_Total_Sphr);
+  if (chg(OTSKOK_Z_mm))                 Display_Send_Int("OTSKOK_Z", (int32_t)OTSKOK_Z_mm * 10L);
+  if (chg(TENSION_Z_mm))                Display_Send_Int("TENSION_Z", (int32_t)TENSION_Z_mm * 10L);
+  if (chg(PASS_FINISH + Pass_Fin))      Display_Send_Int("PASS_FIN", PASS_FINISH + Pass_Fin);
+  if (chg((ConL_Thr_flag || ConR_Thr_flag) ? 1 : 0)) Display_Send_Int("CONE_THR", (ConL_Thr_flag || ConR_Thr_flag) ? 1 : 0);
+  if (chg(Cutter_Width))                Display_Send_Int("CUTTER_W", Cutter_Width);
+  if (chg(Cutting_Width))               Display_Send_Int("CUTTING_W", Cutting_Width);
+  if (chg((limit_Left_flag ? 8 : 0) | (limit_Right_flag ? 4 : 0) | (limit_Front_flag ? 2 : 0) | (limit_Rear_flag ? 1 : 0))) {
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%d,%d,%d,%d", limit_Left_flag ? 1 : 0, limit_Right_flag ? 1 : 0,
+             limit_Front_flag ? 1 : 0, limit_Rear_flag ? 1 : 0);
+    Display_Send_CMD("LIMITS", buf);
+  }
+  // Угол шпинделя (делилка) — меняется непрерывно при вращении: не чаще 10 раз в секунду
+  static uint32_t s_ang_t = 0;
+  int32_t ang = Spindle_Angle / 100;
+  if (millis() - s_ang_t >= 100) {
+    if (chg(ang)) { Display_Send_Int("ANGLE", ang); s_ang_t = millis(); }
+  } else {
+    i++;
+  }
+  s_init = true;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ***** ОТПРАВИТЬ АЛЕРТ ***** ///////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void Display_Send_Alert(int type)

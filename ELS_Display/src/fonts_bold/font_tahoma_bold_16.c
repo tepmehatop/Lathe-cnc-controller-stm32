@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 16 px
  * Bpp: 4
- * Opts: --bpp 4 --size 16 --no-compress --font /System/Library/Fonts/Supplemental/Tahoma Bold.ttf -r 0x0020-0x007F,0x0400-0x04FF,0x00B0 --format lvgl --output /project/ELS_Display/src/fonts_bold/font_tahoma_bold_16.c --force-fast-kern-format
+ * Opts: --bpp 4 --size 16 --no-compress --font /System/Library/Fonts/Supplemental/Tahoma Bold.ttf -r 0x20-0x7F,0x400-0x4FF,0xB0 --font .pio/libdeps/jc4827w543/lvgl/scripts/built_in_font/DejaVuSans.ttf -r 0x2300 --format lvgl --output ELS_Display/src/fonts_bold/font_tahoma_bold_16.c --force-fast-kern-format
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -3764,7 +3764,16 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
     0xff, 0xff, 0xff, 0x60, 0x12, 0x8f, 0xff, 0xf5,
     0x20, 0x0, 0x3f, 0xfd, 0xff, 0xd0, 0x0, 0xd,
     0xff, 0x28, 0xff, 0x90, 0xa, 0xff, 0x70, 0xd,
-    0xff, 0x50
+    0xff, 0x50,
+
+    /* U+2300 "⌀" */
+    0x0, 0x0, 0x21, 0x0, 0x0, 0x0, 0x6e, 0xff,
+    0xc8, 0xd0, 0x7, 0xe4, 0x0, 0xbf, 0x50, 0x1f,
+    0x30, 0x6, 0xfa, 0xb0, 0x4d, 0x0, 0x6f, 0x32,
+    0xf0, 0x4d, 0x6, 0xe3, 0x2, 0xf0, 0x1f, 0x8e,
+    0x30, 0x7, 0xc0, 0xa, 0xf7, 0x0, 0x6f, 0x30,
+    0x2e, 0x8f, 0xef, 0xd4, 0x0, 0x1, 0x0, 0x22,
+    0x0, 0x0
 };
 
 
@@ -4124,7 +4133,8 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 22763, .adv_w = 205, .box_w = 14, .box_h = 15, .ofs_x = -1, .ofs_y = -3},
     {.bitmap_index = 22868, .adv_w = 181, .box_w = 12, .box_h = 12, .ofs_x = -1, .ofs_y = -3},
     {.bitmap_index = 22940, .adv_w = 175, .box_w = 13, .box_h = 12, .ofs_x = -1, .ofs_y = 0},
-    {.bitmap_index = 23018, .adv_w = 155, .box_w = 11, .box_h = 9, .ofs_x = -1, .ofs_y = 0}
+    {.bitmap_index = 23018, .adv_w = 155, .box_w = 11, .box_h = 9, .ofs_x = -1, .ofs_y = 0},
+    {.bitmap_index = 23068, .adv_w = 154, .box_w = 10, .box_h = 10, .ofs_x = 0, .ofs_y = -1}
 };
 
 /*---------------------
@@ -4151,6 +4161,10 @@ static const lv_font_fmt_txt_cmap_t cmaps[] =
     {
         .range_start = 1160, .range_length = 120, .glyph_id_start = 232,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
+    },
+    {
+        .range_start = 8960, .range_length = 1, .glyph_id_start = 352,
+        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     }
 };
 
@@ -4175,7 +4189,7 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
     .cmaps = cmaps,
     .kern_dsc = NULL,
     .kern_scale = 0,
-    .cmap_num = 4,
+    .cmap_num = 5,
     .bpp = 4,
     .kern_classes = 0,
     .bitmap_format = 0,

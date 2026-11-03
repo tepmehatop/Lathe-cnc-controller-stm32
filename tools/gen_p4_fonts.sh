@@ -27,13 +27,13 @@ gen() {  # gen <имя> <4.3-размер> <ttf> <диапазоны> [доп. �
         --format lvgl --force-fast-kern-format --lv-font-name "$name" -o "$OUT/$name.c"
 }
 
-CYR_DEJAVU="0x20-0x7F,0x400-0x45F,0xB0"
+CYR_DEJAVU="0x20-0x7F,0x400-0x45F,0xB0,0x2300"   # 0x2300 — ⌀ (диаметр)
 CYR_TAHOMA="0x20-0x7E,0x400-0x44F,0xB0"
 
 gen font_dejavu_12      12 "$LVF/DejaVuSans.ttf" "$CYR_DEJAVU"
 gen font_dejavu_14      14 "$LVF/DejaVuSans.ttf" "$CYR_DEJAVU"
 gen font_dejavu_16      16 "$LVF/DejaVuSans.ttf" "$CYR_DEJAVU"
-gen font_tahoma_bold_16 16 "$TAHOMA" "0x20-0x7F,0x400-0x4FF,0xB0"
+gen font_tahoma_bold_16 16 "$TAHOMA" "0x20-0x7F,0x400-0x4FF,0xB0" --font "$LVF/DejaVuSans.ttf" -r 0x2300  # ⌀ из DejaVu
 gen font_tahoma_bold_22 22 "$TAHOMA" "$CYR_TAHOMA"
 gen font_tahoma_bold_28 28 "$TAHOMA" "$CYR_TAHOMA"
 gen font_tahoma_bold_40 40 "$TAHOMA" "0x20-0x3A,0x47,0x4B,0x69,0x70,0x74"

@@ -23,6 +23,7 @@ int32_t dro_pos_x = 0;
 int32_t dro_pos_y = 0;
 void e2_pos_update(void);
 void e2_service(void);
+void Display_Watch(void);
 
 // [STM32] Механика, под которую рассчитаны таблицы конусов и резьб ниже. Другая механика
 // в els_config.h → пересчитать таблицы: python3 tools/gen_e2_tables.py --write
@@ -1818,13 +1819,8 @@ void e2_service(void)
       s_rpm_t = now;
       Display_Send_Int("RPM", rpm);
    }
-   // Число заходов шара Sphere() пересчитывает от диаметра и ширины резца, а UartDisplay
-   // отправлял его только при смене прохода — дисплей показывал устаревшее значение
-   static long s_sphr = -1;
-   if (Pass_Total_Sphr != s_sphr) {
-      s_sphr = Pass_Total_Sphr;
-      Display_Send_Int("PASS_SPHR", Pass_Total_Sphr);
-   }
+   // Значения, которые UartDisplay шлёт только в Display_Send_All, — по изменению (e2_display.inc)
+   Display_Watch();
    // Сообщения на новом дисплее горят ровно столько же, сколько на LCD2004: ядро ставит и снимает
    // флаги ошибок в разных местах и не везде шлёт ALERT — отправляем по изменению флагов
    int8_t al = e2_alert_now();
