@@ -131,7 +131,16 @@ class Esp:
     def btn(self, name):
         self.send(f'<BTN:{name}>')
 
-    def uidump(self):
+    def uidump(self, retries=2):
+        for i in range(retries + 1):
+            try:
+                return self._uidump()
+            except RuntimeError:
+                if i == retries:
+                    raise
+                time.sleep(1.0)              # дисплей мог ещё отдавать скриншот по USB
+
+    def _uidump(self):
         self.s.reset_input_buffer()
         self.send('<UIDUMP>')
         buf, t0 = b'', time.time()
