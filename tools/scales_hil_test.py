@@ -78,14 +78,23 @@ def main():
     disp = serial.Serial(a.disp, 115200, timeout=0.3)
     time.sleep(0.3)
     disp.write(b'<RXMUTE:0>')
+    disp.write(b'<BTN:M1>'); time.sleep(0.8)           # позиции Y/X — в ячейках row1/row2 экрана «Подача»
+    disp.write(b'<BTN:S2>'); time.sleep(0.8)
 
     sim_cmd(sim, 'w0')
     sim_cmd(sim, 'm' + (a.mode if a.mode != 'hs800' else '0'))
     fails = 0
     for z, x in POSITIONS:
         sim_cmd(sim, f'z{z}'); sim_cmd(sim, f'x{x}')
-        time.sleep(1.5)                                  # квадратура «доезжает», кадры приходят
-        rows = display_rows(disp)
+        # квадратура «доезжает» ~15 000 имп/с — ждём, пока показание перестанет меняться (до 10 с)
+        rows, prev, t0 = None, None, time.time()
+        while time.time() - t0 < 10:
+            time.sleep(1.0)
+            rows = display_rows(disp)
+            cur = rows and (rows.get('row1_val'), rows.get('row2_val'))
+            if cur and cur == prev:
+                break
+            prev = cur
         if not rows:
             print(f'FAIL z={z} x={x}: нет ответа дисплея'); fails += 1; continue
         try:

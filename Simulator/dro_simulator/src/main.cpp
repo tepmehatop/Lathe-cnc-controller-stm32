@@ -166,30 +166,16 @@ static void apply_mode(char m) {
     s_mode = m;
 }
 
-// Квадратура: один шаг кода Грея к цели, 00 → 01 → 11 → 10
+// Квадратура: один шаг кода Грея к цели. Рост счёта — A опережает B (AB: 00 → 10 → 11 → 01),
+// как у линеек и энкодеров; так же считает таймер STM32 в режиме энкодера
 static void quad_step(uint8_t ax) {
     int32_t target = (int32_t)(((int64_t)scale_um(ax) * 1000) / QUAD_NM_PER_COUNT);
     if (s_quad_count[ax] == target) return;
     s_quad_count[ax] += (target > s_quad_count[ax]) ? 1 : -1;
-    static const uint8_t GRAY[4] = {0b00, 0b01, 0b11, 0b10};
+    static const uint8_t GRAY[4] = {0b00, 0b10, 0b11, 0b01};   // бит 1 — A, бит 0 — B
     uint8_t g = GRAY[(uint8_t)(s_quad_count[ax] & 3)];
     digitalWrite(PINS[ax].a, (g >> 1) & 1);
     digitalWrite(PINS[ax].b, g & 1);
-}
-
-// iGaging: STM32 даёт такт; на фронте такта выставляем следующий бит
-static volatile uint8_t  s_ig_bit[2];
-static volatile uint32_t s_ig_frame[2];
-static volatile uint32_t s_ig_last_us[2];
-static void ig_edge(uint8_t ax) {
-    uint32_t now = micros();
-    if (now - s_ig_last_us[ax] > 1000) {     // пауза — новый кадр
-        s_ig_bit[ax] = 0;
-        s_ig_frame[ax] = frame_igaging21(scale_um(ax));
-    }
-    s_ig_last_us[ax] = now;
-    uint8_t i = s_ig_bit[ax]++;
-    digitalWrite(PINS[ax].b, i < 21 && ((s_ig_frame[ax] >> i) & 1) ? HIGH : LOW);
 }
 
 static void print_state() {
@@ -271,12 +257,31 @@ void loop() {
             }
             break;
         case 'i': {
-            // Такт от STM32 опрашиваем программно (D22/D24 не прерывания на Mega)
-            static uint8_t prev[2] = {0, 0};
-            for (uint8_t ax = 0; ax < 2; ax++) {
-                uint8_t lvl = digitalRead(PINS[ax].a);
-                if (lvl && !prev[ax]) ig_edge(ax);
-                prev[ax] = lvl;
+            // Такт от STM32 (высокий 20 мкс, бит 100 мкс, чтение на спаде, кадр раз в 20 мс) — D22/D24
+            // не прерывания на Mega, поэтому кадр ловим целиком в коротком цикле на прямом чтении порта
+            // (D22 = PA0, D24 = PA2): ждём паузу ≥ 1.2 мс (граница кадров), затем 21 бит каждой оси.
+            // Кадры считаются ДО цикла: 64-битная арифметика на AVR дольше 20 мкс.
+            const uint8_t CLK = _BV(0) | _BV(2);
+            uint32_t fr[2] = { frame_igaging21(scale_um(0)), frame_igaging21(scale_um(1)) };
+            uint8_t prev = PINA;
+            uint32_t t_start = micros(), t_idle = t_start;
+            while (micros() - t_idle < 1200 && micros() - t_start < 40000) {
+                uint8_t p = PINA;
+                if (p & ~prev & CLK) t_idle = micros();
+                prev = p;
+            }
+            uint8_t nbit[2] = {0, 0};
+            t_start = micros();
+            while ((nbit[0] < 21 || nbit[1] < 21) && micros() - t_start < 30000) {
+                uint8_t p = PINA, rise = p & ~prev & CLK;
+                prev = p;
+                if (!rise) continue;
+                for (uint8_t ax = 0; ax < 2; ax++) {
+                    if (!(rise & _BV(ax * 2))) continue;
+                    uint8_t k = nbit[ax]++;
+                    uint8_t bit = _BV(ax * 2 + 1);                    // D23 = PA1, D25 = PA3
+                    if (k < 21 && ((fr[ax] >> k) & 1)) PORTA |= bit; else PORTA &= ~bit;
+                }
             }
             break;
         }
