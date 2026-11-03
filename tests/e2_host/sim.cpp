@@ -97,7 +97,23 @@ static long s_env_zmin, s_env_zmax, s_env_xmin, s_env_xmax;
 static std::string lcd_row(int r);
 static std::string last_disp_pass();
 
+// Механика с люфтом (SIM_BACKLASH): каретка отстаёт от гайки винта на люфт при смене направления.
+// Гайка — Motor_*_Pos (то, что знает прошивка), каретка — то, где на самом деле резец.
+static long s_bl_x = 0, s_bl_z = 0;              // люфт, шаги (0 — без люфта)
+static double s_car_x = 0, s_car_z = 0;          // положение каретки, шаги
+static double s_car_x_max = -1e18, s_car_x_min = 1e18;
+static void backlash_follow() {
+    auto f = [](double& c, long m, long b) {
+        if (m > c + b / 2.0) c = m - b / 2.0;
+        else if (m < c - b / 2.0) c = m + b / 2.0;
+    };
+    f(s_car_x, Motor_X_Pos, s_bl_x); f(s_car_z, Motor_Z_Pos, s_bl_z);
+    if (s_car_x > s_car_x_max) s_car_x_max = s_car_x;
+    if (s_car_x < s_car_x_min) s_car_x_min = s_car_x;
+}
+
 static void sample_steps() {
+    backlash_follow();
     auto chk = [](StepLog& l, uint32_t lvl, uint32_t dir_ccw) {
         if (lvl != l.prev) {
             uint64_t w = t_ns - l.last_edge;
@@ -953,12 +969,71 @@ static void test_cycle_matrix() {
     }
 }
 
+
+// ============================================================================
+// Эксперимент с люфтом (SIM_BACKLASH=1): насколько реально врезается резец в автоциклах 7e2,
+// если у поперечного винта люфт. Ноль — подвод к детали со стороны врезания или с обратной.
+// ============================================================================
+static void jog_x(int dir, double ms) {                   // dir: +1 — к детали (передний упор), −1 — от неё
+    if (dir > 0) { SET_IN(E2_PIN_JOY_UP, 0);   run_ms(ms); SET_IN(E2_PIN_JOY_UP, 1); }
+    else         { SET_IN(E2_PIN_JOY_DOWN, 0); run_ms(ms); SET_IN(E2_PIN_JOY_DOWN, 1); }
+    run_ms(300);
+}
+
+static void backlash_case(const char* what, int mode, std::function<void()> prep, double rpm,
+                          int last_dir, long expect_steps) {
+    setup_z_len(15);
+    select_mode(2); touch("AFEED:300"); run_ms(100);       // подвод X в аподаче — без вращения шпинделя
+    jog_x(-last_dir, 400); jog_x(last_dir, 400);           // последнее движение перед нулём — last_dir
+    select_mode(mode); prep();
+    SET_IN(E2_PIN_SUB_MAN, 1); SET_IN(E2_PIN_SUB_EXT, 0); run_ms(300);
+    double c0 = s_car_x; long m0 = Motor_X_Pos;
+    s_car_x_max = s_car_x; s_car_x_min = s_car_x;
+    spindle(rpm); run_ms(300);
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0;
+    while (!Complete_flag && t < 600000) { run_ms(100); t += 100; }
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1000); spindle(0); run_ms(100);
+    double real = s_car_x_max - c0;                        // насколько резец реально ушёл в деталь
+    double mm_per = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
+    printf("    %-36s ноль после движения %s: задано %.3f мм, резец реально %.3f мм, недорез %.3f мм\n",
+           what, last_dir > 0 ? "К детали " : "ОТ детали", expect_steps * mm_per, real * mm_per, (expect_steps - real) * mm_per);
+    (void)m0;
+    SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
+    touch("ALERT_OK"); select_mode(1);
+    if (limit_Left_flag)  { SET_IN(E2_PIN_LIM_LEFT, 0);  run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1);  run_ms(100); }
+    if (limit_Right_flag) { SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100); }
+}
+
+static void test_backlash() {
+    double mm_per = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
+    for (double bl_mm : {0.0, 0.10, 0.20}) {
+        s_bl_x = lround(bl_mm / mm_per);
+        s_car_x = Motor_X_Pos; s_car_z = Motor_Z_Pos;
+        printf("[люфт поперечного винта %.2f мм, отскок REBOUND_X %.2f мм]\n", bl_mm, REBOUND_X * mm_per);
+        for (int d : {+1, -1}) {
+            backlash_case("подача 3 прох. × съём ⌀1.00 (R 0.5)", 1,
+                          [] { touch("FEED:20"); touch("AP:100"); set_passes(3); }, 600, d,
+                          feed_infeed(100)(3));
+            int idx = thread_idx("1.25mm");
+            backlash_case("резьба 1.25 наружн.", 3,
+                          [idx] { char b[32]; snprintf(b, sizeof b, "THREAD_STEP:%d", idx); touch(b); touch("PH:1"); }, 400, d,
+                          thread_infeed(idx, false)(Thread_Info[idx].Pass + Thr_Pass_Summ));
+        }
+    }
+}
+
 int main() {
     controls_neutral();
     setup();
     check_cnt_resets();
     run_ms(500);
     test_boot();
+    if (getenv("SIM_BACKLASH")) {                    // эксперимент: люфт и точность автоциклов
+        controls_neutral(); run_ms(200);
+        test_backlash();
+        return 0;
+    }
     if (getenv("SIM_CYCLES")) {                      // только матрица автоциклов
         controls_neutral(); run_ms(200);
         test_cycle_matrix();

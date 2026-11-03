@@ -5,6 +5,7 @@
 # Матрица автоциклов (≈40 мин виртуального времени, несколько минут реального):
 #   SIM_CYCLES=1 bash tools/run_e2_sim.sh            — все 29 циклов
 #   SIM_CYCLES=1 SIM_CYC_ONLY="резьба 1.50" bash ...  — только случаи с подстрокой в названии
+# Люфт поперечного винта (модель механики) и реальная глубина резания: SIM_BACKLASH=1 bash tools/run_e2_sim.sh
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 OUT=${TMPDIR:-/tmp}/e2_sim
