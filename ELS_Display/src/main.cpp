@@ -2312,7 +2312,7 @@ static void apply_mode_layout(LatheMode mode)
             // row4: ЦИКЛОВ — read-only (показываем теперь, было скрыто)
             if (g_ui.row4_box) lv_obj_clear_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             lv_label_set_text(g_ui.row4_title,
-                "\xD0\xA6\xD0\x98\xD0\x9A\xD0\x9B\xD0\x9E\xD0\x92");            // ЦИКЛОВ
+                "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA5\xD0\x9E\xD0\x94\xD0\xAB");            // ПРОХОДЫ (LCD «Циклов»; везде «проходы» — решение владельца)
             lv_obj_set_style_text_color(g_ui.row4_title, lv_color_hex(0x6a9fb5), 0);
             // thr_type_box: ТИП резьбы — показываем в M3, сбрасываем заголовок на "ТИП"
             if (g_ui.thr_type_box) {
@@ -2373,9 +2373,9 @@ static void apply_mode_layout(LatheMode mode)
             lv_label_set_text(g_ui.row3_title,
                 "\xD0\x9D\xD0\x9E\xD0\x96\xD0\x9A\xD0\x90 " DIAM_SIGN);  // НОЖКА ⌀ (LCD «Ножка:Ø», диаметр)
             lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0xffaa44), 0);
-            // row4: ЗАХОДОВ — read-only (синий)
+            // row4: ПРОХОДЫ (LCD «Заходов» шара — это проходы) — read-only (синий)
             lv_label_set_text(g_ui.row4_title,
-                "\xD0\x97\xD0\x90\xD0\xA5\xD0\x9E\xD0\x94\xD0\x9E\xD0\x92");  // ЗАХОДОВ
+                "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA5\xD0\x9E\xD0\x94\xD0\xAB");  // ПРОХОДЫ
             lv_obj_set_style_text_color(g_ui.row4_title, lv_color_hex(0x6a9fb5), 0);
             if (g_ui.row4_box) lv_obj_clear_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             // thr_type_box: ШАР ММ (диаметр шара, редактируемый)
