@@ -2137,7 +2137,7 @@ void Limit_Left_Pressed()
          case Mode_Cone_L:
          case Mode_Cone_R:
          case Mode_Sphere:
-         if (!Joy_Z_flag && Submode_Read == B10100000)
+         if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
             if (limit_Left_flag == OFF)
             {
@@ -2176,7 +2176,7 @@ void Limit_Right_Pressed()
          case Mode_Cone_L:
          case Mode_Cone_R:
          case Mode_Sphere:
-         if (!Joy_Z_flag && Submode_Read == B10100000)
+         if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
             if (limit_Right_flag == OFF)
             {
@@ -2215,7 +2215,7 @@ void Limit_Front_Pressed()
          case Mode_Cone_L:
          case Mode_Cone_R:
          case Mode_Sphere:
-         if (!Joy_X_flag && Submode_Read == B10100000)
+         if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
             if (limit_Front_flag == OFF)
             {
@@ -2254,7 +2254,7 @@ void Limit_Rear_Pressed()
          case Mode_Cone_L:
          case Mode_Cone_R:
          case Mode_Sphere:
-         if (!Joy_X_flag && Submode_Read == B10100000)
+         if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
             if (limit_Rear_flag == OFF)
             {

@@ -80,7 +80,7 @@ static StepLog s_z, s_x;
 static std::vector<long> s_z_at_rev;   // счётчик шагов Z на каждом обороте шпинделя
 static long spindle_lines_now();
 extern int McStep_Lag;
-struct MoveStart { long line; long x; int dir; long z; long pass_nr; std::string lcd_row2; std::string disp_pass; };
+struct MoveStart { long line; long x; int dir; long z; long pass_nr; std::string lcd_row2; std::string disp_pass; double cx, cz; };
 static std::vector<MoveStart> s_z_starts;   // начала движений Z (после паузы ≥ 50 мс)
 static uint64_t s_z_last_step = 0;
 struct XTurn { long z; long x; int lag; };
@@ -94,20 +94,35 @@ static void set_in(GPIO_TypeDef* g, uint32_t bit, int level) { if (level) g->IDR
 // Огибающая движения за автоцикл: крайние положения кареток на каждом шаге (проверка упоров)
 static bool s_env_on = false;
 static long s_env_zmin, s_env_zmax, s_env_xmin, s_env_xmax;
+static double s_env_ox = 0, s_env_oz = 0;          // каретка (модель люфта) → координаты прошивки
+static double s_car_x, s_car_z;
+static double car_x() { return s_car_x + s_env_ox; }
+static double car_z() { return s_car_z + s_env_oz; }
 static std::string lcd_row(int r);
 static std::string last_disp_pass();
 
 // Механика с люфтом (SIM_BACKLASH): каретка отстаёт от гайки винта на люфт при смене направления.
-// Гайка — Motor_*_Pos (то, что знает прошивка), каретка — то, где на самом деле резец.
+// Гайка — счёт импульсов STEP на выводе драйвера (столько повернулся винт), каретка — где на самом
+// деле резец. Motor_*_Pos — то, что думает прошивка (с компенсацией люфта — положение каретки).
 static long s_bl_x = 0, s_bl_z = 0;              // люфт, шаги (0 — без люфта)
-static double s_car_x = 0, s_car_z = 0;          // положение каретки, шаги
+// положение каретки, шаги (s_car_x/s_car_z объявлены выше)
 static double s_car_x_max = -1e18, s_car_x_min = 1e18;
+static int s_nut_dir_x = 0, s_nut_dir_z = 0;     // направление последнего движения гайки
 static void backlash_follow() {
+    static long px = 0, pz = 0;
+    if (s_x.count != px) {
+        int nd = s_x.count > px ? 1 : -1;
+        if (nd != s_nut_dir_x && getenv("SIM_BLTRACE"))
+            printf("      [X разворот] t=%.3f имп=%ld Motor_X=%ld каретка=%.0f loaded=%d Null_X=%ld\n",
+                   t_ns / 1e9, s_x.count, Motor_X_Pos, s_car_x + s_env_ox, e2_bl_loaded_x, Null_X_Pos);
+        s_nut_dir_x = nd; px = s_x.count;
+    }
+    if (s_z.count != pz) { s_nut_dir_z = s_z.count > pz ? 1 : -1; pz = s_z.count; }
     auto f = [](double& c, long m, long b) {
         if (m > c + b / 2.0) c = m - b / 2.0;
         else if (m < c - b / 2.0) c = m + b / 2.0;
     };
-    f(s_car_x, Motor_X_Pos, s_bl_x); f(s_car_z, Motor_Z_Pos, s_bl_z);
+    f(s_car_x, s_x.count, s_bl_x); f(s_car_z, s_z.count, s_bl_z);
     if (s_car_x > s_car_x_max) s_car_x_max = s_car_x;
     if (s_car_x < s_car_x_min) s_car_x_min = s_car_x;
 }
@@ -128,7 +143,7 @@ static void sample_steps() {
     if (s_z.count != before) {
         if (t_ns - s_z_last_step > 50000000ull)
             s_z_starts.push_back({spindle_lines_now(), Motor_X_Pos, (int)E2_DRV_RD(E2_PIN_Z_DIR), Motor_Z_Pos,
-                                  Pass_Nr, lcd_row(2), last_disp_pass()});
+                                  Pass_Nr, lcd_row(2), last_disp_pass(), car_x(), car_z()});
         s_z_last_step = t_ns;
     }
     long xb = s_x.count;
@@ -139,11 +154,12 @@ static void sample_steps() {
     if (s_x.count == xb && Motor_X_Pos != s_xpos_prev && getenv("SIM_XTRACE"))
         printf("      X: счёт без импульса t=%.6f %ld→%ld in_loop=%d ev=%d en3b=%d en4b=%d pin=%u ARR12=%u\n", t_ns / 1e9, s_xpos_prev, Motor_X_Pos, in_loop, s_cur_ev, e2_en_t3b, e2_en_t4b, (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)TIM12->ARR);
     s_xpos_prev = Motor_X_Pos;
-    if (s_env_on) {
-        if (Motor_Z_Pos < s_env_zmin) s_env_zmin = Motor_Z_Pos;
-        if (Motor_Z_Pos > s_env_zmax) s_env_zmax = Motor_Z_Pos;
-        if (Motor_X_Pos < s_env_xmin) s_env_xmin = Motor_X_Pos;
-        if (Motor_X_Pos > s_env_xmax) s_env_xmax = Motor_X_Pos;
+    if (s_env_on) {                                  // по реальной каретке (модель люфта)
+        long cz = lround(car_z()), cx = lround(car_x());
+        if (cz < s_env_zmin) s_env_zmin = cz;
+        if (cz > s_env_zmax) s_env_zmax = cz;
+        if (cx < s_env_xmin) s_env_xmin = cx;
+        if (cx > s_env_xmax) s_env_xmax = cx;
     }
     if (s_x.count != xb) {
         int d = (int)E2_DRV_RD(E2_PIN_X_DIR);
@@ -413,6 +429,26 @@ static void test_limit() {
     spindle(0);
     SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(200); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
     CHECK(!limit_Left_flag, "упор не снялся");
+}
+
+// BACKLOG-022: упоры без физического переключателя подрежима — «Ручной» выбран на экране
+static void test_limit_no_switch() {
+    printf("[%7.1f с] [limit-touch] ", t_ns / 1e9); printf("упор без переключателя подрежима (подрежим с экрана)\n");
+    controls_neutral(); select_mode(2);
+    SET_IN(E2_PIN_SUB_MAN, 1); run_ms(200);                 // переключателя нет: все три провода «1»
+    touch("S2"); run_ms(200);
+    if (limit_Left_flag) { SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(150); }
+    SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(150);
+    CHECK(limit_Left_flag == (LIMITS_BY_SELECTED_SUBMODE ? 1 : 0),
+          "упор с «Ручным» на экране: limit_Left_flag=%d (LIMITS_BY_SELECTED_SUBMODE=%d)", limit_Left_flag, LIMITS_BY_SELECTED_SUBMODE);
+    // в автоцикле (подрежим не «Ручной») упор переставить нельзя — как у автора
+    bool before = limit_Left_flag;
+    Sub_Mode_aFeed = Sub_Mode_aFeed_Ext;
+    SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(150);
+    CHECK(limit_Left_flag == before, "упор переставился в подрежиме «Наружный»");
+    Sub_Mode_aFeed = Sub_Mode_aFeed_Man;
+    if (limit_Left_flag) { SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(150); }
+    controls_neutral(); run_ms(100);
 }
 
 static void test_hand() {
@@ -800,6 +836,7 @@ static void run_cyc(const CycCase& c) {
     size_t mark = DISPLAY_UART.out.size();
     spindle(c.rpm); run_ms(300);
     s_z_starts.clear();
+    s_env_ox = Motor_X_Pos - s_car_x; s_env_oz = Motor_Z_Pos - s_car_z;   // суппорт стоит: позиция = каретка
     s_env_zmin = s_env_zmax = z0; s_env_xmin = s_env_xmax = x0; s_env_on = true;
     SET_IN(E2_PIN_JOY_LEFT, 0);                           // старт: джойстик в сторону реза и держать
     double t = 0;
@@ -835,14 +872,14 @@ static void run_cyc(const CycCase& c) {
     }
     // каждый проход дошёл до левого упора (возврат начинается у него)
     int short_cut = 0;
-    for (auto& b : back) if (labs(b.z - L) > tolZ) short_cut++;
+    for (auto& b : back) if (fabs(b.cz - L) > tolZ) short_cut++;
     CHECK(short_cut == 0, "%s: %d возвратов начались не у левого упора", c.name.c_str(), short_cut);
     // врезание по формуле 7e2
     if (c.infeed) {
         int bad = 0;
         for (size_t i = 0; i < work.size(); i++) {
             long want = c.infeed((int)(i / Ph) + 1);
-            long got = (work[i].x - x0) * sgn;
+            long got = lround((work[i].cx - x0) * sgn);
             if (labs(got - want) > McSTEP_X) { if (bad++ < 3) printf("      проход %zu: X %+ld, по формуле %+ld\n", i + 1, got, want); }
         }
         CHECK(bad == 0, "%s: %d проходов с неверным врезанием", c.name.c_str(), bad);
@@ -918,6 +955,18 @@ static void set_passes(int n) {   // число проходов кнопкам�
 }
 
 static void test_cycle_matrix() {
+    // механика с люфтом, равным компенсации из els_config.h (BACKLASH_*_UM; 0 — как у автора)
+    // после включения сторона выбора люфта неизвестна — как оператор, подвигаем суппорт перед работой
+    select_mode(2); touch("AFEED:300"); run_ms(100);
+    SET_IN(E2_PIN_JOY_DOWN, 0); run_ms(300); SET_IN(E2_PIN_JOY_DOWN, 1); run_ms(300);
+    SET_IN(E2_PIN_JOY_UP, 0);   run_ms(300); SET_IN(E2_PIN_JOY_UP, 1);   run_ms(300);
+    select_mode(1);
+    s_bl_x = e2_bl_x; s_bl_z = e2_bl_z;
+    // люфт в модели выбран в ту же сторону, что считает прошивка (e2_bl_dir_*), иначе — сдвиг на поллюфта
+    s_car_x = s_x.count - e2_bl_loaded_x * s_bl_x / 2.0;
+    s_car_z = s_z.count - e2_bl_loaded_z * s_bl_z / 2.0;
+    printf("    модель люфта: X %ld, Z %ld шагов (= компенсации BACKLASH_X_UM %d, BACKLASH_Z_UM %d мкм)\n",
+           s_bl_x, s_bl_z, (int)BACKLASH_X_UM, (int)BACKLASH_Z_UM);
     std::vector<CycCase> cs;
     // ── Подача (синхронная): число проходов × съём, наружная и внутренняя ──
     for (bool in : {false, true})
@@ -1009,8 +1058,9 @@ static void test_backlash() {
     double mm_per = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
     for (double bl_mm : {0.0, 0.10, 0.20}) {
         s_bl_x = lround(bl_mm / mm_per);
-        s_car_x = Motor_X_Pos; s_car_z = Motor_Z_Pos;
-        printf("[люфт поперечного винта %.2f мм, отскок REBOUND_X %.2f мм]\n", bl_mm, REBOUND_X * mm_per);
+        s_car_x = s_x.count; s_car_z = s_z.count;
+        printf("[люфт поперечного винта %.2f мм, отскок REBOUND_X %.2f мм, компенсация BACKLASH_X_UM = %d мкм]\n",
+               bl_mm, REBOUND_X * mm_per, (int)BACKLASH_X_UM);
         for (int d : {+1, -1}) {
             backlash_case("подача 3 прох. × съём ⌀1.00 (R 0.5)", 1,
                           [] { touch("FEED:20"); touch("AP:100"); set_passes(3); }, 600, d,
@@ -1056,6 +1106,7 @@ int main() {
     test_rapid();
     test_hand();
     test_limit();
+    test_limit_no_switch();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();

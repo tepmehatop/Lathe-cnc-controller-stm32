@@ -1804,6 +1804,46 @@ static int8_t e2_alert_now(void)
    return 0;
 }
 
+// [STM32] Компенсация люфта (BACKLASH_*_UM в els_config.h, в 7e2 её нет). На первом шаге после смены
+// направления позиция мотора сдвигается назад на люфт — ядро само делает на столько шагов больше (со
+// своим разгоном, в резьбе — в такт шпинделю), и каретка приходит точно в цель. Счётчики остаются
+// положением каретки. Сдвиг кратен McSTEP: loop() округляет позиции до полного шага.
+#define E2_BL_STEPS(um, screw, spr, mc) \
+   ((long)(((double)(um) / 10.0 / (screw) * (spr) + 0.5)) * (mc))
+static const long e2_bl_z = E2_BL_STEPS(BACKLASH_Z_UM, SCREW_Z, MOTOR_Z_STEP_PER_REV, McSTEP_Z);
+static const long e2_bl_x = E2_BL_STEPS(BACKLASH_X_UM, SCREW_X, MOTOR_X_STEP_PER_REV, McSTEP_X);
+int8_t e2_bl_loaded_z = 0, e2_bl_loaded_x = 0;   // сторона, в которую выбран люфт (0 — неизвестно)
+
+void e2_bl_turn_z(int8_t d)                      // из прерываний шагов (E2_BL_STEP_Z)
+{
+   if (e2_bl_z && e2_bl_loaded_z) { long s = d * e2_bl_z; Motor_Z_Pos -= s; Z_pos -= s; }
+   e2_bl_loaded_z = d;
+}
+
+void e2_bl_turn_x(int8_t d)
+{
+   if (e2_bl_x && e2_bl_loaded_x) { long s = d * e2_bl_x; Motor_X_Pos -= s; X_pos -= s; MX_pos -= s; }
+   e2_bl_loaded_x = d;
+}
+
+// [STM32] Разрешение кнопок упоров (BACKLOG-022): переключатель подрежима в «Ручной», как у автора,
+// или (LIMITS_BY_SELECTED_SUBMODE) выбранный подрежим текущего режима — «Ручной» (с экрана)
+bool e2_limit_buttons_allowed(void)
+{
+   if (Submode_Read == B10100000) return true;
+#if LIMITS_BY_SELECTED_SUBMODE
+   switch (Mode) {
+      case Mode_Thread: return Sub_Mode_Thread == Sub_Mode_Thread_Man;
+      case Mode_Feed:   return Sub_Mode_Feed   == Sub_Mode_Feed_Man;
+      case Mode_aFeed:  return Sub_Mode_aFeed  == Sub_Mode_aFeed_Man;
+      case Mode_Cone_L:
+      case Mode_Cone_R: return Sub_Mode_Cone   == Sub_Mode_Cone_Man;
+      case Mode_Sphere: return Sub_Mode_Sphere == Sub_Mode_Sphere_Man;
+   }
+#endif
+   return false;
+}
+
 // Обороты шпинделя для дисплея ESP32 и строка состояния LCD2004 для автотестов
 void e2_service(void)
 {

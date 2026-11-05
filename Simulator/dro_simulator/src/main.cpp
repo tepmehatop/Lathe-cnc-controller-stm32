@@ -50,6 +50,31 @@ static char     s_mode  = '0';          // режим эмуляции лине�
 static int32_t  s_pos_um[2] = {0, 0};
 static int32_t scale_um(uint8_t ax) { return s_pos_um[ax]; }
 static bool     s_sweep = true;    // по умолчанию позиции «качаются», как в старом симуляторе
+
+// ============================================================
+// Следование за моторами (BACKLOG-026): STEP/DIR драйверов STM32 → Mega, позиция = каретка с люфтом
+//   STEP Z (PE9)  → D2 (INT4)    DIR Z (PE10) → D4 (PG5)
+//   STEP X (PE13) → D3 (INT5)    DIR X (PE14) → D5 (PE3)     через 1 кОм, GND общий
+// Шаг — спад STEP, DIR = 0 — позиция растёт (DRIVER_SIGNALS_DIRECT = 0 в els_config.h).
+// Команды: f1/f0 — следовать/нет, lz<мкм>/lx<мкм> — люфт, kz<нм>/kx<нм> — нм на шаг, o — обнулить.
+// ============================================================
+static bool              s_follow = false;
+static volatile int32_t  s_nut[2], s_car[2];      // шаги: гайка (сколько шагов пришло) и каретка
+static volatile int32_t  s_bl_steps[2] = {0, 0};  // люфт, шаги
+static int32_t           s_nm_per_step[2] = {2500, 1250};   // Z: винт 2 мм / 800, X: 1 мм / 800
+static int32_t           s_bl_um[2] = {0, 0};
+
+static inline void follow_step(uint8_t ax, bool up) {
+    if (up) { int32_t n = ++s_nut[ax]; if (s_car[ax] < n - s_bl_steps[ax]) s_car[ax] = n - s_bl_steps[ax]; }
+    else    { int32_t n = --s_nut[ax]; if (s_car[ax] > n) s_car[ax] = n; }
+}
+static void isr_step_z() { follow_step(0, !(PING & _BV(5))); }   // D4 = PG5
+static void isr_step_x() { follow_step(1, !(PINE & _BV(3))); }   // D5 = PE3
+
+static void follow_apply_bl() {
+    for (uint8_t ax = 0; ax < 2; ax++)
+        s_bl_steps[ax] = (int32_t)(((int64_t)s_bl_um[ax] * 1000 + s_nm_per_step[ax] / 2) / s_nm_per_step[ax]);
+}
 static int32_t  s_quad_count[2] = {0, 0};
 static const int32_t QUAD_NM_PER_COUNT = 5000;   // 5 мкм
 
@@ -182,7 +207,9 @@ static void print_state() {
     Serial.print("[SIM] mode=");  Serial.print(s_mode);
     Serial.print(" z=");          Serial.print(s_pos_um[0]);
     Serial.print(" x=");          Serial.print(s_pos_um[1]);
-    Serial.print(" sweep=");      Serial.println(s_sweep ? 1 : 0);
+    Serial.print(" sweep=");      Serial.print(s_sweep ? 1 : 0);
+    Serial.print(" follow=");     Serial.print(s_follow ? 1 : 0);
+    Serial.print(" люфт z/x мкм="); Serial.print(s_bl_um[0]); Serial.print('/'); Serial.println(s_bl_um[1]);
 }
 
 static void handle_command(const char* c) {
@@ -193,6 +220,10 @@ static void handle_command(const char* c) {
         case 'z': s_pos_um[0] = atol(c + 1); break;
         case 'x': s_pos_um[1] = atol(c + 1); break;
         case 'w': s_sweep = (c[1] == '1'); break;
+        case 'f': s_follow = (c[1] == '1'); if (s_follow) s_sweep = false; break;
+        case 'l': s_bl_um[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
+        case 'k': s_nm_per_step[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
+        case 'o': noInterrupts(); s_nut[0] = s_nut[1] = s_car[0] = s_car[1] = 0; interrupts(); break;
     }
     print_state();
 }
@@ -201,10 +232,13 @@ static void handle_command(const char* c) {
 // Setup / loop
 // ============================================================
 void setup() {
+    pinMode(2, INPUT); pinMode(3, INPUT); pinMode(4, INPUT); pinMode(5, INPUT);
+    attachInterrupt(digitalPinToInterrupt(2), isr_step_z, FALLING);
+    attachInterrupt(digitalPinToInterrupt(3), isr_step_x, FALLING);
     Serial.begin(115200);
     Serial1.begin(57600);
     apply_mode('0');
-    Serial.println("[SIM] DRO simulator: HS800 UART + эмуляция линеек (команды: m<q|s|b|i|d|0>, z<мкм>, x<мкм>, w<0|1>, ?)");
+    Serial.println("[SIM] DRO simulator: HS800 UART + эмуляция линеек (команды: m<q|s|b|i|d|0>, z<мкм>, x<мкм>, w<0|1>, f<0|1>, lz/lx<мкм>, kz/kx<нм>, o, ?)");
     print_state();
 }
 
@@ -223,6 +257,12 @@ void loop() {
 
     uint32_t now = millis();
 
+    if (s_follow) {                         // позиция — каретка с люфтом по шагам моторов
+        for (uint8_t ax = 0; ax < 2; ax++) {
+            noInterrupts(); int32_t c = s_car[ax]; interrupts();
+            s_pos_um[ax] = (int32_t)(((int64_t)c * s_nm_per_step[ax]) / 1000);
+        }
+    }
     // Качание позиций через ноль, чтобы на дисплее были и плюс, и минус:
     // Z −50..+50 мм за 4 с, X −5..+5 мм
     if (s_sweep) {

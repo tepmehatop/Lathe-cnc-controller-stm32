@@ -144,3 +144,6 @@ void aFeed_Ext_Front();
 void aFeed_Ext_Rear();
 void aFeed_Int_Front();
 void aFeed_Int_Rear();
+
+// [STM32] e2_core.cpp
+bool e2_limit_buttons_allowed(void);   // BACKLOG-022

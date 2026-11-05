@@ -114,17 +114,25 @@ static inline void e2_step_hold(volatile uint32_t* edge) {
     *edge = e2_cycles();
 }
 
-#define Motor_Z_SetPulse()     do { if (E2_DRV_RD(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_DRV_LO(E2_PIN_Z_STEP); } } while (0)
+// Компенсация люфта (BACKLASH_*_UM): на первом шаге после смены направления позиция сдвигается на
+// люфт (e2_core.cpp) — именно на шаге, а не при установке DIR: ядро запоминает ноль/упоры стоя на месте
+extern int8_t e2_bl_loaded_z, e2_bl_loaded_x;
+void e2_bl_turn_z(int8_t d);
+void e2_bl_turn_x(int8_t d);
+#define E2_BL_STEP_Z()  do { int8_t _d = E2_DRV_RD(E2_PIN_Z_DIR) ? -1 : 1; if (_d != e2_bl_loaded_z) e2_bl_turn_z(_d); } while (0)
+#define E2_BL_STEP_X()  do { int8_t _d = E2_DRV_RD(E2_PIN_X_DIR) ? -1 : 1; if (_d != e2_bl_loaded_x) e2_bl_turn_x(_d); } while (0)
+
+#define Motor_Z_SetPulse()     do { if (E2_DRV_RD(E2_PIN_Z_STEP)) { E2_BL_STEP_Z(); e2_step_hold(&e2_z_edge); E2_DRV_LO(E2_PIN_Z_STEP); } } while (0)
 #define Motor_Z_RemovePulse()  do { if (!E2_DRV_RD(E2_PIN_Z_STEP)) { e2_step_hold(&e2_z_edge); E2_DRV_HI(E2_PIN_Z_STEP); } } while (0)
-#define Motor_Z_InvertPulse()  do { e2_step_hold(&e2_z_edge); E2_TGL(E2_PIN_Z_STEP); } while (0)
+#define Motor_Z_InvertPulse()  do { if (E2_DRV_RD(E2_PIN_Z_STEP)) E2_BL_STEP_Z(); e2_step_hold(&e2_z_edge); E2_TGL(E2_PIN_Z_STEP); } while (0)
 #define Read_Z_State           E2_DRV_RD(E2_PIN_Z_STEP)
 
-#define Motor_X_SetPulse()     do { if (E2_DRV_RD(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_DRV_LO(E2_PIN_X_STEP); } } while (0)
+#define Motor_X_SetPulse()     do { if (E2_DRV_RD(E2_PIN_X_STEP)) { E2_BL_STEP_X(); e2_step_hold(&e2_x_edge); E2_DRV_LO(E2_PIN_X_STEP); } } while (0)
 #define Motor_X_RemovePulse()  do { if (!E2_DRV_RD(E2_PIN_X_STEP)) { e2_step_hold(&e2_x_edge); E2_DRV_HI(E2_PIN_X_STEP); } } while (0)
-#define Motor_X_InvertPulse()  do { e2_step_hold(&e2_x_edge); E2_TGL(E2_PIN_X_STEP); } while (0)
+#define Motor_X_InvertPulse()  do { if (E2_DRV_RD(E2_PIN_X_STEP)) E2_BL_STEP_X(); e2_step_hold(&e2_x_edge); E2_TGL(E2_PIN_X_STEP); } while (0)
 #define Read_X_State           E2_DRV_RD(E2_PIN_X_STEP)
 
-#define Motor_Z_CW()           E2_DRV_LO(E2_PIN_Z_DIR)
+#define Motor_Z_CW()           E2_DRV_LO(E2_PIN_Z_DIR)     // CW — позиция растёт
 #define Motor_Z_CCW()          E2_DRV_HI(E2_PIN_Z_DIR)
 #define Motor_X_CW()           E2_DRV_LO(E2_PIN_X_DIR)
 #define Motor_X_CCW()          E2_DRV_HI(E2_PIN_X_DIR)
