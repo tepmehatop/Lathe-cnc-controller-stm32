@@ -246,13 +246,14 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 // LVGL Touch Driver
 // ============================================================================
 
-// Имитация касания для автотестов (<TAP:x,y> по USB): нажатие держится 120 мс
+// Имитация касания для автотестов (<TAP:x,y> или <TAP:x,y,мс> по USB): нажатие держится 120 мс
+// или заданное время (долгое нажатие — от 400 мс)
 static struct { bool active; lv_coord_t x, y; uint32_t until_ms; } g_sim_tap = {};
-static void sim_tap(int x, int y)
+static void sim_tap(int x, int y, int ms = 120)
 {
     g_sim_tap.x = (lv_coord_t)x;
     g_sim_tap.y = (lv_coord_t)y;
-    g_sim_tap.until_ms = millis() + 120;
+    g_sim_tap.until_ms = millis() + ms;
     g_sim_tap.active = true;
 }
 
@@ -1638,6 +1639,8 @@ static void cfg_open()
     cfg_set_status(d.cfg_valid ? "" : "\xD0\x9D\xD0\x95\xD0\xA2 \xD0\x94\xD0\x90\xD0\x9D\xD0\x9D\xD0\xAB\xD0\xA5 \xD0\x9E\xD0\xA2 STM32",
                    0xff8800);                                            // НЕТ ДАННЫХ ОТ STM32
     cfg_refresh();
+    if (g_ui.alert_box && !lv_obj_has_flag(g_ui.alert_box, LV_OBJ_FLAG_HIDDEN))
+        dismiss_alert();                                   // подсказка Wi-Fi от первого тапа по ⚠
     lv_obj_clear_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -1679,7 +1682,7 @@ static void create_settings_menu(lv_obj_t* screen)
     lv_obj_set_size(ov, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_set_pos(ov, 0, 0);
     lv_obj_set_style_bg_color(ov, lv_color_hex(0x000814), 0);
-    lv_obj_set_style_bg_opa(ov, LV_OPA_90, 0);
+    lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);   // непрозрачно: экран под ним не просвечивает
     lv_obj_set_style_border_width(ov, 0, 0);
     lv_obj_set_style_radius(ov, 0, 0);
     lv_obj_set_style_pad_all(ov, 0, 0);
@@ -5458,7 +5461,7 @@ void loop()
             // USB CDC (закрой Serial Monitor перед использованием!):
             //   'S'          → скриншот
             //   <BTN:name>   → <TOUCH:name> в STM32 (как нажатие на экране)
-            //   <TAP:x,y>    → имитация касания, x/y в координатах базы 480×272
+            //   <TAP:x,y[,мс]> → имитация касания, x/y в координатах базы 480×272
             //   <UIDUMP>     → тексты виджетов в [UI]-строку (автотесты)
             //   <RXMUTE:0|1> → игнорировать данные от STM32 (автотесты)
             //   <CMD:val>    → обработать как команду от STM32
@@ -5470,13 +5473,13 @@ void loop()
                     if (usb_inj_len < sizeof(usb_inj_buf) - 1) usb_inj_buf[usb_inj_len++] = c;
                     if (c == '>') {
                         usb_inj_buf[usb_inj_len - 1] = '\0';  // без '>'
-                        int tx, ty;
+                        int tx, ty, tms = 120;
                         if (strncmp(usb_inj_buf, "<BTN:", 5) == 0) {
                             uart_protocol.sendButtonPress(usb_inj_buf + 5);
                             Serial.printf("[BTN→STM32] TOUCH:%s\n", usb_inj_buf + 5);
-                        } else if (sscanf(usb_inj_buf, "<TAP:%d,%d", &tx, &ty) == 2) {
-                            sim_tap(UX(tx), UY(ty));
-                            Serial.printf("[TAP] %d,%d\n", tx, ty);
+                        } else if (sscanf(usb_inj_buf, "<TAP:%d,%d,%d", &tx, &ty, &tms) >= 2) {
+                            sim_tap(UX(tx), UY(ty), tms);
+                            Serial.printf("[TAP] %d,%d %d мс\n", tx, ty, tms);
                         } else if (strcmp(usb_inj_buf, "<UIDUMP") == 0) {
                             ui_dump();
                         } else if (sscanf(usb_inj_buf, "<RXMUTE:%d", &tx) == 1) {
