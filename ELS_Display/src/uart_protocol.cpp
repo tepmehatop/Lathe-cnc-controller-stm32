@@ -215,6 +215,9 @@ void UartProtocol::parseCommand(const char* cmd)
     else if (strcmp(command, "CUTTING_W") == 0) {
         parseCuttingW(params);
     }
+    else if (strcmp(command, "AXIS_EDIT") == 0) {
+        data_.axis_edit = (uint8_t)atoi(params);
+    }
     else if (strcmp(command, "ERR") == 0) {
         if (gcode_response_callback_) gcode_response_callback_(false, params);
     }
