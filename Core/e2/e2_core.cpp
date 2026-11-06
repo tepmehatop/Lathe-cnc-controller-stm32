@@ -905,6 +905,44 @@ void setup()
 }
 
 
+// [STM32] Ввод и сброс осей при любом источнике координат. У автора «Сброс» в подрежиме
+// «Ввод * Сброс осей» обнуляет счётчики шагов X_pos/Z_pos (они только для показа, циклы их не
+// читают). При линейках напрямую показания берутся с линейки — для них свой ноль (смещение).
+// Диаметр — отдельный ноль, как MX_pos у автора. С блоком DRO оси задаются на самом блоке.
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+static int32_t e2_scale_off[2] = {0, 0};   // показание = линейка − смещение (индекс ScaleAxis)
+static int32_t e2_diam_off = 0;            // диаметр = 2 × линейка X − смещение
+#endif
+#if ELS_POS_SOURCE != POS_SOURCE_STEPS
+static int32_t e2_diam_um = 0;             // диаметр, мкм (DRO и линейки)
+#endif
+
+bool e2_axis_editable(void) { return ELS_POS_SOURCE != POS_SOURCE_DRO_UART; }
+
+void e2_axis_set(char axis, int32_t um)
+{
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+   if (axis == 'D' && DRV_Scales_Present(SCALE_AXIS_X)) {
+      e2_diam_off = 2 * DRV_Scales_GetUm(SCALE_AXIS_X) - um;
+      return;
+   }
+   ScaleAxis ax = axis == 'Z' ? SCALE_AXIS_Z : SCALE_AXIS_X;
+   if (axis != 'D' && DRV_Scales_Present(ax)) {
+      e2_scale_off[ax] = DRV_Scales_GetUm(ax) - um;
+      return;
+   }
+#elif ELS_POS_SOURCE == POS_SOURCE_DRO_UART
+   (void)axis; (void)um;
+   return;
+#endif
+   // По шагам: обратный пересчёт к loop() (позиция = −шаги / шагов на 0.01 мм × 10 мкм)
+   float spu_x = (float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X;
+   float spu_z = (float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z;
+   if (axis == 'Z')      Z_pos  = -lroundf(um / 10.0f * spu_z);
+   else if (axis == 'X') X_pos  = -lroundf(um / 10.0f * spu_x);
+   else if (axis == 'D') MX_pos = -lroundf(um / 10.0f * spu_x / 2);
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void loop()
@@ -953,10 +991,11 @@ void loop()
     // Инвертируем оба знака чтобы на LCD и ESP32 отображалось то же что на HS800-2.
     int32_t new_x = -(dro_pos_x / 10L);
     int32_t new_z = -(dro_pos_y / 10L);
-    if (new_x != Size_X_mm || new_z != Size_Z_mm) {
+    int32_t new_d = -(e2_diam_um / 10L);
+    if (new_x != Size_X_mm || new_z != Size_Z_mm || new_d != MSize_X_mm) {
       Size_X_mm  = new_x;
       Size_Z_mm  = new_z;
-      MSize_X_mm = -(dro_pos_x / 5L);
+      MSize_X_mm = new_d;                      // [STM32] диаметр со своим нулём (было −dro_pos_x/5)
       Display_On_Position_Change();
     }
   }
@@ -1715,11 +1754,18 @@ void e2_pos_update(void)
    DRV_DRO_Process();
    dro_pos_x = DRV_DRO_GetX();
    dro_pos_y = DRV_DRO_GetY();
+   e2_diam_um = 2 * dro_pos_x;
 #elif ELS_POS_SOURCE == POS_SOURCE_SCALES
    DRV_Scales_Process();
-   if (DRV_Scales_Present(SCALE_AXIS_X)) dro_pos_x = DRV_Scales_GetUm(SCALE_AXIS_X);
-   else dro_pos_x = -(int32_t)(X_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X)) * 10;
-   if (DRV_Scales_Present(SCALE_AXIS_Z)) dro_pos_y = DRV_Scales_GetUm(SCALE_AXIS_Z);
+   if (DRV_Scales_Present(SCALE_AXIS_X)) {
+      int32_t raw = DRV_Scales_GetUm(SCALE_AXIS_X);
+      dro_pos_x = raw - e2_scale_off[SCALE_AXIS_X];
+      e2_diam_um = 2 * raw - e2_diam_off;
+   } else {
+      dro_pos_x = -(int32_t)(X_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X)) * 10;
+      e2_diam_um = -(int32_t)(MX_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X / 2 * McSTEP_X)) * 10;
+   }
+   if (DRV_Scales_Present(SCALE_AXIS_Z)) dro_pos_y = DRV_Scales_GetUm(SCALE_AXIS_Z) - e2_scale_off[SCALE_AXIS_Z];
    else dro_pos_y = -(int32_t)(Z_pos / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z)) * 10;
 
    // Пропала связь с линейкой (протоколы с тактом) — предупредить один раз

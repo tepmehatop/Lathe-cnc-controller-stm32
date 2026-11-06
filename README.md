@@ -35,8 +35,10 @@
 ## Быстро
 
 ```bash
-# прошивка платы STM32 (mini-USB в разъём ST-Link)
-pio run -e stm32f407_discovery -t upload
+# прошивка платы STM32 (mini-USB в разъём ST-Link) — один из вариантов:
+pio run -e stm32f407_discovery -t upload   # без линеек: позиция по шагам моторов, как в исходной 7e2
+pio run -e stm32f407_dro -t upload         # с блоком DRO HS800-2
+pio run -e stm32f407_scales -t upload      # линейки напрямую к STM32 (тип — в els_config.h)
 # прошивка дисплея: 4.3" или 10.1"
 pio run -e jc4827w543 -t upload
 pio run -e jc8012p4a1c -t upload

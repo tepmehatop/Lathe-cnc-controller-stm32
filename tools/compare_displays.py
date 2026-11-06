@@ -18,7 +18,8 @@ w0/z/x). Запуск из корня проекта:
 import argparse, os, re, socket, subprocess, sys, time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-ELF = os.path.join(ROOT, '.pio', 'build', 'stm32f407_discovery', 'firmware.elf')
+# стенд: эмулятор Mega выдаёт координаты как блок DRO — прошивка из env stm32f407_dro
+ELF = os.path.join(ROOT, '.pio', 'build', os.environ.get('ELS_ENV', 'stm32f407_dro'), 'firmware.elf')
 PIO = os.path.expanduser('~/.platformio')
 NM = os.path.join(PIO, 'packages', 'toolchain-gccarmnoneeabi', 'bin', 'arm-none-eabi-nm')
 OCD = os.path.join(PIO, 'packages', 'tool-openocd')

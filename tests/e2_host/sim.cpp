@@ -451,6 +451,53 @@ static void test_limit_no_switch() {
     controls_neutral(); run_ms(100);
 }
 
+// Ввод и сброс осей: с экрана (AXIS:) и кнопкой «Сброс» автора. Показания — как уходят на экран, мкм.
+extern uint8_t g_stub_scale_present[2];
+extern int32_t g_stub_scale_um[2];
+static long shown_z() { return -(long)Size_Z_mm * 10; }
+static long shown_x() { return -(long)Size_X_mm * 10; }
+static long shown_d() { return -(long)MSize_X_mm * 10; }
+static void test_axis_set() {
+    printf("[%7.1f с] [axis] ", t_ns / 1e9); printf("ввод и сброс осей (экран AXIS:, кнопка «Сброс»), источник %d\n", ELS_POS_SOURCE);
+    controls_neutral(); select_mode(1); run_ms(100);
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+    g_stub_scale_present[0] = g_stub_scale_present[1] = 1;
+    g_stub_scale_um[0] = 123456; g_stub_scale_um[1] = -7890; run_ms(50);
+#endif
+    long z0 = shown_z(), x0 = shown_x(), d0 = shown_d();
+    touch("AXIS:Z:-12345"); touch("AXIS:X:2500"); touch("AXIS:D:40000"); run_ms(50);
+#if ELS_POS_SOURCE == POS_SOURCE_DRO_UART
+    CHECK(shown_z() == z0 && shown_x() == x0 && shown_d() == d0, "с блоком DRO оси с экрана меняться не должны");
+#else
+    (void)z0; (void)x0; (void)d0;
+    CHECK(shown_z() == -12340 && shown_x() == 2500 && shown_d() == 40000,
+          "после ввода Z=%ld X=%ld ⌀=%ld, ожидалось -12340 2500 40000", shown_z(), shown_x(), shown_d());
+    // ось после ввода продолжает считать движение
+  #if ELS_POS_SOURCE == POS_SOURCE_SCALES
+    g_stub_scale_um[0] += 1000; g_stub_scale_um[1] -= 500; run_ms(50);
+    CHECK(shown_z() == -11340 && shown_x() == 2000 && shown_d() == 39000,
+          "после движения Z=%ld X=%ld ⌀=%ld, ожидалось -11340 2000 39000", shown_z(), shown_x(), shown_d());
+  #else
+    long zs = shown_z();
+    SET_IN(E2_PIN_HAND_X1, 0); SET_IN(E2_PIN_HAND_X10, 1); SET_IN(E2_PIN_HAND_AXIS_Z, 0); run_ms(100);
+    hand_turn(25, 20); run_ms(1500);
+    long dz = shown_z() - zs;
+    CHECK(dz == 250 || dz == -250, "после ввода РГИ 25 щелчков сдвинул Z на %ld мкм (ожидалось ±250)", dz);
+    hand_turn(-25, 20); run_ms(1500);
+    SET_IN(E2_PIN_HAND_AXIS_Z, 1); run_ms(100);
+  #endif
+    // «Сброс» автора: подрежим «Ввод * Сброс осей» (SelectMenu 2 в синхронной подаче), ▲ — X, ▼ — Z
+    SelectMenu = 2;
+    touch("KEY:UP"); touch("KEY:DN"); run_ms(50);
+    CHECK(shown_z() == 0 && shown_x() == 0, "после «Сброс» Z=%ld X=%ld, ожидалось 0 0", shown_z(), shown_x());
+    SelectMenu = 1;
+#endif
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+    g_stub_scale_present[0] = g_stub_scale_present[1] = 0;
+#endif
+    printf("    Z=%ld X=%ld ⌀=%ld мкм\n", shown_z(), shown_x(), shown_d());
+}
+
 static void test_hand() {
     printf("[%7.1f с] [hand] ", t_ns / 1e9); printf("РГИ: ось Z, x1, 25 щелчков\n");
     select_mode(1);
@@ -1107,6 +1154,7 @@ int main() {
     test_hand();
     test_limit();
     test_limit_no_switch();
+    test_axis_set();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();

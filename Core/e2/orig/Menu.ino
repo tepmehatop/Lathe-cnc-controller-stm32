@@ -1497,7 +1497,7 @@ void Key_Up_Pressed()
          }
         else if (SelectMenu == 2)
         {
-         X_pos = 0;
+         X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
 
          Beep();
         }
@@ -1524,7 +1524,7 @@ void Key_Up_Pressed()
            }
            else if (SelectMenu == 3)
            {
-            X_pos = 0;
+            X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
             Beep();
            }
            Print();
@@ -1565,7 +1565,7 @@ void Key_Up_Pressed()
         }
         else if (SelectMenu == 3) 
         {
-          X_pos = 0; 
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
           Beep();
         }        
         Print();
@@ -1589,7 +1589,7 @@ void Key_Up_Pressed()
            }
            else if (SelectMenu == 3)
            {
-            X_pos = 0;
+            X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
             Beep();
            }
         Print();
@@ -1616,7 +1616,7 @@ void Key_Up_Pressed()
         }
         else if (SelectMenu == 3)
         {
-         X_pos = 0;
+         X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
          Beep();
         }
         Print();
@@ -1644,7 +1644,7 @@ void Key_Down_Pressed()
          }
          else if (SelectMenu == 2)
          {
-          Z_pos = 0;
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
 
           Beep();
          }
@@ -1672,7 +1672,7 @@ void Key_Down_Pressed()
             }
          else if (SelectMenu == 3)
          {
-          Z_pos = 0;
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
           Beep();
          }
          Print();
@@ -1703,7 +1703,7 @@ void Key_Down_Pressed()
         }
          else if (SelectMenu == 3) 
          {
-          Z_pos = 0; 
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
           Beep();
          }          
          Print();
@@ -1728,7 +1728,7 @@ void Key_Down_Pressed()
             }
          else if (SelectMenu == 3)
          {
-          Z_pos = 0;
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
           Beep();
          }
          Print();
@@ -1756,7 +1756,7 @@ void Key_Down_Pressed()
          }
          else if (SelectMenu == 3)
          {
-          Z_pos = 0;
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
           Beep();
          }
          Print();

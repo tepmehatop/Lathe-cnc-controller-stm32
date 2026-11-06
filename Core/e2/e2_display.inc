@@ -284,6 +284,9 @@ void Display_Send_All()
   // 18. Диаметр заготовки (MSize_X_mm, для M1 SM=2)
   Display_Send_Int("DIAM_X", -(int32_t)MSize_X_mm * 10L);
 
+  // [STM32] Можно ли задавать оси с экрана (нет — при блоке DRO, там оси задаются на блоке)
+  Display_Send_Int("AXIS_EDIT", e2_axis_editable() ? 1 : 0);
+
   // 19. Чистовых проходов (для M3 SM=2)
   Display_Send_Int("PASS_FIN", PASS_FINISH + Pass_Fin);
 
@@ -619,6 +622,16 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
         Pass_Fin = 0;
         Print();
         _Display_SendThread();
+        Beep();
+      }
+    }
+    // [STM32] AXIS:<Z|X|D>:<мкм> — ввод/сброс оси с экрана (двойной тап — 0, удержание — клавиатура)
+    else if (prm.startsWith("AXIS:") && prm.length() >= 8 && prm.charAt(6) == ':') {
+      char ax = prm.charAt(5);
+      if (!e2_axis_editable()) {
+        Display_Send_CMD("ALERT", "ОСИ ЗАДАЮТСЯ НА БЛОКЕ DRO");
+      } else if (ax == 'Z' || ax == 'X' || ax == 'D') {
+        e2_axis_set(ax, prm.substring(7).toInt());
         Beep();
       }
     }

@@ -28,8 +28,11 @@
 #define POS_SOURCE_DRO_UART     1   // блок DRO HS800-2 по UART (линейки подключены к блоку)
 #define POS_SOURCE_SCALES       2   // линейки напрямую к STM32, без блока DRO
 
+// По умолчанию — без линеек, как исходная 7e2. С блоком DRO или линейками собирайте свой env:
+//   pio run -e stm32f407_dro      (блок DRO HS800-2)
+//   pio run -e stm32f407_scales   (линейки напрямую, тип — SCALE_Z_TYPE/SCALE_X_TYPE ниже)
 #ifndef ELS_POS_SOURCE   // можно переопределить флагом -D при сборке
-#define ELS_POS_SOURCE          POS_SOURCE_DRO_UART
+#define ELS_POS_SOURCE          POS_SOURCE_STEPS
 #endif
 
 /** Драйвер блока DRO HS800-2 включён только в режиме DRO_UART */
