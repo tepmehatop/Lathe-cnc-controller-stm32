@@ -15,7 +15,7 @@ void Cone_Left(bool & a_flag, bool & b_flag)
    Start_Speed = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * MIN_FEED / SCREW_Z) / FEED_ACCEL /2;
    if (Motor_Z_Pos < Limit_Pos_Left - Start_Speed * 2)
    {
-      Feed_Divisor = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * Feed_mm / SCREW_Z) /2;
+      Feed_Divisor = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * Feed_mm / SCREW_Z) /2 - FEED_EXACT;   // [STM32] BACKLOG-020: таймер считает Feed_Divisor + 1 линий
       if (Feed_Divisor < Start_Speed)
       {
          max_OCR5A = Start_Speed;
@@ -66,7 +66,7 @@ void Cone_Right(bool & a_flag, bool & b_flag)
    Start_Speed = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * MIN_FEED / SCREW_Z) / FEED_ACCEL /2;
    if (Motor_Z_Pos > Limit_Pos_Right + Start_Speed * 2)
    {
-      Feed_Divisor = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * Feed_mm / SCREW_Z) /2;
+      Feed_Divisor = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * Feed_mm / SCREW_Z) /2 - FEED_EXACT;   // [STM32] BACKLOG-020: таймер считает Feed_Divisor + 1 линий
       if (Feed_Divisor < Start_Speed)
       {
          max_OCR5A = Start_Speed;

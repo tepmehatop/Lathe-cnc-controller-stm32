@@ -371,7 +371,11 @@ static void test_feed(int feed) {
     double expect_avr = (double)ENC_LINE_PER_REV / (2.0 * (Feed_Divisor + 1));
     double ideal = feed / 100.0 / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z;
     CHECK(fabs(spr - expect_avr) < 0.05, "шагов/об %.3f, по формуле 7e2 %.3f", spr, expect_avr);
-    printf("    шагов/об %.3f (как у 7e2 на Mega: %.3f; идеально %.3f)\n", spr, expect_avr, ideal);
+#if FEED_EXACT
+    // BACKLOG-020: подача равна заданной с точностью до округления целого периода таймера
+    CHECK(fabs(spr - ideal) / ideal < 0.03, "подача %.2f: шагов/об %.3f, задано %.3f (FEED_EXACT)", feed / 100.0, spr, ideal);
+#endif
+    printf("    шагов/об %.3f (по формуле: %.3f; задано %.3f)\n", spr, expect_avr, ideal);
     SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800);
     spindle(0); run_ms(50);
 }
