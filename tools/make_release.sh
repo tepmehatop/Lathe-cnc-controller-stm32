@@ -10,6 +10,9 @@ PIO=${PIO:-$(command -v pio || echo "$HOME/.platformio/penv/bin/pio")}
 STM32_ENVS=${STM32_ENVS:-stm32f407_dro}
 DISPLAY_ENVS=${DISPLAY_ENVS:-"jc4827w543 jc8012p4a1c"}
 OUT=dist
+# esptool 4.x/5.x — для склейки образов дисплея: Python из PlatformIO (локально) или pip install esptool (CI)
+PIO_PY=$(dirname "$PIO")/python
+ESPTOOL=${ESPTOOL:-$( [ -x "$PIO_PY" ] && "$PIO_PY" -m esptool version >/dev/null 2>&1 && echo "$PIO_PY -m esptool" || echo "python3 -m esptool")}
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 # Wi-Fi дисплея (G-код): ELS_RELEASE — в релиз идёт только шаблон wifi_config.example.h,
@@ -34,7 +37,7 @@ for i in v["extra"]["flash_images"]:
     parts += [i["offset"], i["path"]]
 parts += [v["extra"].get("application_offset") or "0x10000", ".pio/build/%s/firmware.bin" % env]
 print(" ".join(parts))' "$e")
-    "$PIO" pkg exec -p tool-esptoolpy -- esptool.py ${args/OUT/$OUT/els-display-$e.bin}
+    $ESPTOOL ${args/OUT/$OUT/els-display-$e.bin}   # без кавычек: «python -m esptool»
 done
 
 ( cd "$OUT" && shasum -a 256 *.bin > SHA256SUMS.txt )

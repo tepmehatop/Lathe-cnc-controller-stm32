@@ -28,7 +28,7 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
 
       - name: PlatformIO
-        run: pip install platformio==6.1.19
+        run: pip install platformio==6.1.19 esptool==5.2.0
 
       - name: Сборка
         run: bash tools/make_release.sh
