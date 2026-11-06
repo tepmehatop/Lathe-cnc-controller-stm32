@@ -25,17 +25,14 @@ void e2_pos_update(void);
 void e2_service(void);
 void Display_Watch(void);
 
-// [STM32] Механика, под которую рассчитаны таблицы конусов и резьб ниже. Другая механика
-// в els_config.h → пересчитать таблицы: python3 tools/gen_e2_tables.py --write
+// [STM32] Механика, под которую рассчитаны таблицы конусов и резьб ниже (отметка gen_e2_tables.py).
+// При другой механике (els_config.h или настройки с экрана) прошивка пересчитывает таблицы сама
+// при старте — e2_mech_apply(); при этой — таблицы автора как есть.
 #define E2_TABLES_ENC       1800    // линий энкодера
 #define E2_TABLES_Z_STEPS   800     // шагов мотора Z на оборот винта (с микрошагом)
 #define E2_TABLES_SCREW_Z   200     // шаг винта Z, 0.01 мм
 #define E2_TABLES_X_STEPS   800
 #define E2_TABLES_SCREW_X   100
-static_assert(ENC_LINE_PER_REV == E2_TABLES_ENC &&
-              (long)MOTOR_Z_STEP_PER_REV * McSTEP_Z * E2_TABLES_SCREW_Z == (long)E2_TABLES_Z_STEPS * SCREW_Z &&
-              (long)MOTOR_X_STEP_PER_REV * McSTEP_X * E2_TABLES_SCREW_X == (long)E2_TABLES_X_STEPS * SCREW_X,
-              "Таблицы резьб и конусов рассчитаны под другую механику: запустите python3 tools/gen_e2_tables.py --write");
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // ***** Cone *****
@@ -45,7 +42,7 @@ struct cone_info_type
   int  Cm_Div;
   char Cone_Print[6];
 };
-const cone_info_type Cone_Info[] =
+cone_info_type Cone_Info[] =   // [STM32] не const: пересчёт под механику (e2_mech_apply)
 {
   //****начало таблицы конусов**** 
      { 1, 0, " 45\5" },		
@@ -129,7 +126,7 @@ struct thread_info_type
   byte Pass;
   int Limit_Print;     
 };
-const thread_info_type Thread_Info[] = 
+thread_info_type Thread_Info[] =   // [STM32] не const: пересчёт под механику (e2_mech_apply)
 {  
 //****начало таблицы резьб****                                                                                                           
 // Резьба метрическая                                                                                               					
@@ -239,6 +236,10 @@ static_assert(CHECK_MIN_aFEED_X <= 65535, "Неверно задано знач�
 #define CHECK_MAX_aFEED_X  250000 / ((uint32_t)MAX_aFEED * MOTOR_X_STEP_PER_REV * McSTEP_X / ((uint32_t)60 * SCREW_X / 100) * 2) -1
 static_assert(CHECK_MAX_aFEED_X > 1, "Неверно задано значение MAX_aFEED");
 //////////////////////////////////////////////////////////
+
+// [STM32] Дальше механика — из настроек (флеш / экран), исходные значения — из els_config.h
+#include "e2_mech.h"
+E2Mech e2_mech = E2_MECH_CONFIG;
 
 
 // ***** MY CONSTANT *****
@@ -702,6 +703,7 @@ uint16_t min_OCR3A = HC_MAX_SPEED_1;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void setup()
 {
+  e2_mech_load();           // [STM32] механика: флеш или els_config.h (BACKLOG-028) — до всего остального
   // ========== SERIAL EMULATION - ИНИЦИАЛИЗАЦИЯ В ПЕРВУЮ ОЧЕРЕДЬ! ==========
   // ВАЖНО: Serial инициализируется ПЕРВЫМ, чтобы видеть отладку даже если LCD зависнет
   Serial_Emulation_Init();  // Инициализация эмуляции кнопок через Serial Monitor
@@ -1856,8 +1858,8 @@ static int8_t e2_alert_now(void)
 // положением каретки. Сдвиг кратен McSTEP: loop() округляет позиции до полного шага.
 #define E2_BL_STEPS(um, screw, spr, mc) \
    ((long)(((double)(um) / 10.0 / (screw) * (spr) + 0.5)) * (mc))
-static const long e2_bl_z = E2_BL_STEPS(BACKLASH_Z_UM, SCREW_Z, MOTOR_Z_STEP_PER_REV, McSTEP_Z);
-static const long e2_bl_x = E2_BL_STEPS(BACKLASH_X_UM, SCREW_X, MOTOR_X_STEP_PER_REV, McSTEP_X);
+static long e2_bl_z = E2_BL_STEPS(BACKLASH_Z_UM, SCREW_Z, MOTOR_Z_STEP_PER_REV, McSTEP_Z);   // e2_mech_apply
+static long e2_bl_x = E2_BL_STEPS(BACKLASH_X_UM, SCREW_X, MOTOR_X_STEP_PER_REV, McSTEP_X);
 int8_t e2_bl_loaded_z = 0, e2_bl_loaded_x = 0;   // сторона, в которую выбран люфт (0 — неизвестно)
 
 void e2_bl_turn_z(int8_t d)                      // из прерываний шагов (E2_BL_STEP_Z)
@@ -1870,6 +1872,217 @@ void e2_bl_turn_x(int8_t d)
 {
    if (e2_bl_x && e2_bl_loaded_x) { long s = d * e2_bl_x; Motor_X_Pos -= s; X_pos -= s; MX_pos -= s; }
    e2_bl_loaded_x = d;
+}
+
+// [STM32] Механика из настроек (BACKLOG-028, e2_mech.h). Проверки — те же, что static_assert автора
+// для els_config.h, плюс делители таблиц резьб и конусов: они хранятся в byte, а мотор должен успевать
+// за шпинделем (делитель ≥ 1). Таблицы считаются по формулам tools/gen_e2_tables.py.
+static thread_info_type e2_thread_author[TOTAL_THREADS];   // таблицы автора — для механики-отметки
+static cone_info_type   e2_cone_author[TOTAL_CONE];
+static bool e2_author_saved = false;
+
+static bool e2_mech_is_stamp(const E2Mech& m)
+{
+   return m.enc_lines == E2_TABLES_ENC &&
+          (long)m.z_steps * m.z_mc * E2_TABLES_SCREW_Z == (long)E2_TABLES_Z_STEPS * m.z_screw &&
+          (long)m.x_steps * m.x_mc * E2_TABLES_SCREW_X == (long)E2_TABLES_X_STEPS * m.x_screw;
+}
+
+// Шаг резьбы, мм: дюймовые и трубные — точно 25.4 / ниток на дюйм, метрические — колонка Step.
+// Расчёт в double, константы целые: при -fsingle-precision-constant дробный литерал — float.
+static double e2_thread_pitch(const thread_info_type& t)
+{
+   const char* p = t.Thread_Print;
+   while (*p == ' ') p++;
+   if (strstr(p, "tpi")) return (double)254 / (10 * atoi(p));
+   if (*p == 'G' || *p == 'K') {
+      const char* sz = p + 1; while (*sz == ' ') sz++;
+      double tpi;
+      if (!strncmp(sz, "1/16", 4) || !strncmp(sz, "1/8", 3)) tpi = *p == 'G' ? 28 : 27;
+      else if (!strncmp(sz, "1/4", 3) || !strncmp(sz, "3/8", 3)) tpi = *p == 'G' ? 19 : 18;
+      else if (!strncmp(sz, "1/2", 3) || !strncmp(sz, "3/4", 3)) tpi = 14;
+      else tpi = *p == 'G' ? 11 : (double)23 / 2;
+      return (double)254 / (10 * tpi);
+   }
+   return (double)t.Step;
+}
+
+// Уклон образующей конуса на радиус: угол — тангенс, 1:N — на диаметр → /2, KM — конусы Морзе
+static double e2_cone_slope(const cone_info_type& c)
+{
+   static const int morse_x1000[] = {19212, 20047, 20020, 19922, 19254, 19002, 19180};   // KM0…KM6, 1:N
+   const char* p = c.Cone_Print;
+   while (*p == ' ') p++;
+   if (p[0] == 'K' && p[1] == 'M') return (double)1000 / (2 * morse_x1000[p[2] - '0']);
+   const char* colon = strchr(p, ':');
+   if (colon) return (double)atoi(p) / atoi(colon + 1) / 2;
+   return tan(atoi(p) * (4 * atan((double)1)) / 180);
+}
+
+static void e2_split(double d, byte& ks, int& km)
+{
+   long s = (long)d;
+   long m = lround((d - s) * 10000);
+   if (m == 10000) { s++; m = 0; }
+   ks = (byte)s; km = (int)m;
+}
+
+// Делители под механику m → в таблицы (или проверка, если out == false). nullptr — все годятся.
+static const char* e2_mech_tables(const E2Mech& m, bool out)
+{
+   static char err[64];
+   double z_spm = (double)m.z_steps * m.z_mc / ((double)m.z_screw / 100);   // шагов Z на мм
+   double x_spm = (double)m.x_steps * m.x_mc / ((double)m.x_screw / 100);
+   double tick = (double)2 * m.enc_lines;
+   for (unsigned i = 0; i < TOTAL_THREADS; i++) {
+      double p = e2_thread_pitch(Thread_Info[i]);
+      double dz = tick / (p * z_spm), dx = tick / (p * x_spm);
+      if (dz < 1 || dx < 1 || dz + THRD_ACCEL > 255 || dx + THRD_ACCEL > 255) {
+         snprintf(err, sizeof(err), "РЕЗЬБА %.6s: %s", Thread_Info[i].Thread_Print,
+                  (dz < 1 || dx < 1) ? "МОТОР НЕ УСПЕЕТ" : "ДЕЛИТЕЛЬ > 255");
+         return err;
+      }
+      if (out) {
+         e2_split(dz, Thread_Info[i].Ks_Div_Z, Thread_Info[i].Km_Div_Z);
+         e2_split(dx, Thread_Info[i].Ks_Div_X, Thread_Info[i].Km_Div_X);
+      }
+   }
+   for (unsigned i = 0; i < TOTAL_CONE; i++) {
+      double d = 2 * z_spm / (x_spm * e2_cone_slope(Cone_Info[i]));
+      if (d < 1 || d >= 256) {
+         snprintf(err, sizeof(err), "КОНУС %.5s: ДЕЛИТЕЛЬ ВНЕ 1…255", Cone_Info[i].Cone_Print);
+         return err;
+      }
+      if (out) e2_split(d, Cone_Info[i].Cs_Div, Cone_Info[i].Cm_Div);
+   }
+   return nullptr;
+}
+
+const char* e2_mech_check(const E2Mech& m)
+{
+   auto pow2 = [](int v) { return v >= 1 && v <= 128 && (v & (v - 1)) == 0; };
+   if (m.enc_lines < 100 || m.enc_lines > 10000) return "ЭНКОДЕР: 100…10000 ЛИНИЙ";
+   if (m.z_steps < 50 || m.z_steps > 1000 || m.x_steps < 50 || m.x_steps > 1000) return "ШАГОВ НА ОБОРОТ: 50…1000";
+   if (!pow2(m.z_mc) || !pow2(m.x_mc)) return "МИКРОШАГ: 1, 2, 4 … 128";
+   if (m.z_screw < 25 || m.z_screw > 1000 || m.x_screw < 25 || m.x_screw > 1000) return "ШАГ ВИНТА: 0.25…10 ММ";
+   if (m.bl_z_um < 0 || m.bl_z_um > 2000 || m.bl_x_um < 0 || m.bl_x_um > 2000) return "ЛЮФТ: 0…2000 МКМ";
+   // как static_assert автора (CHECK_MIN_FEED_* и др.) — пределы подач укладываются в таймеры
+   const int ax[2][3] = {{m.z_steps, m.z_mc, m.z_screw}, {m.x_steps, m.x_mc, m.x_screw}};
+   for (auto& a : ax) {
+      float spr = (float)a[0] * a[1];
+      if ((uint32_t)(m.enc_lines / (spr * MIN_FEED / a[2]) / 2) > 255) return "MIN_FEED: ДЕЛИТЕЛЬ > 255";
+      if ((uint32_t)(m.enc_lines / (spr * MAX_FEED / a[2]) / 2) <= 1)  return "MAX_FEED: ДЕЛИТЕЛЬ ≤ 1";
+      uint32_t k_min = (uint32_t)MIN_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
+      uint32_t k_max = (uint32_t)MAX_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
+      if (k_min == 0 || 250000 / k_min - 1 > 65535) return "MIN_aFEED: ДЕЛИТЕЛЬ > 65535";
+      if (k_max == 0 || 250000 / k_max - 1 <= 1)    return "MAX_aFEED: ДЕЛИТЕЛЬ ≤ 1";
+   }
+   if (e2_mech_is_stamp(m)) return nullptr;            // таблицы автора
+   return e2_mech_tables(m, false);
+}
+
+const char* e2_mech_apply(const E2Mech& m)
+{
+   const char* err = e2_mech_check(m);
+   if (err) return err;
+   if (!e2_author_saved) {
+      memcpy(e2_thread_author, Thread_Info, sizeof(Thread_Info));
+      memcpy(e2_cone_author, Cone_Info, sizeof(Cone_Info));
+      e2_author_saved = true;
+   }
+   e2_mech = m;
+   if (e2_mech_is_stamp(m)) {
+      memcpy(Thread_Info, e2_thread_author, sizeof(Thread_Info));
+      memcpy(Cone_Info, e2_cone_author, sizeof(Cone_Info));
+   } else {
+      e2_mech_tables(m, true);
+   }
+   // то же, что инициализация глобальных переменных автора
+   Start_Speed = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * MIN_FEED / SCREW_Z) /FEED_ACCEL;
+   max_OCR5A = ENC_LINE_PER_REV / ((uint32_t)MOTOR_Z_STEP_PER_REV * McSTEP_Z * MIN_FEED / SCREW_Z) /FEED_ACCEL;
+   max_OCR4A = (250000 / ((uint32_t)MIN_aFEED * MOTOR_Z_STEP_PER_REV * McSTEP_Z / ((uint32_t)60 * SCREW_Z / 100) * 2) - 1) /FEED_ACCEL;
+   e2_bl_z = E2_BL_STEPS(BACKLASH_Z_UM, SCREW_Z, MOTOR_Z_STEP_PER_REV, McSTEP_Z);
+   e2_bl_x = E2_BL_STEPS(BACKLASH_X_UM, SCREW_X, MOTOR_X_STEP_PER_REV, McSTEP_X);
+   return nullptr;
+}
+
+// Станок стоит: шпиндель не крутится (обороты — e2_service, раз в 250 мс), джойстик в нейтрали.
+// Только тогда можно менять механику и писать флеш (стирание сектора останавливает процессор на 1–2 с).
+uint32_t e2_rpm = 0;
+bool e2_machine_idle(void)
+{
+   return e2_rpm == 0 && Joy_Z_flag == OFF && Joy_X_flag == OFF && !rapid_Z_flag && !rapid_X_flag;
+}
+
+// Механика для экрана: <CFG:энкодер,шагов Z,микрошаг Z,винт Z,шагов X,микрошаг X,винт X,люфт Z,люфт X>
+void e2_mech_send(void)
+{
+   char b[80];
+   const E2Mech& m = e2_mech;
+   snprintf(b, sizeof(b), "%d,%d,%d,%d,%d,%d,%d,%d,%d", m.enc_lines, m.z_steps, m.z_mc, m.z_screw,
+            m.x_steps, m.x_mc, m.x_screw, m.bl_z_um, m.bl_x_um);
+   Display_Send_CMD("CFG", b);
+}
+
+// Команда экрана: применить и сохранить (CFG_SET) или вернуть els_config.h (CFG_DEFAULT).
+// Ответ — <CFG_RES:OK> или причина отказа; затем текущие настройки.
+void e2_mech_from_display(const char* prm)
+{
+   E2Mech m = E2_MECH_CONFIG;
+   const char* err = nullptr;
+   if (strncmp(prm, "CFG_SET:", 8) == 0 &&
+       sscanf(prm + 8, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &m.enc_lines, &m.z_steps, &m.z_mc, &m.z_screw,
+              &m.x_steps, &m.x_mc, &m.x_screw, &m.bl_z_um, &m.bl_x_um) != 9)
+      err = "НЕВЕРНАЯ КОМАНДА";
+   if (!err && !e2_machine_idle()) err = "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
+   if (!err) err = e2_mech_apply(m);
+   if (!err) err = e2_mech_save();
+   Serial.print(F("[CFG] ")); Serial.println(err ? err : "сохранено");
+   Display_Send_CMD("CFG_RES", err ? err : "OK");
+   if (!err) Beep(); else Beep_Error();
+   e2_mech_send();
+}
+
+// Запись во флеше: метка, версия, механика, контрольная сумма
+struct E2Settings {
+   uint32_t magic;
+   uint32_t version;
+   E2Mech   mech;
+   uint32_t sum;
+};
+#define E2_SETTINGS_MAGIC   0x45325354UL   // "E2ST"
+#define E2_SETTINGS_VERSION 1
+
+static uint32_t e2_settings_sum(const E2Settings& s)
+{
+   const uint8_t* b = (const uint8_t*)&s;
+   uint32_t h = 2166136261UL;                  // FNV-1a по всем полям, кроме суммы
+   for (size_t i = 0; i < offsetof(E2Settings, sum); i++) h = (h ^ b[i]) * 16777619UL;
+   return h;
+}
+
+void e2_mech_load(void)
+{
+   E2Settings s;
+   const char* err = "НЕТ";
+   if (e2_store_read(&s, sizeof(s)) && s.magic == E2_SETTINGS_MAGIC && s.version == E2_SETTINGS_VERSION &&
+       s.sum == e2_settings_sum(s)) {
+      err = e2_mech_apply(s.mech);
+      if (!err) { Serial.println(F("[CFG] механика — из флеша")); return; }
+   }
+   e2_mech_apply(E2_MECH_CONFIG);
+   Serial.print(F("[CFG] механика — из els_config.h (во флеше: ")); Serial.print(err); Serial.println(')');
+}
+
+const char* e2_mech_save(void)
+{
+   E2Settings s;
+   memset(&s, 0, sizeof(s));
+   s.magic = E2_SETTINGS_MAGIC;
+   s.version = E2_SETTINGS_VERSION;
+   s.mech = e2_mech;
+   s.sum = e2_settings_sum(s);
+   return e2_store_write(&s, sizeof(s)) ? nullptr : "ОШИБКА ЗАПИСИ ВО ФЛЕШ";
 }
 
 // [STM32] Разрешение кнопок упоров (BACKLOG-022): переключатель подрежима в «Ручной», как у автора,
@@ -1904,6 +2117,7 @@ void e2_service(void)
       s_rpm_edges = edges;
       s_rpm_t = now;
       Display_Send_Int("RPM", rpm);
+      e2_rpm = rpm;                             // [STM32] для e2_machine_idle()
    }
    // Значения, которые UartDisplay шлёт только в Display_Send_All, — по изменению (e2_display.inc)
    Display_Watch();

@@ -147,5 +147,7 @@ void aFeed_Int_Rear();
 
 // [STM32] e2_core.cpp
 bool e2_limit_buttons_allowed(void);   // BACKLOG-022
+void e2_mech_send(void);               // <CFG:…> — механика для экрана (BACKLOG-028)
+void e2_mech_from_display(const char* prm);   // CFG_SET / CFG_DEFAULT
 bool e2_axis_editable(void);           // ввод/сброс осей с экрана (нет — при блоке DRO)
 void e2_axis_set(char axis, int32_t um);   // 'Z', 'X' — позиция, 'D' — диаметр; мкм, как на экране

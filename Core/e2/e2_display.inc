@@ -284,6 +284,9 @@ void Display_Send_All()
   // 18. Диаметр заготовки (MSize_X_mm, для M1 SM=2)
   Display_Send_Int("DIAM_X", -(int32_t)MSize_X_mm * 10L);
 
+  // [STM32] Механика станка (настройки, BACKLOG-028)
+  e2_mech_send();
+
   // [STM32] Можно ли задавать оси с экрана (нет — при блоке DRO, там оси задаются на блоке)
   Display_Send_Int("AXIS_EDIT", e2_axis_editable() ? 1 : 0);
 
@@ -624,6 +627,11 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
         _Display_SendThread();
         Beep();
       }
+    }
+    // [STM32] CFG_SET:<9 чисел> / CFG_DEFAULT — механика станка с экрана (BACKLOG-028)
+    else if (prm.startsWith("CFG_SET:") || prm == "CFG_DEFAULT") {
+      e2_mech_from_display(prm.c_str());
+      Display_Send_All();
     }
     // [STM32] AXIS:<Z|X|D>:<мкм> — ввод/сброс оси с экрана (двойной тап — 0, удержание — клавиатура)
     else if (prm.startsWith("AXIS:") && prm.length() >= 8 && prm.charAt(6) == ':') {

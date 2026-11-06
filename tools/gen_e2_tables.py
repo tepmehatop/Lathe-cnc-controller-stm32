@@ -5,9 +5,10 @@
 Таблицы в Core/e2/e2_core.cpp (Thread_Info, Cone_Info) — это делители
 «фронтов энкодера на шаг мотора», рассчитанные автором 7e2 для энкодера
 1800 линий, винта Z 2 мм, винта X 1 мм, 200 шагов × микрошаг 4. Если механика
-другая (параметры в Core/els_config.h), делители надо пересчитать — иначе
-резьба и конусы получатся не того шага/угла. Прошивка сама не соберётся с
-другими параметрами и подскажет запустить этот скрипт.
+другая, прошивка пересчитывает делители сама при старте (e2_mech_apply,
+те же формулы) — в том числе под настройки, заданные с экрана. Скрипт нужен,
+чтобы записать в исходники таблицы под свою механику из els_config.h
+(тогда при старте ничего не пересчитывается) и проверить формулы.
 
 Запуск:
   python3 tools/gen_e2_tables.py            — проверить: совпадают ли таблицы с конфигом
@@ -98,7 +99,7 @@ def main():
         if old != new:
             diffs.append(f"резьба {m.group(5)}: {old} → {new}")
         return f"{{ {new[0]}, {new[1]}, {new[2]}, {new[3]}, {m.group(5)}, {m.group(6)},{m.group(7)}}}"
-    a, b = out.index("const thread_info_type Thread_Info[]"), out.index("#define TOTAL_THREADS")
+    a, b = out.index("thread_info_type Thread_Info[]"), out.index("#define TOTAL_THREADS")
     out = out[:a] + thr_re.sub(thr, out[a:b]) + out[b:]
 
     # Конусы: { Cs, Cm, "подпись" },
@@ -111,12 +112,12 @@ def main():
             diffs.append(f"конус {m.group(3)}: {old} → {new}")
             return f"{{ {new[0]}, {new[1]}, {m.group(3)} }}"
         return m.group(0)
-    a, b = out.index("const cone_info_type Cone_Info[]"), out.index("#define TOTAL_CONE")
+    a, b = out.index("cone_info_type Cone_Info[]"), out.index("#define TOTAL_CONE")
     out = out[:a] + cone_re.sub(cone, out[a:b]) + out[b:]
 
     # Делитель резьбы хранится в byte, и к нему прибавляется THRD_ACCEL (разгон) — сумма < 256
     accel = int(re.search(r"#define\s+THRD_ACCEL\s+(\d+)", CONFIG.read_text(encoding="utf-8")).group(1))
-    for m in thr_re.finditer(out[out.index("const thread_info_type Thread_Info[]"):out.index("#define TOTAL_THREADS")]):
+    for m in thr_re.finditer(out[out.index("thread_info_type Thread_Info[]"):out.index("#define TOTAL_THREADS")]):
         if int(m.group(1)) + accel > 255 or int(m.group(3)) + accel > 255:
             print(f"ВНИМАНИЕ: резьба {m.group(5)} — делитель + THRD_ACCEL > 255: такой шаг на этой механике не нарезать")
 

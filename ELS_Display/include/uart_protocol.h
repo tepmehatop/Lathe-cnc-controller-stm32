@@ -78,6 +78,11 @@ typedef struct {
     int32_t  tension_z;      // M1 SM=3: ослабление натяга Z
     int32_t  diam_x;         // M1 SM=2: диаметр заготовки (MSize_X_mm * 10)
     uint8_t  axis_edit;      // <AXIS_EDIT:1> — оси можно задавать с экрана (0 — их задаёт блок DRO)
+    // Механика станка (BACKLOG-028): <CFG:энкодер,шагов Z,микрошаг Z,винт Z,шагов X,микрошаг X,винт X,люфт Z,люфт X>
+    int32_t  cfg[9];
+    uint8_t  cfg_valid;      // CFG получен
+    char     cfg_res[64];    // <CFG_RES:OK> или причина отказа
+    uint8_t  cfg_res_seq;    // растёт с каждым CFG_RES
     uint8_t  pass_fin;       // M3 SM=2: чистовых проходов (PASS_FINISH + Pass_Fin)
     bool     cone_thr;       // M4/M5 SM=2: коническая резьба включена
     int16_t  cutter_w;      // M6 SM=2: ширина резца (мм × 100)

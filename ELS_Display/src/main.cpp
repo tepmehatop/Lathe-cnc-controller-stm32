@@ -1131,70 +1131,94 @@ static void axis_send(char axis, int32_t um)
     uart_protocol.sendButtonPress(cmd);
 }
 
-struct AxisKeypad {
-    lv_obj_t* back;    // затемнение на весь экран (nullptr — закрыта)
-    lv_obj_t* val;     // набираемое значение
-    char axis;         // 'Z' (Y на экране), 'X', 'D' (диаметр)
-    char buf[12];      // "-1234.567"
+// Цифровая клавиатура (оси, настройки): значение — целое в единицах 10^-dec
+// (мкм при dec = 3, 0.01 мм при dec = 2). Текущее значение видно сразу; первая цифра его заменяет.
+typedef void (*NumpadDone)(int32_t v, intptr_t tag);
+struct Numpad {
+    lv_obj_t* back;       // затемнение на весь экран (nullptr — закрыта)
+    lv_obj_t* val;        // набираемое значение
+    const char* unit;
+    uint8_t dec;          // знаков после точки
+    uint8_t int_digits;   // цифр до точки
+    bool sign;            // можно минус
+    bool fresh;           // показано исходное значение — первая цифра его заменяет
+    NumpadDone done;
+    intptr_t tag;
+    char buf[12];         // "-1234.567"
 };
-static AxisKeypad g_axkb = {};
+static Numpad g_numpad = {};
 
-static void axis_kb_close()
+static void numpad_close()
 {
-    if (g_axkb.back) { lv_obj_del(g_axkb.back); g_axkb.back = nullptr; }
+    if (g_numpad.back) { lv_obj_del(g_numpad.back); g_numpad.back = nullptr; }
 }
 
-static void axis_kb_refresh()
+static void numpad_refresh()
 {
-    char t[20];
-    snprintf(t, sizeof(t), "%s \xD0\xBC\xD0\xBC", g_axkb.buf[0] ? g_axkb.buf : "0");   // мм
-    lv_label_set_text(g_axkb.val, t);
+    char t[24];
+    snprintf(t, sizeof(t), "%s %s", g_numpad.buf[0] ? g_numpad.buf : "0", g_numpad.unit);
+    lv_label_set_text(g_numpad.val, t);
+    lv_obj_set_style_text_color(g_numpad.val, lv_color_hex(g_numpad.fresh ? 0x6a9fb5 : 0x00ff88), 0);
 }
 
-// "-12.3456" → мкм; не больше 4 цифр до точки и 3 после (набор это ограничивает)
-static int32_t axis_kb_um()
+// "-12.3456" → целое в единицах 10^-dec (набор ограничивает число цифр)
+static int32_t numpad_value()
 {
-    const char* p = g_axkb.buf;
+    const char* p = g_numpad.buf;
     bool neg = (*p == '-'); if (neg) p++;
-    int32_t mm = 0, frac = 0; int nf = 0;
-    for (; *p && *p != '.'; p++) mm = mm * 10 + (*p - '0');
-    if (*p == '.') for (p++; *p && nf < 3; p++, nf++) frac = frac * 10 + (*p - '0');
-    for (; nf < 3; nf++) frac *= 10;
-    int32_t um = mm * 1000 + frac;
-    return neg ? -um : um;
+    int32_t ip = 0, frac = 0; int nf = 0;
+    for (; *p && *p != '.'; p++) ip = ip * 10 + (*p - '0');
+    if (*p == '.') for (p++; *p && nf < g_numpad.dec; p++, nf++) frac = frac * 10 + (*p - '0');
+    for (; nf < g_numpad.dec; nf++) frac *= 10;
+    int32_t scale = 1;
+    for (int i = 0; i < g_numpad.dec; i++) scale *= 10;
+    int32_t v = ip * scale + frac;
+    return neg ? -v : v;
 }
 
-static void axis_kb_key(const char* k)
+static void numpad_key(const char* k)
 {
-    char* b = g_axkb.buf;
+    char* b = g_numpad.buf;
+    bool edit = !strcmp(k, "<") || !strcmp(k, ".") || (k[0] >= '0' && k[0] <= '9' && !k[1]);
+    if (edit && g_numpad.fresh) b[0] = 0;          // первая цифра заменяет исходное значение
+    if (edit || !strcmp(k, "+/-")) g_numpad.fresh = false;
     size_t n = strlen(b);
     const char* dot = strchr(b, '.');
     if (!strcmp(k, "<")) { if (n) b[n - 1] = 0; }
     else if (!strcmp(k, "+/-")) {
+        if (!g_numpad.sign) return;
         if (b[0] == '-') memmove(b, b + 1, n);
-        else if (n + 1 < sizeof(g_axkb.buf)) { memmove(b + 1, b, n + 1); b[0] = '-'; }
+        else if (n + 1 < sizeof(g_numpad.buf)) { memmove(b + 1, b, n + 1); b[0] = '-'; }
     }
-    else if (!strcmp(k, ".")) { if (!dot && n + 1 < sizeof(g_axkb.buf)) strcat(b, "."); }
+    else if (!strcmp(k, ".")) { if (g_numpad.dec && !dot && n + 1 < sizeof(g_numpad.buf)) strcat(b, "."); }
     else if (k[0] >= '0' && k[0] <= '9' && !k[1]) {
         size_t digits = dot ? strlen(dot + 1) : n - (b[0] == '-');
-        if (digits < (dot ? 3u : 4u) && n + 1 < sizeof(g_axkb.buf)) { b[n] = k[0]; b[n + 1] = 0; }
+        if (digits < (dot ? g_numpad.dec : g_numpad.int_digits) && n + 1 < sizeof(g_numpad.buf)) { b[n] = k[0]; b[n + 1] = 0; }
     }
     else if (k[0] == '\xD0' && k[1] == '\x92') {   // ВВОД
-        if (n && strcmp(b, "-") && strcmp(b, ".") && strcmp(b, "-.")) axis_send(g_axkb.axis, axis_kb_um());
-        axis_kb_close(); return;
+        bool has_digit = strpbrk(b, "0123456789") != nullptr;
+        NumpadDone done = g_numpad.done; intptr_t tag = g_numpad.tag;
+        int32_t v = numpad_value();
+        numpad_close();
+        if (has_digit && done) done(v, tag);
+        return;
     }
-    else { axis_kb_close(); return; }              // ОТМЕНА
-    axis_kb_refresh();
+    else { numpad_close(); return; }               // ОТМЕНА
+    numpad_refresh();
 }
 
-static void axis_kb_show(char axis)
+// init — исходное значение текстом (nullptr — пусто, «0»)
+static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_t int_digits, bool sign,
+                        const char* init, NumpadDone done, intptr_t tag)
 {
-    axis_kb_close();
-    g_axkb.axis = axis;
-    g_axkb.buf[0] = 0;
+    numpad_close();
+    g_numpad.unit = unit; g_numpad.dec = dec; g_numpad.int_digits = int_digits; g_numpad.sign = sign;
+    g_numpad.done = done; g_numpad.tag = tag;
+    g_numpad.fresh = init != nullptr;
+    snprintf(g_numpad.buf, sizeof(g_numpad.buf), "%s", init ? init : "");
 
     lv_obj_t* back = lv_obj_create(lv_layer_top());
-    g_axkb.back = back;
+    g_numpad.back = back;
     lv_obj_set_size(back, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_set_pos(back, 0, 0);
     lv_obj_set_style_bg_color(back, lv_color_hex(0x000000), 0);
@@ -1213,20 +1237,17 @@ static void axis_kb_show(char axis)
     lv_obj_set_style_pad_all(panel, US(6), 0);
     lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* title = lv_label_create(panel);
-    lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
-    lv_obj_set_style_text_color(title, lv_color_hex(0x6a9fb5), 0);
-    lv_label_set_recolor(title, true);
-    lv_label_set_text(title, axis == 'D' ? TITLE_DIAM
-                           : axis == 'Z' ? "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y
-                                         : "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_t* t = lv_label_create(panel);
+    lv_obj_set_style_text_font(t, &font_tahoma_bold_22, 0);
+    lv_obj_set_style_text_color(t, lv_color_hex(0x6a9fb5), 0);
+    lv_label_set_recolor(t, true);
+    lv_label_set_text(t, title);
+    lv_obj_align(t, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    g_axkb.val = lv_label_create(panel);
-    lv_obj_set_style_text_font(g_axkb.val, &font_tahoma_bold_28, 0);
-    lv_obj_set_style_text_color(g_axkb.val, lv_color_hex(0x00ff88), 0);
-    lv_obj_align(g_axkb.val, LV_ALIGN_TOP_RIGHT, 0, UY(26));
-    axis_kb_refresh();
+    g_numpad.val = lv_label_create(panel);
+    lv_obj_set_style_text_font(g_numpad.val, &font_tahoma_bold_28, 0);
+    lv_obj_align(g_numpad.val, LV_ALIGN_TOP_RIGHT, 0, UY(26));
+    numpad_refresh();
 
     static const char* map[] = {
         "7", "8", "9", "<", "\n",
@@ -1238,6 +1259,8 @@ static void axis_kb_show(char axis)
     lv_btnmatrix_set_map(m, map);
     lv_btnmatrix_set_btn_width(m, 13, 2);              // ОТМЕНА
     lv_btnmatrix_set_btn_width(m, 14, 2);              // ВВОД
+    if (!sign) lv_btnmatrix_set_btn_ctrl(m, 7, LV_BTNMATRIX_CTRL_DISABLED);    // +/-
+    if (!dec)  lv_btnmatrix_set_btn_ctrl(m, 12, LV_BTNMATRIX_CTRL_DISABLED);   // .
     lv_obj_set_size(m, UX(306), UY(184));
     lv_obj_align(m, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_text_font(m, &font_tahoma_bold_22, 0);
@@ -1247,11 +1270,21 @@ static void axis_kb_show(char axis)
     lv_obj_set_style_pad_gap(m, US(4), 0);
     lv_obj_set_style_bg_color(m, lv_color_hex(0x1a2a3a), LV_PART_ITEMS);
     lv_obj_set_style_text_color(m, lv_color_hex(0xe0e0e0), LV_PART_ITEMS);
+    lv_obj_set_style_text_color(m, lv_color_hex(0x3a4a5a), LV_PART_ITEMS | LV_STATE_DISABLED);
     lv_obj_add_event_cb(m, [](lv_event_t* e) {
         lv_obj_t* o = lv_event_get_target(e);
         const char* k = lv_btnmatrix_get_btn_text(o, lv_btnmatrix_get_selected_btn(o));
-        if (k) axis_kb_key(k);
+        if (k) numpad_key(k);
     }, LV_EVENT_VALUE_CHANGED, nullptr);
+}
+
+static void axis_kb_show(char axis)
+{
+    numpad_show(axis == 'D' ? TITLE_DIAM
+              : axis == 'Z' ? "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y
+                            : "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X,
+                "\xD0\xBC\xD0\xBC", 3, 4, true, nullptr,                     // мм
+                [](int32_t um, intptr_t a) { axis_send((char)a, um); }, axis);
 }
 
 // ============================================================================
@@ -1547,8 +1580,99 @@ static void create_k_content(lv_obj_t* screen)
 }
 
 // ============================================================================
-// Меню настроек — оверлей (double-tap на иконку ⚠ в statusbar)
+// Меню настроек — оверлей (double-tap на иконку ⚠ в statusbar).
+// Механика станка (BACKLOG-028): значения приходят от STM32 (<CFG:…>), правятся клавиатурой,
+// СОХРАНИТЬ — CFG_SET (STM32 проверяет, применяет и пишет во флеш), ИЗ КОНФИГА — CFG_DEFAULT
+// (значения из els_config.h). Ответ STM32 (CFG_RES) — в строке статуса.
 // ============================================================================
+// Индексы в LatheData::cfg: 0 энкодер, 1 шагов Z, 2 микрошаг Z, 3 винт Z (0.01 мм),
+// 4 шагов X, 5 микрошаг X, 6 винт X, 7 люфт Z (мкм), 8 люфт X
+struct CfgField { const char* name; int8_t idx_z, idx_x; uint8_t dec, digits; const char* unit; };
+static const CfgField CFG_FIELDS[] = {
+    { "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x92\xD0\x98\xD0\x9D\xD0\xA2\xD0\x90, \xD0\xBC\xD0\xBC", 3, 6, 2, 2, "\xD0\xBC\xD0\xBC" },   // ШАГ ВИНТА, мм
+    { "\xD0\xA8\xD0\x90\xD0\x93\xD0\x9E\xD0\x92 \xD0\x9D\xD0\x90 \xD0\x9E\xD0\x91\xD0\x9E\xD0\xA0\xD0\x9E\xD0\xA2", 1, 4, 0, 4, "" },      // ШАГОВ НА ОБОРОТ
+    { "\xD0\x9C\xD0\x98\xD0\x9A\xD0\xA0\xD0\x9E\xD0\xA8\xD0\x90\xD0\x93", 2, 5, 0, 3, "" },                                                  // МИКРОШАГ
+    { "\xD0\x9B\xD0\xAE\xD0\xA4\xD0\xA2, \xD0\xBC\xD0\xBA\xD0\xBC", 7, 8, 0, 4, "\xD0\xBC\xD0\xBA\xD0\xBC" },                              // ЛЮФТ, мкм
+    { "\xD0\xAD\xD0\x9D\xD0\x9A\xD0\x9E\xD0\x94\xD0\x95\xD0\xA0, \xD0\xBB\xD0\xB8\xD0\xBD\xD0\xB8\xD0\xB9", 0, -1, 0, 5, "" },           // ЭНКОДЕР, линий
+};
+struct CfgUi {
+    int32_t   edit[9];       // правка до сохранения
+    bool      dirty;         // есть несохранённые правки
+    uint8_t   seen_seq;      // последний показанный CFG_RES
+    lv_obj_t* val[9];
+    lv_obj_t* status;
+};
+static CfgUi g_cfg = {};
+
+static void cfg_fmt(char* b, size_t n, int idx, int32_t v)
+{
+    if (idx == 3 || idx == 6) snprintf(b, n, "%ld.%02ld", (long)(v / 100), (long)(v % 100));
+    else snprintf(b, n, "%ld", (long)v);
+}
+
+static void cfg_set_status(const char* t, uint32_t color)
+{
+    lv_label_set_text(g_cfg.status, t);
+    lv_obj_set_style_text_color(g_cfg.status, lv_color_hex(color), 0);
+}
+
+static void cfg_refresh()
+{
+    const LatheData& d = uart_protocol.getData();
+    for (int i = 0; i < 9; i++) {
+        if (!g_cfg.val[i]) continue;
+        char b[16];
+        if (!d.cfg_valid) { lv_label_set_text(g_cfg.val[i], "--"); continue; }
+        cfg_fmt(b, sizeof(b), i, g_cfg.edit[i]);
+        lv_label_set_text(g_cfg.val[i], b);
+        lv_obj_set_style_text_color(g_cfg.val[i], lv_color_hex(g_cfg.edit[i] != d.cfg[i] ? 0xffcc00 : 0xe0e0e0), 0);
+    }
+}
+
+static void cfg_open()
+{
+    const LatheData& d = uart_protocol.getData();
+    memcpy(g_cfg.edit, d.cfg, sizeof(g_cfg.edit));
+    g_cfg.dirty = false;
+    g_cfg.seen_seq = d.cfg_res_seq;
+    cfg_set_status(d.cfg_valid ? "" : "\xD0\x9D\xD0\x95\xD0\xA2 \xD0\x94\xD0\x90\xD0\x9D\xD0\x9D\xD0\xAB\xD0\xA5 \xD0\x9E\xD0\xA2 STM32",
+                   0xff8800);                                            // НЕТ ДАННЫХ ОТ STM32
+    cfg_refresh();
+    lv_obj_clear_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Раз в 200 мс, пока меню открыто: новые значения от STM32 и ответ на сохранение
+static void cfg_tick(lv_timer_t*)
+{
+    if (!g_ui.settings_menu || lv_obj_has_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN)) return;
+    const LatheData& d = uart_protocol.getData();
+    if (d.cfg_res_seq != g_cfg.seen_seq) {
+        g_cfg.seen_seq = d.cfg_res_seq;
+        bool ok = !strcmp(d.cfg_res, "OK");
+        cfg_set_status(ok ? "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E" : d.cfg_res,   // СОХРАНЕНО
+                       ok ? 0x00ff88 : 0xff5555);
+        if (ok) g_cfg.dirty = false;
+    }
+    if (!g_cfg.dirty && d.cfg_valid) memcpy(g_cfg.edit, d.cfg, sizeof(g_cfg.edit));
+    cfg_refresh();
+}
+
+static lv_obj_t* cfg_button(lv_obj_t* parent, const char* text, uint32_t bg, uint32_t fg)
+{
+    lv_obj_t* b = lv_btn_create(parent);
+    lv_obj_set_style_bg_color(b, lv_color_hex(bg), 0);
+    lv_obj_set_style_border_color(b, lv_color_hex(0x3a5a6a), 0);
+    lv_obj_set_style_border_width(b, US(1), 0);
+    lv_obj_set_style_radius(b, US(6), 0);
+    lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_t* l = lv_label_create(b);
+    lv_obj_center(l);
+    lv_obj_set_style_text_font(l, &font_tahoma_bold_16, 0);
+    lv_obj_set_style_text_color(l, lv_color_hex(fg), 0);
+    lv_label_set_text(l, text);
+    return b;
+}
+
 static void create_settings_menu(lv_obj_t* screen)
 {
     lv_obj_t* ov = lv_obj_create(screen);
@@ -1564,44 +1688,103 @@ static void create_settings_menu(lv_obj_t* screen)
     g_ui.settings_menu = ov;
 
     lv_obj_t* title = lv_label_create(ov);
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, UY(12));
+    lv_obj_set_pos(title, UX(16), UY(6));
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
     lv_label_set_text(title,
-        "\xD0\x9D\xD0\x90\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x99\xD0\x9A\xD0\x98");  // НАСТРОЙКИ
+        "\xD0\x9C\xD0\x95\xD0\xA5\xD0\x90\xD0\x9D\xD0\x98\xD0\x9A\xD0\x90 "
+        "\xD0\xA1\xD0\xA2\xD0\x90\xD0\x9D\xD0\x9A\xD0\x90");                      // МЕХАНИКА СТАНКА
 
-    lv_obj_t* lang_lbl = lv_label_create(ov);
-    lv_obj_set_pos(lang_lbl, UX(20), UY(50));
-    lv_obj_set_style_text_color(lang_lbl, lv_color_hex(0x6a9fb5), 0);
-    lv_obj_set_style_text_font(lang_lbl, &font_dejavu_12, 0);
-    lv_label_set_text(lang_lbl,
-        "\xD0\xAF\xD0\x97\xD0\xAB\xD0\x9A: RU/EN \xe2\x80\x94 "
-        "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ЯЗЫК: RU/EN — В РАЗРАБОТКЕ
+    g_cfg.status = lv_label_create(ov);
+    lv_obj_set_width(g_cfg.status, UX(220));
+    lv_obj_set_pos(g_cfg.status, UX(248), UY(10));
+    lv_obj_set_style_text_font(g_cfg.status, &font_dejavu_14, 0);
+    lv_obj_set_style_text_align(g_cfg.status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_long_mode(g_cfg.status, LV_LABEL_LONG_DOT);
+    lv_label_set_text(g_cfg.status, "");
 
-    lv_obj_t* other_lbl = lv_label_create(ov);
-    lv_obj_set_pos(other_lbl, UX(20), UY(72));
-    lv_obj_set_style_text_color(other_lbl, lv_color_hex(0x6a9fb5), 0);
-    lv_obj_set_style_text_font(other_lbl, &font_dejavu_12, 0);
-    lv_label_set_text(other_lbl,
-        "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA7\xD0\x95\xD0\x95: "
-        "\xD0\x92 \xD0\xA0\xD0\x90\xD0\x97\xD0\xA0\xD0\x90\xD0\x91\xD0\x9E\xD0\xA2\xD0\x9A\xD0\x95");  // ПРОЧЕЕ: В РАЗРАБОТКЕ
+    const int X_NAME = UX(16), X_Z = UX(200), X_X = UX(336), COL_W = UX(128), ROW_Y0 = UY(62), ROW_DY = UY(34), ROW_H = UY(30);
+    // заголовки колонок: продольная — Y на экране (как ПОЗИЦИЯ Y), поперечная — X
+    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y,   // ПРОДОЛЬНАЯ Y
+                             "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X }; // ПОПЕРЕЧНАЯ X
+    for (int c = 0; c < 2; c++) {
+        lv_obj_t* h = lv_label_create(ov);
+        lv_obj_set_style_text_font(h, &font_dejavu_14, 0);
+        lv_obj_set_style_text_color(h, lv_color_hex(0x6a9fb5), 0);
+        lv_label_set_recolor(h, true);
+        lv_label_set_text(h, heads[c]);
+        lv_obj_set_pos(h, c ? X_X : X_Z, UY(40));
+    }
+    for (int r = 0; r < (int)(sizeof(CFG_FIELDS) / sizeof(CFG_FIELDS[0])); r++) {
+        const CfgField& f = CFG_FIELDS[r];
+        int y = ROW_Y0 + r * ROW_DY;
+        lv_obj_t* n = lv_label_create(ov);
+        lv_obj_set_style_text_font(n, &font_dejavu_16, 0);
+        lv_obj_set_style_text_color(n, lv_color_hex(0x9ab8c8), 0);
+        lv_label_set_text(n, f.name);
+        lv_obj_set_pos(n, X_NAME, y + UY(6));
+        for (int c = 0; c < 2; c++) {
+            int idx = c ? f.idx_x : f.idx_z;
+            if (idx < 0) continue;
+            lv_obj_t* b = cfg_button(ov, "--", 0x10202c, 0xe0e0e0);
+            lv_obj_set_size(b, COL_W, ROW_H);
+            lv_obj_set_pos(b, c ? X_X : X_Z, y);
+            g_cfg.val[idx] = lv_obj_get_child(b, 0);
+            lv_obj_set_style_text_font(g_cfg.val[idx], &font_tahoma_bold_22, 0);
+            lv_obj_add_event_cb(b, [](lv_event_t* e) {
+                int idx = (int)(intptr_t)lv_event_get_user_data(e);
+                if (!uart_protocol.getData().cfg_valid) return;
+                const CfgField* f = nullptr;
+                for (auto& x : CFG_FIELDS) if (x.idx_z == idx || x.idx_x == idx) f = &x;
+                static char title[64];
+                snprintf(title, sizeof(title), "%s%s", f->name,
+                         f->idx_x < 0 ? "" : idx == f->idx_z ? " (" AXIS_Y ")" : " (" AXIS_X ")");
+                char init[16];
+                cfg_fmt(init, sizeof(init), idx, g_cfg.edit[idx]);
+                numpad_show(title, f->unit, f->dec, f->digits, false, init, [](int32_t v, intptr_t i) {
+                    g_cfg.edit[i] = v;
+                    g_cfg.dirty = true;
+                    cfg_set_status("\xD0\x9D\xD0\x95 \xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E", 0xffcc00);   // НЕ СОХРАНЕНО
+                    cfg_refresh();
+                }, idx);
+            }, LV_EVENT_CLICKED, (void*)(intptr_t)idx);
+        }
+    }
 
-    lv_obj_t* close_btn = lv_btn_create(ov);
-    lv_obj_set_size(close_btn, UX(160), UY(36));
-    lv_obj_align(close_btn, LV_ALIGN_BOTTOM_MID, 0, -UY(16));
-    lv_obj_set_style_bg_color(close_btn, lv_color_hex(0x2a1a1a), 0);
-    lv_obj_set_style_border_color(close_btn, lv_color_hex(0x604040), 0);
-    lv_obj_set_style_border_width(close_btn, US(1), 0);
-    lv_obj_set_style_radius(close_btn, US(6), 0);
-    lv_obj_set_style_shadow_width(close_btn, 0, 0);
-    { lv_obj_t* l = lv_label_create(close_btn); lv_obj_center(l);
-      lv_obj_set_style_text_font(l, &font_tahoma_bold_22, 0);
-      lv_obj_set_style_text_color(l, lv_color_hex(0xa08080), 0);
-      lv_label_set_text(l,
-          "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC"); }  // ЗАКРЫТЬ
+    // СОХРАНИТЬ / ИЗ КОНФИГА / ЗАКРЫТЬ
+    const int BY = UY(236), BH = UY(30), BW = UX(140);
+    lv_obj_t* save = cfg_button(ov, "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x98\xD0\xA2\xD0\xAC", 0x0a3a2a, 0x00ff88);   // СОХРАНИТЬ
+    lv_obj_set_size(save, BW, BH); lv_obj_set_pos(save, UX(16), BY);
+    lv_obj_add_event_cb(save, [](lv_event_t*) {
+        if (!uart_protocol.getData().cfg_valid) return;
+        const int32_t* v = g_cfg.edit;
+        char cmd[96];
+        snprintf(cmd, sizeof(cmd), "CFG_SET:%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", (long)v[0], (long)v[1], (long)v[2],
+                 (long)v[3], (long)v[4], (long)v[5], (long)v[6], (long)v[7], (long)v[8]);
+        uart_protocol.sendButtonPress(cmd);
+        cfg_set_status("\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\xAF\xD0\x95\xD0\x9C\xE2\x80\xA6", 0x6a9fb5);   // СОХРАНЯЕМ…
+    }, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t* def = cfg_button(ov, "\xD0\x98\xD0\x97 \xD0\x9A\xD0\x9E\xD0\x9D\xD0\xA4\xD0\x98\xD0\x93\xD0\x90", 0x1a2a3a, 0x9ab8c8);   // ИЗ КОНФИГА
+    lv_obj_set_size(def, BW, BH); lv_obj_set_pos(def, UX(170), BY);
+    lv_obj_add_event_cb(def, [](lv_event_t*) {
+        // долгое нажатие — чтобы не сбросить случайно
+        uart_protocol.sendButtonPress("CFG_DEFAULT");
+        g_cfg.dirty = false;
+        cfg_set_status("\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\xAF\xD0\x95\xD0\x9C\xE2\x80\xA6", 0x6a9fb5);   // СОХРАНЯЕМ…
+    }, LV_EVENT_LONG_PRESSED, nullptr);
+    lv_obj_add_event_cb(def, [](lv_event_t*) {
+        cfg_set_status("\xD0\x94\xD0\x95\xD0\xA0\xD0\x96\xD0\x98\xD0\xA2\xD0\x95 \xD0\x9D\xD0\x90\xD0\x96\xD0\x90\xD0\xA2\xD0\x9E\xD0\x99", 0xffcc00);   // ДЕРЖИТЕ НАЖАТОЙ
+    }, LV_EVENT_SHORT_CLICKED, nullptr);
+
+    lv_obj_t* close_btn = cfg_button(ov, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);   // ЗАКРЫТЬ
+    lv_obj_set_size(close_btn, BW, BH); lv_obj_set_pos(close_btn, UX(324), BY);
     lv_obj_add_event_cb(close_btn, [](lv_event_t*) {
+        numpad_close();
         lv_obj_add_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
     }, LV_EVENT_CLICKED, nullptr);
+
+    lv_timer_create(cfg_tick, 200, nullptr);
 
     // Tap on ⚠ warn icon → show WiFi info; double-tap → also open settings
     if (g_ui.warn_bg) {
@@ -1615,7 +1798,7 @@ static void create_settings_menu(lv_obj_t* screen)
             snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "http://els.local/ (%s)",
                      (ip && *ip) ? ip : "...");
             show_alert(msg);
-            if (dbl) lv_obj_clear_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
+            if (dbl) cfg_open();
         }, LV_EVENT_CLICKED, nullptr);
     }
 }
@@ -4971,7 +5154,7 @@ static void ui_dump()
                   !hidden(g_ui.alert_box), !hidden(g_ui.mode_menu), !hidden(g_ui.thr_type_menu),
                   !hidden(g_ui.joystick_overlay), !hidden(g_ui.settings_menu), (int)g_roller.active,
                   (int)g_edit_param.active, (int)g_sub_edit.active, !hidden(g_ui.thr_type_box),
-                  g_axkb.back != nullptr, (int)uart_protocol.getData().axis_edit);
+                  g_numpad.back != nullptr, (int)uart_protocol.getData().axis_edit);
     if (g_ui.lim_L)
         Serial.printf(" lim=%06X,%06X,%06X,%06X", color(g_ui.lim_L, 0), color(g_ui.lim_R, 0),
                       color(g_ui.lim_F, 0), color(g_ui.lim_B, 0));

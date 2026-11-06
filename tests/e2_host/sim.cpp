@@ -498,6 +498,71 @@ static void test_axis_set() {
     printf("    Z=%ld X=%ld ⌀=%ld мкм\n", shown_z(), shown_x(), shown_d());
 }
 
+// Механика из настроек (BACKLOG-028): пересчёт таблиц по формулам gen_e2_tables.py, проверки, флеш
+extern uint8_t g_stub_flash[256];
+static void test_mech() {
+    printf("[%7.1f с] [mech] ", t_ns / 1e9); printf("механика из настроек: таблицы, проверки, флеш\n");
+    // 1. Пересчёт под механику автора совпадает с его таблицами (резьбы — точно, конусы — 0.2 %)
+    static thread_info_type thr[TOTAL_THREADS]; static cone_info_type cone[TOTAL_CONE];
+    memcpy(thr, Thread_Info, sizeof thr); memcpy(cone, Cone_Info, sizeof cone);
+    CHECK(e2_mech_tables(E2_MECH_CONFIG, true) == nullptr, "таблицы автора не считаются");
+    int bad_thr = 0, bad_cone = 0;
+    for (unsigned i = 0; i < TOTAL_THREADS; i++)
+        if (thr[i].Ks_Div_Z != Thread_Info[i].Ks_Div_Z || thr[i].Km_Div_Z != Thread_Info[i].Km_Div_Z ||
+            thr[i].Ks_Div_X != Thread_Info[i].Ks_Div_X || thr[i].Km_Div_X != Thread_Info[i].Km_Div_X) {
+            if (!bad_thr++) printf("    резьба %s: %d.%04d → %d.%04d\n", thr[i].Thread_Print, thr[i].Ks_Div_Z,
+                                   thr[i].Km_Div_Z, Thread_Info[i].Ks_Div_Z, Thread_Info[i].Km_Div_Z);
+        }
+    for (unsigned i = 0; i < TOTAL_CONE; i++) {
+        double a = cone[i].Cs_Div + cone[i].Cm_Div / 1e4, b = Cone_Info[i].Cs_Div + Cone_Info[i].Cm_Div / 1e4;
+        if (fabs(a - b) > 0.002 * a) { if (!bad_cone++) printf("    конус %s: %.4f → %.4f\n", cone[i].Cone_Print, a, b); }
+    }
+    CHECK(bad_thr == 0 && bad_cone == 0, "пересчёт расходится с таблицами автора: резьб %d, конусов %d", bad_thr, bad_cone);
+    CHECK(e2_mech_apply(E2_MECH_CONFIG) == nullptr && !memcmp(thr, Thread_Info, sizeof thr) && !memcmp(cone, Cone_Info, sizeof cone),
+          "механика автора — не его таблицы");
+    // 2. Неверные значения отклоняются, текущие не меняются
+    E2Mech m = E2_MECH_CONFIG; m.z_mc = 3;
+    CHECK(e2_mech_apply(m) != nullptr && e2_mech.z_mc == E2_MECH_CONFIG.z_mc, "микрошаг 3 принят");
+    m = E2_MECH_CONFIG; m.enc_lines = 10000; m.z_steps = 50; m.z_mc = 1; m.z_screw = 1000;
+    const char* err = e2_mech_check(m);
+    CHECK(err != nullptr, "механика с делителем резьбы > 255 принята");
+    printf("    отказ: %s\n", err ? err : "-");
+    m = E2_MECH_CONFIG; m.z_mc = 16;                 // 1600 шагов/мм: на 4.5 мм мотор не успевает за шпинделем
+    err = e2_mech_check(m);
+    CHECK(err && strstr(err, "РЕЗЬБА"), "механика, где мотор не успевает в резьбе, принята (%s)", err ? err : "-");
+    printf("    отказ: %s\n", err ? err : "-");
+    // 3. Флеш: сохранить другую механику, затем загрузка при старте её возвращает; испорченная запись — из конфига
+    m = E2_MECH_CONFIG; m.z_screw = 150; m.bl_x_um = 80;
+    CHECK(e2_mech_apply(m) == nullptr && e2_mech_save() == nullptr, "винт Z 1.5 мм не применился/не сохранился");
+    e2_mech_apply(E2_MECH_CONFIG); e2_mech_load();
+    CHECK(e2_mech.z_screw == 150 && e2_mech.bl_x_um == 80, "из флеша: винт Z %d, люфт X %d", e2_mech.z_screw, e2_mech.bl_x_um);
+    g_stub_flash[10] ^= 1; e2_mech_load();
+    CHECK(e2_mech.z_screw == E2_MECH_CONFIG.z_screw, "испорченная запись принята");
+    memset(g_stub_flash, 0xFF, sizeof g_stub_flash);
+    e2_mech_apply(E2_MECH_CONFIG);
+    // 4. С экрана: при вращающемся шпинделе — отказ; на стоящем станке — применить, сохранить, ответить
+    controls_neutral(); select_mode(1);
+    spindle(300); run_ms(600);
+    size_t o = DISPLAY_UART.out.size();
+    touch("CFG_SET:1800,200,4,150,200,4,125,0,80"); run_ms(20);
+    CHECK(e2_mech.z_screw == E2_MECH_CONFIG.z_screw && DISPLAY_UART.out.find("<CFG_RES:OK>", o) == std::string::npos,
+          "настройки приняты при вращающемся шпинделе");
+    spindle(0); run_ms(600);
+    o = DISPLAY_UART.out.size();
+    touch("CFG_SET:1800,200,4,150,200,4,125,0,80"); run_ms(20);
+    CHECK(e2_mech.z_screw == 150 && e2_mech.x_screw == 125 && e2_mech.bl_x_um == 80, "CFG_SET не применился");
+    CHECK(DISPLAY_UART.out.find("<CFG_RES:OK>", o) != std::string::npos &&
+          DISPLAY_UART.out.find("<CFG:1800,200,4,150,200,4,125,0,80>", o) != std::string::npos, "нет ответа CFG_RES/CFG");
+    e2_mech_apply(E2_MECH_CONFIG); e2_mech_load();
+    CHECK(e2_mech.z_screw == 150, "CFG_SET не сохранился во флеш");
+    o = DISPLAY_UART.out.size();
+    touch("CFG_SET:1800,200,3,200,200,4,100,0,0"); run_ms(20);
+    CHECK(e2_mech.z_mc == 4 && DISPLAY_UART.out.find("<CFG_RES:МИКРОШАГ", o) != std::string::npos, "микрошаг 3 с экрана не отклонён");
+    touch("CFG_DEFAULT"); run_ms(20);
+    CHECK(!memcmp(&e2_mech, &E2_MECH_CONFIG, sizeof e2_mech), "CFG_DEFAULT не вернул els_config.h");
+    memset(g_stub_flash, 0xFF, sizeof g_stub_flash);
+}
+
 static void test_hand() {
     printf("[%7.1f с] [hand] ", t_ns / 1e9); printf("РГИ: ось Z, x1, 25 щелчков\n");
     select_mode(1);
@@ -1122,10 +1187,22 @@ static void test_backlash() {
 
 int main() {
     controls_neutral();
+    // SIM_MECH="энкодер,шагов Z,микрошаг Z,винт Z,шагов X,микрошаг X,винт X" — весь набор на другой механике
+    // (записывается во флеш до старта: проверяет и загрузку настроек), например SIM_MECH=3600,200,8,150,200,4,125
+    if (const char* sm = getenv("SIM_MECH")) {
+        E2Mech m = E2_MECH_CONFIG;
+        sscanf(sm, "%d,%d,%d,%d,%d,%d,%d", &m.enc_lines, &m.z_steps, &m.z_mc, &m.z_screw, &m.x_steps, &m.x_mc, &m.x_screw);
+        const char* err = e2_mech_apply(m);
+        if (err) { printf("SIM_MECH: %s\n", err); return 1; }
+        e2_mech_save();
+        printf("Механика: энкодер %d, Z %d×%d винт %.2f, X %d×%d винт %.2f\n", m.enc_lines, m.z_steps, m.z_mc,
+               m.z_screw / 100.0, m.x_steps, m.x_mc, m.x_screw / 100.0);
+    }
     setup();
     check_cnt_resets();
     run_ms(500);
     test_boot();
+    if (e2_mech_is_stamp(E2_MECH_CONFIG) && !getenv("SIM_MECH")) test_mech();   // проверки — под механику автора
     if (getenv("SIM_BACKLASH")) {                    // эксперимент: люфт и точность автоциклов
         controls_neutral(); run_ms(200);
         test_backlash();
