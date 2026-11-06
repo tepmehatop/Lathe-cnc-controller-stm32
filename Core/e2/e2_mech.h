@@ -34,11 +34,15 @@ struct E2ScaleCfg { int type, nm_per_count, invert, sig_inv; };
 struct E2Pos {
   int        source;      // POS_SOURCE_STEPS / _DRO_UART / _SCALES
   E2ScaleCfg ax[2];       // индекс ScaleAxis: 0 — Z, 1 — X
+  int        fix_x;       // доводка X по линейке перед проходом (BACKLOG-025)
+  int        loss_check;  // контроль пропуска шагов по линейкам
+  int        loss_tol_um; // допуск расхождения шагов и линейки, мкм
 };
 static constexpr E2Pos E2_POS_CONFIG = {
   ELS_POS_SOURCE,
   { { SCALE_Z_TYPE, SCALE_Z_NM_PER_COUNT, SCALE_Z_INVERT, SCALE_Z_SIGNAL_INVERT },
-    { SCALE_X_TYPE, SCALE_X_NM_PER_COUNT, SCALE_X_INVERT, SCALE_X_SIGNAL_INVERT } }
+    { SCALE_X_TYPE, SCALE_X_NM_PER_COUNT, SCALE_X_INVERT, SCALE_X_SIGNAL_INVERT } },
+  SCALE_FIX_X, STEP_LOSS_CHECK, STEP_LOSS_TOL_UM
 };
 extern E2Pos e2_pos;
 const char* e2_pos_check(const E2Pos& p);     // nullptr — годится

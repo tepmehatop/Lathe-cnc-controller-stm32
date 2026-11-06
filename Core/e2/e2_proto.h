@@ -151,6 +151,9 @@ void e2_mech_send(void);               // <CFG:…> — механика для 
 void e2_mech_from_display(const char* prm);   // CFG_SET / CFG_DEFAULT
 void e2_pos_send(void);                // <POS:…> — источник координат и линейки
 void e2_pos_from_display(const char* prm);    // POS_SET / POS_DEFAULT (сохранить и перезапустить)
-void e2_cal_from_display(const char* prm);    // CAL:<Z|X>:<мкм> — калибровка по линейкам
+void e2_cal_from_display(const char* prm);
+void e2_scale_reref(void);             // линейки: новая опорная точка (BACKLOG-025)
+void e2_scale_track(void);
+bool e2_scale_gate(void);              // true — автоцикл в этот раз не вызывать (доводка X / пропуск шагов)    // CAL:<Z|X>:<мкм> — калибровка по линейкам
 bool e2_axis_editable(void);           // ввод/сброс осей с экрана (нет — при блоке DRO)
 void e2_axis_set(char axis, int32_t um);   // 'Z', 'X' — позиция, 'D' — диаметр; мкм, как на экране

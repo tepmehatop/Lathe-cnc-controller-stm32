@@ -2045,6 +2045,8 @@ void e2_mech_from_display(const char* prm)
 const char* e2_pos_check(const E2Pos& p)
 {
    if (p.source < POS_SOURCE_STEPS || p.source > POS_SOURCE_SCALES) return "НЕВЕРНЫЙ ИСТОЧНИК КООРДИНАТ";
+   if ((p.fix_x | p.loss_check) & ~1) return "НЕВЕРНЫЙ ФЛАГ";
+   if (p.loss_tol_um < 20 || p.loss_tol_um > 2000) return "ДОПУСК ПРОПУСКА ШАГОВ: 20-2000 МКМ";
    for (auto& a : p.ax) {
       if (a.type < SCALE_NONE || a.type > SCALE_DIGIMATIC) return "НЕВЕРНЫЙ ТИП ЛИНЕЙКИ";
       if (a.nm_per_count < 10 || a.nm_per_count > 100000) return "РАЗРЕШЕНИЕ ЛИНЕЙКИ: 10-100000 НМ";
@@ -2102,14 +2104,15 @@ const char* e2_mech_save(void)
    return e2_store_write(&s, sizeof(s)) ? nullptr : "ОШИБКА ЗАПИСИ ВО ФЛЕШ";
 }
 
-// Экрану: <POS:источник,Z тип,нм,инв,инв.сигн,X тип,нм,инв,инв.сигн>
+// Экрану: <POS:источник,Z тип,нм,инв,инв.сигн,X тип,нм,инв,инв.сигн,доводка X,контроль шагов,допуск мкм>
 void e2_pos_send(void)
 {
-   char b[80];
+   char b[96];
    const E2Pos& p = e2_pos;
-   snprintf(b, sizeof(b), "%d,%d,%d,%d,%d,%d,%d,%d,%d", p.source,
+   snprintf(b, sizeof(b), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", p.source,
             p.ax[0].type, p.ax[0].nm_per_count, p.ax[0].invert, p.ax[0].sig_inv,
-            p.ax[1].type, p.ax[1].nm_per_count, p.ax[1].invert, p.ax[1].sig_inv);
+            p.ax[1].type, p.ax[1].nm_per_count, p.ax[1].invert, p.ax[1].sig_inv,
+            p.fix_x, p.loss_check, p.loss_tol_um);
    Display_Send_CMD("POS", b);
 }
 
@@ -2118,11 +2121,15 @@ void e2_pos_from_display(const char* prm)
 {
    E2Pos p = E2_POS_CONFIG;
    const char* err = nullptr;
-   if (strncmp(prm, "POS_SET:", 8) == 0 &&
-       sscanf(prm + 8, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &p.source,
-              &p.ax[0].type, &p.ax[0].nm_per_count, &p.ax[0].invert, &p.ax[0].sig_inv,
-              &p.ax[1].type, &p.ax[1].nm_per_count, &p.ax[1].invert, &p.ax[1].sig_inv) != 9)
-      err = "НЕВЕРНАЯ КОМАНДА";
+   if (strncmp(prm, "POS_SET:", 8) == 0) {
+      // 9 чисел — без доводки/контроля (прежний экран): эти три — текущие
+      p.fix_x = e2_pos.fix_x; p.loss_check = e2_pos.loss_check; p.loss_tol_um = e2_pos.loss_tol_um;
+      int n = sscanf(prm + 8, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &p.source,
+                     &p.ax[0].type, &p.ax[0].nm_per_count, &p.ax[0].invert, &p.ax[0].sig_inv,
+                     &p.ax[1].type, &p.ax[1].nm_per_count, &p.ax[1].invert, &p.ax[1].sig_inv,
+                     &p.fix_x, &p.loss_check, &p.loss_tol_um);
+      if (n != 9 && n != 12) err = "НЕВЕРНАЯ КОМАНДА";
+   }
    if (!err) err = e2_pos_check(p);
    if (!err && !e2_machine_idle()) err = "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
    E2Pos old = e2_pos;
@@ -2168,6 +2175,7 @@ void e2_service(void)
       Display_Send_Int("RPM", rpm);
       e2_rpm = rpm;                             // [STM32] для e2_machine_idle()
    }
+   e2_scale_track();                             // [STM32] линейки: пропуск шагов (BACKLOG-025)
    // Значения, которые UartDisplay шлёт только в Display_Send_All, — по изменению (e2_display.inc)
    Display_Watch();
    // Сообщения на новом дисплее горят ровно столько же, сколько на LCD2004: ядро ставит и снимает
@@ -2210,3 +2218,4 @@ void e2_service(void)
 #include "orig/Thread.ino"
 #include "orig/aFeed.ino"
 #include "e2_calib.inc"                     // [STM32] калибровка по линейкам (BACKLOG-029)
+#include "e2_scalefix.inc"                  // [STM32] линейки в автоциклах (BACKLOG-025)

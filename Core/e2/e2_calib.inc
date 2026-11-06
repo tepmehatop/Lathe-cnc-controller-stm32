@@ -11,6 +11,7 @@
 // Ответ экрану: <CAL:RUN:Z>, затем <CAL:RES:Z,шаг винта мкм,люфт мкм,нм на шаг> или <CAL:ERR:причина>.
 
 static bool e2_cal_abort = false;
+static bool e2_cal_joy = true;           // джойстик прерывает (калибровка); доводка X в цикле — нет
 static char e2_cal_rx[16];
 
 // Линейки/DRO обновить; заодно смотреть, не пришёл ли от экрана CAL_STOP и не тронут ли джойстик
@@ -23,7 +24,7 @@ static void e2_cal_poll(void)
       e2_cal_rx[sizeof(e2_cal_rx) - 1] = 0;
       if (strstr(e2_cal_rx, "CAL_STOP")) e2_cal_abort = true;
    }
-   if ((Joy_Read & 0x0F) != 0x0F) e2_cal_abort = true;
+   if (e2_cal_joy && (Joy_Read & 0x0F) != 0x0F) e2_cal_abort = true;
 }
 
 // Показание линейки оси, мкм: подождать, пока придут свежие данные (DRO — пакеты 50 Гц)
@@ -94,6 +95,7 @@ static const char* e2_calibrate(char ax, int32_t len_um, int32_t* screw_um, int3
       Display_Send_CMD("CAL_RUN", p);
    }
 
+   e2_scale_reref();                             // каретка могла сместиться на люфт — новая опорная точка
    if (!ena) {                                   // Motor_*_Disable() у автора — блок без do-while
       if (ax == 'Z') { Motor_Z_Disable(); } else { Motor_X_Disable(); }
    }

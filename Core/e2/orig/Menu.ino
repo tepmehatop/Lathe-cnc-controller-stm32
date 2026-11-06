@@ -163,6 +163,7 @@ void Menu()
 // ********** Обработчик Джойстик Влево **********
 void Joy_LeftPressed()
 {  
+   if (e2_scale_gate()) return;   // [STM32] доводка X по линейке / пропуск шагов (BACKLOG-025)
    flag_j = ON;
    Disa_INT_Hcoder();
    Disable_INT_OCR3A();
@@ -354,6 +355,7 @@ void Joy_LeftPressed()
 // ********** Обработчик Джойстик Вправо **********  
 void Joy_RightPressed()
 {
+   if (e2_scale_gate()) return;   // [STM32] доводка X по линейке / пропуск шагов (BACKLOG-025)
    flag_j = ON;
    Disa_INT_Hcoder();
    Disable_INT_OCR3A();

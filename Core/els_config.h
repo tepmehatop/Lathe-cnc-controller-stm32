@@ -124,6 +124,20 @@
 #define LIMITS_BY_SELECTED_SUBMODE  1
 #endif
 
+// Линейки в автоциклах (BACKLOG-025; работают, если есть блок DRO или линейки). Доводка X: после врезания,
+// до прохода, X доезжает по линейке до глубины от нуля цикла. Контроль шагов: на остановках шаги сверяются
+// с линейкой; расхождение больше допуска — сообщение и стоп джойстика, пока его не отпустят.
+// ПОКА ВЫКЛЮЧЕНО (0): на железе не проверено. Без настроенного люфта возможны ложные срабатывания.
+#ifndef SCALE_FIX_X
+#define SCALE_FIX_X                 0
+#endif
+#ifndef STEP_LOSS_CHECK
+#define STEP_LOSS_CHECK             0
+#endif
+#ifndef STEP_LOSS_TOL_UM
+#define STEP_LOSS_TOL_UM            150
+#endif
+
 #ifndef BACKLASH_Z_UM
 #define BACKLASH_Z_UM        0        // люфт продольного винта (Z), мкм; 0 — без компенсации
 #endif
