@@ -319,3 +319,5 @@
 - Релизы: tools/make_release.sh (STM32 с DRO + оба дисплея одним файлом с 0x0, SHA256SUMS), workflow
   .github/workflows/release.yml (тег v* — релиз; вручную — только сборка), docs/RELEASE.md — что внутри и
   как прошить. Wi-Fi в релизе — только шаблон (ELS_RELEASE). Локально собирается.
+- CI: ststm32 закреплена на 19.5.0 — свежая 20.0.0 (STM32duino 3.0, ArduinoCore-API) ядро 7e2 не собирает
+  («Print is ambiguous», HardwareSerial(int,int)). Переход на 3.0 — отдельной задачей, если понадобится.
