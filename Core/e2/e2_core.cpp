@@ -1910,7 +1910,7 @@ static double e2_thread_pitch(const thread_info_type& t)
 // Уклон образующей конуса на радиус: угол — тангенс, 1:N — на диаметр → /2, KM — конусы Морзе
 static double e2_cone_slope(const cone_info_type& c)
 {
-   static const int morse_x1000[] = {19212, 20047, 20020, 19922, 19254, 19002, 19180};   // KM0…KM6, 1:N
+   static const int morse_x1000[] = {19212, 20047, 20020, 19922, 19254, 19002, 19180};   // KM0-KM6, 1:N
    const char* p = c.Cone_Print;
    while (*p == ' ') p++;
    if (p[0] == 'K' && p[1] == 'M') return (double)1000 / (2 * morse_x1000[p[2] - '0']);
@@ -1950,7 +1950,7 @@ static const char* e2_mech_tables(const E2Mech& m, bool out)
    for (unsigned i = 0; i < TOTAL_CONE; i++) {
       double d = 2 * z_spm / (x_spm * e2_cone_slope(Cone_Info[i]));
       if (d < 1 || d >= 256) {
-         snprintf(err, sizeof(err), "КОНУС %.5s: ДЕЛИТЕЛЬ ВНЕ 1…255", Cone_Info[i].Cone_Print);
+         snprintf(err, sizeof(err), "КОНУС %.5s: ДЕЛИТЕЛЬ ВНЕ 1-255", Cone_Info[i].Cone_Print);
          return err;
       }
       if (out) e2_split(d, Cone_Info[i].Cs_Div, Cone_Info[i].Cm_Div);
@@ -1961,21 +1961,21 @@ static const char* e2_mech_tables(const E2Mech& m, bool out)
 const char* e2_mech_check(const E2Mech& m)
 {
    auto pow2 = [](int v) { return v >= 1 && v <= 128 && (v & (v - 1)) == 0; };
-   if (m.enc_lines < 100 || m.enc_lines > 10000) return "ЭНКОДЕР: 100…10000 ЛИНИЙ";
-   if (m.z_steps < 50 || m.z_steps > 1000 || m.x_steps < 50 || m.x_steps > 1000) return "ШАГОВ НА ОБОРОТ: 50…1000";
-   if (!pow2(m.z_mc) || !pow2(m.x_mc)) return "МИКРОШАГ: 1, 2, 4 … 128";
-   if (m.z_screw < 25 || m.z_screw > 1000 || m.x_screw < 25 || m.x_screw > 1000) return "ШАГ ВИНТА: 0.25…10 ММ";
-   if (m.bl_z_um < 0 || m.bl_z_um > 2000 || m.bl_x_um < 0 || m.bl_x_um > 2000) return "ЛЮФТ: 0…2000 МКМ";
+   if (m.enc_lines < 100 || m.enc_lines > 10000) return "ЭНКОДЕР: 100-10000 ЛИНИЙ";
+   if (m.z_steps < 50 || m.z_steps > 1000 || m.x_steps < 50 || m.x_steps > 1000) return "ШАГОВ НА ОБОРОТ: 50-1000";
+   if (!pow2(m.z_mc) || !pow2(m.x_mc)) return "МИКРОШАГ: 1, 2, 4 ... 128";
+   if (m.z_screw < 25 || m.z_screw > 1000 || m.x_screw < 25 || m.x_screw > 1000) return "ШАГ ВИНТА: 0.25-10 ММ";
+   if (m.bl_z_um < 0 || m.bl_z_um > 2000 || m.bl_x_um < 0 || m.bl_x_um > 2000) return "ЛЮФТ: 0-2000 МКМ";
    // как static_assert автора (CHECK_MIN_FEED_* и др.) — пределы подач укладываются в таймеры
    const int ax[2][3] = {{m.z_steps, m.z_mc, m.z_screw}, {m.x_steps, m.x_mc, m.x_screw}};
    for (auto& a : ax) {
       float spr = (float)a[0] * a[1];
       if ((uint32_t)(m.enc_lines / (spr * MIN_FEED / a[2]) / 2) > 255) return "MIN_FEED: ДЕЛИТЕЛЬ > 255";
-      if ((uint32_t)(m.enc_lines / (spr * MAX_FEED / a[2]) / 2) <= 1)  return "MAX_FEED: ДЕЛИТЕЛЬ ≤ 1";
+      if ((uint32_t)(m.enc_lines / (spr * MAX_FEED / a[2]) / 2) <= 1)  return "MAX_FEED: ДЕЛИТЕЛЬ <= 1";
       uint32_t k_min = (uint32_t)MIN_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
       uint32_t k_max = (uint32_t)MAX_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
       if (k_min == 0 || 250000 / k_min - 1 > 65535) return "MIN_aFEED: ДЕЛИТЕЛЬ > 65535";
-      if (k_max == 0 || 250000 / k_max - 1 <= 1)    return "MAX_aFEED: ДЕЛИТЕЛЬ ≤ 1";
+      if (k_max == 0 || 250000 / k_max - 1 <= 1)    return "MAX_aFEED: ДЕЛИТЕЛЬ <= 1";
    }
    if (e2_mech_is_stamp(m)) return nullptr;            // таблицы автора
    return e2_mech_tables(m, false);
@@ -2160,3 +2160,4 @@ void e2_service(void)
 #include "orig/TestPresets.ino"
 #include "orig/Thread.ino"
 #include "orig/aFeed.ino"
+#include "e2_calib.inc"                     // [STM32] калибровка по линейкам (BACKLOG-029)

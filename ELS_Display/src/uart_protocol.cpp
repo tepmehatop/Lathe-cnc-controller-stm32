@@ -226,6 +226,21 @@ void UartProtocol::parseCommand(const char* cmd)
             data_.cfg_valid = 1;
         }
     }
+    else if (strncmp(command, "CAL_", 4) == 0) {
+        if (!strcmp(command, "CAL_RES")) {
+            long s = 0, b = 0, k = 0; char ax = 0;
+            if (sscanf(params, "%c,%ld,%ld,%ld", &ax, &s, &b, &k) == 4) {
+                data_.cal_ax = ax; data_.cal_screw_um = s; data_.cal_bl_um = b; data_.cal_k_nm = k;
+                data_.cal_state = 2;
+            }
+        } else {
+            data_.cal_state = !strcmp(command, "CAL_RUN") ? 1 : 3;
+            if (data_.cal_state == 1) data_.cal_ax = params[0];
+            strncpy(data_.cal_text, params, sizeof(data_.cal_text) - 1);
+            data_.cal_text[sizeof(data_.cal_text) - 1] = 0;
+        }
+        data_.cal_seq++;
+    }
     else if (strcmp(command, "CFG_RES") == 0) {
         strncpy(data_.cfg_res, params, sizeof(data_.cfg_res) - 1);
         data_.cfg_res[sizeof(data_.cfg_res) - 1] = 0;

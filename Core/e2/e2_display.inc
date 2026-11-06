@@ -633,6 +633,10 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
       e2_mech_from_display(prm.c_str());
       Display_Send_All();
     }
+    // [STM32] CAL:<Z|X>:<мкм хода> — калибровка шага винта и люфта по линейкам (BACKLOG-029)
+    else if (prm.startsWith("CAL:")) {
+      e2_cal_from_display(prm.c_str());
+    }
     // [STM32] AXIS:<Z|X|D>:<мкм> — ввод/сброс оси с экрана (двойной тап — 0, удержание — клавиатура)
     else if (prm.startsWith("AXIS:") && prm.length() >= 8 && prm.charAt(6) == ':') {
       char ax = prm.charAt(5);

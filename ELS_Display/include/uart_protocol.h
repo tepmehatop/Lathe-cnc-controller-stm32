@@ -83,6 +83,12 @@ typedef struct {
     uint8_t  cfg_valid;      // CFG получен
     char     cfg_res[64];    // <CFG_RES:OK> или причина отказа
     uint8_t  cfg_res_seq;    // растёт с каждым CFG_RES
+    // Калибровка по линейкам (BACKLOG-029): <CAL_RUN:Z:1/3>, <CAL_RES:Z,мкм винта,мкм люфта,нм на шаг>, <CAL_ERR:…>
+    uint8_t  cal_state;      // 0 — нет, 1 — идёт, 2 — результат, 3 — ошибка
+    char     cal_ax;
+    char     cal_text[64];   // ход (1/3) или причина ошибки
+    int32_t  cal_screw_um, cal_bl_um, cal_k_nm;
+    uint8_t  cal_seq;        // растёт с каждым CAL_*
     uint8_t  pass_fin;       // M3 SM=2: чистовых проходов (PASS_FINISH + Pass_Fin)
     bool     cone_thr;       // M4/M5 SM=2: коническая резьба включена
     int16_t  cutter_w;      // M6 SM=2: ширина резца (мм × 100)
