@@ -11,7 +11,11 @@
 
 #include "gcode_wifi.h"
 #include "gcode_exec.h"
+#ifdef ELS_RELEASE
+#include "wifi_config.example.h"   // релиз (tools/make_release.sh): только шаблон, без чужих сетей и паролей
+#else
 #include "wifi_config.h"
+#endif
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>

@@ -45,3 +45,6 @@ hardware/shield/*-backups/
 hardware/shield/fp-info-cache
 hardware/shield/__pycache__/
 hardware/shield/*.kicad_prl
+
+# Файлы релиза (tools/make_release.sh)
+dist/

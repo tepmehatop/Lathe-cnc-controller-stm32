@@ -1,0 +1,48 @@
+# Сборка релиза: по тегу v* (например, v0.1.0) — релиз на GitHub с файлами прошивок;
+# вручную (Actions → Релиз → Run workflow) — только сборка, файлы в артефакте запуска.
+# Что собирается и как прошивать — tools/make_release.sh и docs/RELEASE.md.
+name: Релиз
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Кэш PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: PlatformIO
+        run: pip install platformio==6.1.19
+
+      - name: Сборка
+        run: bash tools/make_release.sh
+
+      - name: Файлы сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: els-${{ github.ref_name }}
+          path: dist/
+
+      - name: Релиз
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" --notes-file docs/RELEASE.md
