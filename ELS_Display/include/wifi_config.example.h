@@ -5,8 +5,10 @@
 //   cp ELS_Display/include/wifi_config.example.h ELS_Display/include/wifi_config.h
 
 // === РЕЖИМ 1: Домашний роутер (STA) — основной ===============================
-#define WIFI_STA_SSID  "your-ssid"
-#define WIFI_STA_PASS  "your-password"
+// Пусто — сразу точка доступа. Сеть роутера можно задать и на экране: ⚠ → НАСТРОЙКИ → WI-FI
+// (хранится в памяти дисплея и главнее этих строк).
+#define WIFI_STA_SSID  ""
+#define WIFI_STA_PASS  ""
 
 // === РЕЖИМ 2: AP fallback (если роутер недоступен) ===========================
 #define WIFI_AP_SSID   "ELS-WiFi"

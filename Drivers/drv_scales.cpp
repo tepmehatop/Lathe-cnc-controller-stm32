@@ -19,7 +19,7 @@
 #include "../Core/els_config.h"
 #include <Arduino.h>
 
-#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+// [BACKLOG-028] драйвер в прошивке всегда; запускается, если источник координат в настройках — линейки
 
 static const uint32_t SYNC_GAP_US        = 2000;  // пауза такта = начало нового кадра
 static const uint32_t STALE_MS           = 1000;  // нет кадров дольше — ось «нет связи»
@@ -232,11 +232,18 @@ static void axis_config(ScaleAxis axis, uint8_t type, int32_t nm, uint8_t inv, u
     }
 }
 
+void DRV_Scales_InitCfg(const ScaleAxisCfg cfg[2]) {
+    axis_config(SCALE_AXIS_Z, cfg[0].type, cfg[0].nm_per_count, cfg[0].invert,
+                cfg[0].sig_inv, SCALE_Z_PIN_A, SCALE_Z_PIN_B, SCALE_Z_PIN_REQ);
+    axis_config(SCALE_AXIS_X, cfg[1].type, cfg[1].nm_per_count, cfg[1].invert,
+                cfg[1].sig_inv, SCALE_X_PIN_A, SCALE_X_PIN_B, SCALE_X_PIN_REQ);
+}
+
 void DRV_Scales_Init(void) {
-    axis_config(SCALE_AXIS_Z, SCALE_Z_TYPE, SCALE_Z_NM_PER_COUNT, SCALE_Z_INVERT,
-                SCALE_Z_SIGNAL_INVERT, SCALE_Z_PIN_A, SCALE_Z_PIN_B, SCALE_Z_PIN_REQ);
-    axis_config(SCALE_AXIS_X, SCALE_X_TYPE, SCALE_X_NM_PER_COUNT, SCALE_X_INVERT,
-                SCALE_X_SIGNAL_INVERT, SCALE_X_PIN_A, SCALE_X_PIN_B, SCALE_X_PIN_REQ);
+    const ScaleAxisCfg cfg[2] = {
+        { SCALE_Z_TYPE, SCALE_Z_NM_PER_COUNT, SCALE_Z_INVERT, SCALE_Z_SIGNAL_INVERT },
+        { SCALE_X_TYPE, SCALE_X_NM_PER_COUNT, SCALE_X_INVERT, SCALE_X_SIGNAL_INVERT } };
+    DRV_Scales_InitCfg(cfg);
 }
 
 // ============================================================
@@ -326,15 +333,4 @@ const char* DRV_Scales_TypeName(ScaleAxis axis) {
     }
 }
 
-#else  // ELS_POS_SOURCE != POS_SOURCE_SCALES — заглушки
 
-void     DRV_Scales_Init(void)                  {}
-void     DRV_Scales_Process(void)               {}
-uint8_t  DRV_Scales_Present(ScaleAxis)          { return 0; }
-int32_t  DRV_Scales_GetUm(ScaleAxis)            { return 0; }
-uint8_t  DRV_Scales_IsOk(ScaleAxis)             { return 0; }
-uint32_t DRV_Scales_GetFrames(ScaleAxis)        { return 0; }
-uint32_t DRV_Scales_GetErrors(ScaleAxis)        { return 0; }
-const char* DRV_Scales_TypeName(ScaleAxis)      { return "NONE"; }
-
-#endif

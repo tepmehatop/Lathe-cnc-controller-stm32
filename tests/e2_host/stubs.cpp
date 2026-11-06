@@ -7,6 +7,7 @@ void     DRV_DRO_Process(void) {}
 int32_t  DRV_DRO_GetX(void) { return g_stub_dro_x; }
 int32_t  DRV_DRO_GetY(void) { return g_stub_dro_y; }
 void     DRV_Scales_Init(void) {}
+void     DRV_Scales_InitCfg(const ScaleAxisCfg*) {}
 void     DRV_Scales_Process(void) {}
 uint8_t  g_stub_scale_present[2] = {0, 0};
 int32_t  g_stub_scale_um[2] = {0, 0};
@@ -21,3 +22,6 @@ uint8_t g_stub_flash[256];
 static bool s_flash_init = (memset(g_stub_flash, 0xFF, sizeof g_stub_flash), true);
 bool e2_store_read(void* b, uint32_t n) { memcpy(b, g_stub_flash, n); return true; }
 bool e2_store_write(const void* b, uint32_t n) { memcpy(g_stub_flash, b, n); return true; }
+
+bool g_stub_rebooted = false;
+void e2_reboot(void) { g_stub_rebooted = true; }

@@ -240,6 +240,7 @@ static_assert(CHECK_MAX_aFEED_X > 1, "Неверно задано значени
 // [STM32] Дальше механика — из настроек (флеш / экран), исходные значения — из els_config.h
 #include "e2_mech.h"
 E2Mech e2_mech = E2_MECH_CONFIG;
+E2Pos  e2_pos  = E2_POS_CONFIG;
 
 
 // ***** MY CONSTANT *****
@@ -712,11 +713,14 @@ void setup()
   // ========== НОВЫЙ ДИСПЛЕЙ ESP32-S3 (SoftwareSerial Pin51=TX, Pin52=RX, 57600) =========
   Display_UART_Init();
   // =========================================================================
-#if USE_DRO_HS800
-  DRV_DRO_Init();                              // [STM32] вместо DRO_Init() из DRO_HS800.ino
-#elif ELS_POS_SOURCE == POS_SOURCE_SCALES
-  DRV_Scales_Init();                           // [STM32] линейки напрямую
-#endif
+  // [STM32] источник координат — из настроек (e2_pos, BACKLOG-028)
+  if (e2_pos.source == POS_SOURCE_DRO_UART) DRV_DRO_Init();            // вместо DRO_Init() из DRO_HS800.ino
+  else if (e2_pos.source == POS_SOURCE_SCALES) {                        // линейки напрямую
+    ScaleAxisCfg sc[2];
+    for (int i = 0; i < 2; i++)
+      sc[i] = { (uint8_t)e2_pos.ax[i].type, e2_pos.ax[i].nm_per_count, (uint8_t)e2_pos.ax[i].invert, (uint8_t)e2_pos.ax[i].sig_inv };
+    DRV_Scales_InitCfg(sc);
+  }
 
   _delay_ms(500);
 
@@ -911,32 +915,26 @@ void setup()
 // «Ввод * Сброс осей» обнуляет счётчики шагов X_pos/Z_pos (они только для показа, циклы их не
 // читают). При линейках напрямую показания берутся с линейки — для них свой ноль (смещение).
 // Диаметр — отдельный ноль, как MX_pos у автора. С блоком DRO оси задаются на самом блоке.
-#if ELS_POS_SOURCE == POS_SOURCE_SCALES
-static int32_t e2_scale_off[2] = {0, 0};   // показание = линейка − смещение (индекс ScaleAxis)
-static int32_t e2_diam_off = 0;            // диаметр = 2 × линейка X − смещение
-#endif
-#if ELS_POS_SOURCE != POS_SOURCE_STEPS
+static int32_t e2_scale_off[2] = {0, 0};   // линейки: показание = линейка − смещение (индекс ScaleAxis)
+static int32_t e2_diam_off = 0;            // линейки: диаметр = 2 × линейка X − смещение
 static int32_t e2_diam_um = 0;             // диаметр, мкм (DRO и линейки)
-#endif
 
-bool e2_axis_editable(void) { return ELS_POS_SOURCE != POS_SOURCE_DRO_UART; }
+bool e2_axis_editable(void) { return e2_pos.source != POS_SOURCE_DRO_UART; }
 
 void e2_axis_set(char axis, int32_t um)
 {
-#if ELS_POS_SOURCE == POS_SOURCE_SCALES
-   if (axis == 'D' && DRV_Scales_Present(SCALE_AXIS_X)) {
-      e2_diam_off = 2 * DRV_Scales_GetUm(SCALE_AXIS_X) - um;
-      return;
+   if (e2_pos.source == POS_SOURCE_DRO_UART) return;
+   if (e2_pos.source == POS_SOURCE_SCALES) {
+      if (axis == 'D' && DRV_Scales_Present(SCALE_AXIS_X)) {
+         e2_diam_off = 2 * DRV_Scales_GetUm(SCALE_AXIS_X) - um;
+         return;
+      }
+      ScaleAxis ax = axis == 'Z' ? SCALE_AXIS_Z : SCALE_AXIS_X;
+      if (axis != 'D' && DRV_Scales_Present(ax)) {
+         e2_scale_off[ax] = DRV_Scales_GetUm(ax) - um;
+         return;
+      }
    }
-   ScaleAxis ax = axis == 'Z' ? SCALE_AXIS_Z : SCALE_AXIS_X;
-   if (axis != 'D' && DRV_Scales_Present(ax)) {
-      e2_scale_off[ax] = DRV_Scales_GetUm(ax) - um;
-      return;
-   }
-#elif ELS_POS_SOURCE == POS_SOURCE_DRO_UART
-   (void)axis; (void)um;
-   return;
-#endif
    // По шагам: обратный пересчёт к loop() (позиция = −шаги / шагов на 0.01 мм × 10 мкм)
    float spu_x = (float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X;
    float spu_z = (float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z;
@@ -986,7 +984,7 @@ void loop()
   lcd.flush();                                 // [STM32] вывод изменений на LCD2004 (не дольше 2 мс)
   e2_service();                                // [STM32] обороты, LCD2004-строка для тестов, линейки
  
-#if ELS_POS_SOURCE != POS_SOURCE_STEPS
+  if (e2_pos.source != POS_SOURCE_STEPS) {      // [STM32] источник — из настроек (было #ifdef USE_DRO_HS800)
   e2_pos_update();                             // [STM32] вместо DRO_Process(): dro_pos_x/y от блока DRO или линеек
   {
     // Print.ino показывает минус когда переменная ПОЛОЖИТЕЛЬНАЯ (инвертированная логика).
@@ -1001,11 +999,11 @@ void loop()
       Display_On_Position_Change();
     }
   }
-#else
+  } else {
   MSize_X_mm = MX_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X / 2 * McSTEP_X);   //перерасчёт в миллиметры диаметр заготовки
   Size_X_mm  = X_pos  / ((float)MOTOR_X_STEP_PER_REV / SCREW_X     * McSTEP_X);   //перерасчёт в миллиметры X
   Size_Z_mm  = Z_pos  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z     * McSTEP_Z);   //перерасчёт в миллиметры Z
-#endif
+  }
   OTSKOK_Z_mm  = OTSKOK_Z  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры отскок
   TENSION_Z_mm = TENSION_Z / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры натяг
   
@@ -1752,12 +1750,12 @@ void Spindle()
 // (SCALE_NONE) считается по шагам мотора, как в 7e2 без DRO.
 void e2_pos_update(void)
 {
-#if USE_DRO_HS800
+   if (e2_pos.source == POS_SOURCE_DRO_UART) {
    DRV_DRO_Process();
    dro_pos_x = DRV_DRO_GetX();
    dro_pos_y = DRV_DRO_GetY();
    e2_diam_um = 2 * dro_pos_x;
-#elif ELS_POS_SOURCE == POS_SOURCE_SCALES
+   } else if (e2_pos.source == POS_SOURCE_SCALES) {
    DRV_Scales_Process();
    if (DRV_Scales_Present(SCALE_AXIS_X)) {
       int32_t raw = DRV_Scales_GetUm(SCALE_AXIS_X);
@@ -1782,7 +1780,7 @@ void e2_pos_update(void)
       }
       s_lost[i] = lost;
    }
-#endif
+   }
 }
 
 static int _Display_GetSubMode();   // e2_display.inc
@@ -2043,21 +2041,30 @@ void e2_mech_from_display(const char* prm)
    e2_mech_send();
 }
 
-// Запись во флеше: метка, версия, механика, контрольная сумма
-struct E2Settings {
-   uint32_t magic;
-   uint32_t version;
-   E2Mech   mech;
-   uint32_t sum;
-};
-#define E2_SETTINGS_MAGIC   0x45325354UL   // "E2ST"
-#define E2_SETTINGS_VERSION 1
-
-static uint32_t e2_settings_sum(const E2Settings& s)
+// Источник координат и линейки (BACKLOG-028)
+const char* e2_pos_check(const E2Pos& p)
 {
-   const uint8_t* b = (const uint8_t*)&s;
-   uint32_t h = 2166136261UL;                  // FNV-1a по всем полям, кроме суммы
-   for (size_t i = 0; i < offsetof(E2Settings, sum); i++) h = (h ^ b[i]) * 16777619UL;
+   if (p.source < POS_SOURCE_STEPS || p.source > POS_SOURCE_SCALES) return "НЕВЕРНЫЙ ИСТОЧНИК КООРДИНАТ";
+   for (auto& a : p.ax) {
+      if (a.type < SCALE_NONE || a.type > SCALE_DIGIMATIC) return "НЕВЕРНЫЙ ТИП ЛИНЕЙКИ";
+      if (a.nm_per_count < 10 || a.nm_per_count > 100000) return "РАЗРЕШЕНИЕ ЛИНЕЙКИ: 10-100000 НМ";
+      if ((a.invert | a.sig_inv) & ~1) return "НЕВЕРНЫЙ ФЛАГ ЛИНЕЙКИ";
+   }
+   return nullptr;
+}
+
+// Запись во флеше: метка, версия, настройки, контрольная сумма (FNV-1a по всему, кроме суммы).
+// Версия 1 — только механика (до 2026-11-06), читается: источник и линейки — из els_config.h.
+struct E2SettingsV1 { uint32_t magic, version; E2Mech mech; uint32_t sum; };
+struct E2Settings   { uint32_t magic, version; E2Mech mech; E2Pos pos; uint32_t sum; };
+#define E2_SETTINGS_MAGIC   0x45325354UL   // "E2ST"
+#define E2_SETTINGS_VERSION 2
+
+static uint32_t e2_settings_sum(const void* rec, size_t len)
+{
+   const uint8_t* b = (const uint8_t*)rec;
+   uint32_t h = 2166136261UL;
+   for (size_t i = 0; i < len; i++) h = (h ^ b[i]) * 16777619UL;
    return h;
 }
 
@@ -2065,8 +2072,17 @@ void e2_mech_load(void)
 {
    E2Settings s;
    const char* err = "НЕТ";
-   if (e2_store_read(&s, sizeof(s)) && s.magic == E2_SETTINGS_MAGIC && s.version == E2_SETTINGS_VERSION &&
-       s.sum == e2_settings_sum(s)) {
+   E2Pos pos = E2_POS_CONFIG;
+   bool ok = e2_store_read(&s, sizeof(s)) && s.magic == E2_SETTINGS_MAGIC;
+   if (ok && s.version == E2_SETTINGS_VERSION && s.sum == e2_settings_sum(&s, offsetof(E2Settings, sum))) {
+      if (!e2_pos_check(s.pos)) pos = s.pos;
+   } else if (ok && s.version == 1) {          // старая запись: механика есть, источник — из конфига
+      E2SettingsV1 v1;
+      memcpy(&v1, &s, sizeof(v1));
+      ok = v1.sum == e2_settings_sum(&v1, offsetof(E2SettingsV1, sum));
+   } else ok = false;
+   e2_pos = pos;
+   if (ok) {
       err = e2_mech_apply(s.mech);
       if (!err) { Serial.println(F("[CFG] механика — из флеша")); return; }
    }
@@ -2081,8 +2097,41 @@ const char* e2_mech_save(void)
    s.magic = E2_SETTINGS_MAGIC;
    s.version = E2_SETTINGS_VERSION;
    s.mech = e2_mech;
-   s.sum = e2_settings_sum(s);
+   s.pos = e2_pos;
+   s.sum = e2_settings_sum(&s, offsetof(E2Settings, sum));
    return e2_store_write(&s, sizeof(s)) ? nullptr : "ОШИБКА ЗАПИСИ ВО ФЛЕШ";
+}
+
+// Экрану: <POS:источник,Z тип,нм,инв,инв.сигн,X тип,нм,инв,инв.сигн>
+void e2_pos_send(void)
+{
+   char b[80];
+   const E2Pos& p = e2_pos;
+   snprintf(b, sizeof(b), "%d,%d,%d,%d,%d,%d,%d,%d,%d", p.source,
+            p.ax[0].type, p.ax[0].nm_per_count, p.ax[0].invert, p.ax[0].sig_inv,
+            p.ax[1].type, p.ax[1].nm_per_count, p.ax[1].invert, p.ax[1].sig_inv);
+   Display_Send_CMD("POS", b);
+}
+
+// Команда экрана POS_SET:<9 чисел> / POS_DEFAULT — сохранить и перезапустить STM32
+void e2_pos_from_display(const char* prm)
+{
+   E2Pos p = E2_POS_CONFIG;
+   const char* err = nullptr;
+   if (strncmp(prm, "POS_SET:", 8) == 0 &&
+       sscanf(prm + 8, "%d,%d,%d,%d,%d,%d,%d,%d,%d", &p.source,
+              &p.ax[0].type, &p.ax[0].nm_per_count, &p.ax[0].invert, &p.ax[0].sig_inv,
+              &p.ax[1].type, &p.ax[1].nm_per_count, &p.ax[1].invert, &p.ax[1].sig_inv) != 9)
+      err = "НЕВЕРНАЯ КОМАНДА";
+   if (!err) err = e2_pos_check(p);
+   if (!err && !e2_machine_idle()) err = "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
+   E2Pos old = e2_pos;
+   if (!err) { e2_pos = p; err = e2_mech_save(); if (err) e2_pos = old; }
+   Serial.print(F("[POS] ")); Serial.println(err ? err : "сохранено, перезапуск");
+   Display_Send_CMD("CFG_RES", err ? err : "OK");
+   if (err) { Beep_Error(); e2_pos_send(); return; }
+   Beep();
+   e2_reboot();
 }
 
 // [STM32] Разрешение кнопок упоров (BACKLOG-022): переключатель подрежима в «Ручной», как у автора,

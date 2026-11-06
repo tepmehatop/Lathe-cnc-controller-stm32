@@ -10,7 +10,6 @@
 // кнопкой СТОП экрана (CAL_STOP). Компенсация люфта на время калибровки выключена.
 // Ответ экрану: <CAL:RUN:Z>, затем <CAL:RES:Z,шаг винта мкм,люфт мкм,нм на шаг> или <CAL:ERR:причина>.
 
-#if ELS_POS_SOURCE != POS_SOURCE_STEPS
 static bool e2_cal_abort = false;
 static char e2_cal_rx[16];
 
@@ -55,17 +54,11 @@ static void e2_cal_move(char ax, long n)
    }
 }
 
-#endif
-
 static const char* e2_calibrate(char ax, int32_t len_um, int32_t* screw_um, int32_t* bl_um, int32_t* k_nm)
 {
-#if ELS_POS_SOURCE == POS_SOURCE_STEPS
-   (void)ax; (void)len_um; (void)screw_um; (void)bl_um; (void)k_nm;
-   return "НУЖНЫ ЛИНЕЙКИ ИЛИ БЛОК DRO";
-#else
-#if ELS_POS_SOURCE == POS_SOURCE_SCALES
-   if (!DRV_Scales_Present(ax == 'Z' ? SCALE_AXIS_Z : SCALE_AXIS_X)) return "НА ЭТОЙ ОСИ НЕТ ЛИНЕЙКИ";
-#endif
+   if (e2_pos.source == POS_SOURCE_STEPS) return "НУЖНЫ ЛИНЕЙКИ ИЛИ БЛОК DRO";
+   if (e2_pos.source == POS_SOURCE_SCALES && !DRV_Scales_Present(ax == 'Z' ? SCALE_AXIS_Z : SCALE_AXIS_X))
+      return "НА ЭТОЙ ОСИ НЕТ ЛИНЕЙКИ";
    if (!e2_machine_idle()) return "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
    const E2Mech& m = e2_mech;
    long spr = ax == 'Z' ? (long)m.z_steps * m.z_mc : (long)m.x_steps * m.x_mc;   // шагов на оборот винта
@@ -114,7 +107,6 @@ static const char* e2_calibrate(char ax, int32_t len_um, int32_t* screw_um, int3
    *screw_um = (int32_t)lround(fabs(k) * spr);
    *bl_um = (int32_t)lround(b * fabs(k));
    return nullptr;
-#endif
 }
 
 // Команда экрана CAL:<Z|X>:<мкм хода>

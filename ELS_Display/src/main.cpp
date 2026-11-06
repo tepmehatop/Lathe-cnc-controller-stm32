@@ -1866,6 +1866,418 @@ static void cal_show()
     lv_obj_add_event_cb(close_btn, [](lv_event_t*) { cal_close(); }, LV_EVENT_CLICKED, nullptr);
 }
 
+// ============================================================================
+// Раздел «НАСТРОЙКИ» (тап по ⚠): механика, калибровка, Wi-Fi; внизу крупно — адрес точки доступа.
+// Wi-Fi: сеть роутера задаётся здесь (хранится в памяти дисплея), поиск сетей, «забыть» — только точка доступа.
+// ============================================================================
+static void cfg_open();
+struct HubUi { lv_obj_t* ov; lv_obj_t* info; lv_obj_t* addr; };
+static HubUi g_hub = {};
+
+static void hub_refresh()
+{
+    char b[96];
+    const char* ip = GCodeWiFi_GetIP();
+    if (!GCodeWiFi_IsAP() && !GCodeWiFi_IsConnected() && GCodeWiFi_GetStaSsid()[0]) {
+        snprintf(b, sizeof(b), "%s %s...", "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xB8\xD0\xB5 \xD0\xBA", GCodeWiFi_GetStaSsid());
+    } else if (GCodeWiFi_IsAP() || !GCodeWiFi_GetStaSsid()[0]) {
+        snprintf(b, sizeof(b), "%s %s   %s %s", "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C:", GCodeWiFi_GetApSsid(), "\xD0\xBF\xD0\xB0\xD1\x80\xD0\xBE\xD0\xBB\xD1\x8C:", GCodeWiFi_GetApPass());
+    } else {
+        snprintf(b, sizeof(b), "%s %s", "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80:", GCodeWiFi_GetStaSsid());
+    }
+    lv_label_set_text(g_hub.info, b);
+    snprintf(b, sizeof(b), "http://%s", (ip && *ip) ? ip : "...");
+    lv_label_set_text(g_hub.addr, b);
+}
+
+static void hub_tick(lv_timer_t*)
+{
+    if (g_hub.ov && !lv_obj_has_flag(g_hub.ov, LV_OBJ_FLAG_HIDDEN)) hub_refresh();
+}
+
+static void hub_open()
+{
+    if (g_ui.alert_box && !lv_obj_has_flag(g_ui.alert_box, LV_OBJ_FLAG_HIDDEN)) dismiss_alert();
+    hub_refresh();
+    lv_obj_clear_flag(g_hub.ov, LV_OBJ_FLAG_HIDDEN);
+}
+
+// ── Wi-Fi: сеть роутера ─────────────────────────────────────────────────────
+struct WifiUi { lv_obj_t* back; lv_obj_t* status; lv_obj_t* ssid; lv_obj_t* pass; lv_obj_t* kb; lv_obj_t* list; int shown_scan; };
+static WifiUi g_wifi = {};
+
+static void wifi_close()
+{
+    if (g_wifi.back) { lv_obj_del(g_wifi.back); g_wifi.back = nullptr; }
+}
+
+static void wifi_list_fill()
+{
+    lv_obj_clean(g_wifi.list);
+    int n = GCodeWiFi_ScanCount();
+    g_wifi.shown_scan = n;
+    if (n < 0) { lv_list_add_text(g_wifi.list, "\xD0\x9F\xD0\xBE\xD0\xB8\xD1\x81\xD0\xBA \xD1\x81\xD0\xB5\xD1\x82\xD0\xB5\xD0\xB9..."); return; }
+    if (n == 0) { lv_list_add_text(g_wifi.list, "\xD0\xA1\xD0\xB5\xD1\x82\xD0\xB8 \xD0\xBD\xD0\xB5 \xD0\xBD\xD0\xB0\xD0\xB9\xD0\xB4\xD0\xB5\xD0\xBD\xD1\x8B"); return; }
+    for (int i = 0; i < n; i++) {
+        lv_obj_t* b = lv_list_add_btn(g_wifi.list, nullptr, GCodeWiFi_ScanSsid(i));
+        lv_obj_set_style_text_font(b, &font_dejavu_16, 0);
+        lv_obj_add_event_cb(b, [](lv_event_t* e) {
+            lv_obj_t* btn = lv_event_get_target(e);
+            lv_textarea_set_text(g_wifi.ssid, lv_list_get_btn_text(g_wifi.list, btn));
+            lv_textarea_set_text(g_wifi.pass, "");
+            lv_obj_add_state(g_wifi.pass, LV_STATE_FOCUSED);
+            lv_obj_clear_state(g_wifi.ssid, LV_STATE_FOCUSED);
+            lv_keyboard_set_textarea(g_wifi.kb, g_wifi.pass);
+            lv_obj_add_flag(g_wifi.list, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+        }, LV_EVENT_CLICKED, nullptr);
+    }
+}
+
+static void wifi_tick(lv_timer_t*)
+{
+    if (!g_wifi.back) return;
+    char b[96];
+    const char* sta = GCodeWiFi_GetStaSsid();
+    if (GCodeWiFi_IsConnected() && !GCodeWiFi_IsAP() && sta[0])
+        snprintf(b, sizeof(b), "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xBE \xD0\xBA %s: http://%s", sta, GCodeWiFi_GetIP());
+    else if (sta[0] && GCodeWiFi_IsAP())
+        snprintf(b, sizeof(b), "%s %s %s", "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80", sta, "\xD0\xBD\xD0\xB5\xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB5\xD0\xBD, \xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xB0\xD0\xB5\xD1\x82 \xD1\x82\xD0\xBE\xD1\x87\xD0\xBA\xD0\xB0 \xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB0");
+    else if (sta[0])
+        snprintf(b, sizeof(b), "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xB8\xD0\xB5 \xD0\xBA %s...", sta);
+    else
+        snprintf(b, sizeof(b), "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80 \xD0\xBD\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB4\xD0\xB0\xD0\xBD: \xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xB0\xD0\xB5\xD1\x82 \xD1\x82\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xBA\xD0\xBE \xD1\x82\xD0\xBE\xD1\x87\xD0\xBA\xD0\xB0 \xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB0");
+    lv_label_set_text(g_wifi.status, b);
+    if (GCodeWiFi_ScanCount() != g_wifi.shown_scan) wifi_list_fill();
+}
+
+static lv_obj_t* wifi_ta(lv_obj_t* parent, int y, bool password)
+{
+    lv_obj_t* ta = lv_textarea_create(parent);
+    lv_textarea_set_one_line(ta, true);
+    lv_textarea_set_password_mode(ta, password);
+    lv_textarea_set_max_length(ta, password ? 64 : 32);
+    lv_obj_set_size(ta, UX(236), UY(30));
+    lv_obj_set_pos(ta, UX(96), y);
+    lv_obj_set_style_text_font(ta, &font_dejavu_16, 0);
+    lv_obj_set_style_bg_color(ta, lv_color_hex(0x10202c), 0);
+    lv_obj_set_style_text_color(ta, lv_color_hex(0xe0e0e0), 0);
+    lv_obj_set_style_border_color(ta, lv_color_hex(0x3a5a6a), 0);
+    lv_obj_add_event_cb(ta, [](lv_event_t* e) {
+        lv_obj_t* t = lv_event_get_target(e);
+        lv_keyboard_set_textarea(g_wifi.kb, t);
+        lv_obj_add_flag(g_wifi.list, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+    }, LV_EVENT_FOCUSED, nullptr);
+    return ta;
+}
+
+static void wifi_show()
+{
+    wifi_close();
+    lv_obj_t* back = lv_obj_create(lv_layer_top());
+    g_wifi.back = back;
+    lv_obj_set_size(back, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_obj_set_pos(back, 0, 0);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0x000814), 0);
+    lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(back, 0, 0);
+    lv_obj_set_style_radius(back, 0, 0);
+    lv_obj_set_style_pad_all(back, 0, 0);
+    lv_obj_clear_flag(back, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* title = lv_label_create(back);
+    lv_obj_set_pos(title, UX(16), UY(6));
+    lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
+    lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
+    lv_label_set_text(title, "WI-FI: \xD0\xA1\xD0\x95\xD0\xA2\xD0\xAC \xD0\xA0\xD0\x9E\xD0\xA3\xD0\xA2\xD0\x95\xD0\xA0\xD0\x90");
+
+    lv_obj_t* close_btn = cfg_button(back, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);
+    lv_obj_set_size(close_btn, UX(110), UY(28)); lv_obj_set_pos(close_btn, UX(354), UY(4));
+    lv_obj_add_event_cb(close_btn, [](lv_event_t*) { wifi_close(); }, LV_EVENT_CLICKED, nullptr);
+
+    g_wifi.status = lv_label_create(back);
+    lv_obj_set_width(g_wifi.status, UX(448));
+    lv_obj_set_pos(g_wifi.status, UX(16), UY(36));
+    lv_obj_set_style_text_font(g_wifi.status, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(g_wifi.status, lv_color_hex(0x6a9fb5), 0);
+    lv_label_set_long_mode(g_wifi.status, LV_LABEL_LONG_DOT);
+
+    const char* names[2] = { "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C", "\xD0\x9F\xD0\xB0\xD1\x80\xD0\xBE\xD0\xBB\xD1\x8C" };
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t* n = lv_label_create(back);
+        lv_obj_set_style_text_font(n, &font_dejavu_16, 0);
+        lv_obj_set_style_text_color(n, lv_color_hex(0x9ab8c8), 0);
+        lv_label_set_text(n, names[i]);
+        lv_obj_set_pos(n, UX(16), UY(60) + i * UY(34) + UY(6));
+    }
+    g_wifi.ssid = wifi_ta(back, UY(60), false);
+    g_wifi.pass = wifi_ta(back, UY(94), true);
+    lv_textarea_set_text(g_wifi.ssid, GCodeWiFi_GetStaSsid());
+
+    lv_obj_t* scan = cfg_button(back, "\xD0\x9F\xD0\x9E\xD0\x98\xD0\xA1\xD0\x9A", 0x1a2a3a, 0x00d4ff);
+    lv_obj_set_size(scan, UX(124), UY(30)); lv_obj_set_pos(scan, UX(340), UY(60));
+    lv_obj_add_event_cb(scan, [](lv_event_t*) {
+        GCodeWiFi_Scan();
+        lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(g_wifi.list, LV_OBJ_FLAG_HIDDEN);
+        wifi_list_fill();
+    }, LV_EVENT_CLICKED, nullptr);
+
+    lv_obj_t* conn = cfg_button(back, "\xD0\x9F\xD0\x9E\xD0\x94\xD0\x9A\xD0\x9B\xD0\xAE\xD0\xA7\xD0\x98\xD0\xA2\xD0\xAC", 0x0a3a2a, 0x00ff88);
+    lv_obj_set_size(conn, UX(124), UY(30)); lv_obj_set_pos(conn, UX(340), UY(94));
+    lv_obj_set_style_text_font(lv_obj_get_child(conn, 0), &font_dejavu_14, 0);   // ПОДКЛЮЧИТЬ — длинное слово
+    lv_obj_add_event_cb(conn, [](lv_event_t*) {
+        GCodeWiFi_SetSta(lv_textarea_get_text(g_wifi.ssid), lv_textarea_get_text(g_wifi.pass));
+        lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+    }, LV_EVENT_CLICKED, nullptr);
+
+    // ЗАБЫТЬ — раньше клавиатуры: открытая клавиатура её закрывает
+    lv_obj_t* forget = cfg_button(back, "\xD0\x97\xD0\x90\xD0\x91\xD0\xAB\xD0\xA2\xD0\xAC (\xD0\xB4\xD0\xB5\xD1\x80\xD0\xB6\xD0\xB0\xD1\x82\xD1\x8C)", 0x2a1a1a, 0xa08080);
+    lv_obj_set_size(forget, UX(220), UY(28)); lv_obj_set_pos(forget, UX(16), UY(238));
+    lv_obj_add_event_cb(forget, [](lv_event_t*) {               // держать — только точка доступа
+        GCodeWiFi_SetSta("", "");
+        lv_textarea_set_text(g_wifi.ssid, "");
+        lv_textarea_set_text(g_wifi.pass, "");
+    }, LV_EVENT_LONG_PRESSED, nullptr);
+
+    // Нижняя часть: список найденных сетей или клавиатура (пока поле в фокусе)
+    g_wifi.list = lv_list_create(back);
+    lv_obj_set_size(g_wifi.list, UX(448), UY(100));
+    lv_obj_set_pos(g_wifi.list, UX(16), UY(132));
+    lv_obj_set_style_bg_color(g_wifi.list, lv_color_hex(0x0a1622), 0);
+    lv_obj_set_style_text_font(g_wifi.list, &font_dejavu_16, 0);
+    g_wifi.kb = lv_keyboard_create(back);
+    lv_obj_set_size(g_wifi.kb, SCREEN_WIDTH, UY(136));
+    lv_obj_align(g_wifi.kb, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(g_wifi.kb, &lv_font_montserrat_20, 0);
+    lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(g_wifi.kb, [](lv_event_t*) {          // ✓ или ✕ на клавиатуре — спрятать
+        lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(g_wifi.list, LV_OBJ_FLAG_HIDDEN);
+    }, LV_EVENT_READY, nullptr);
+    lv_obj_add_event_cb(g_wifi.kb, [](lv_event_t*) {
+        lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(g_wifi.list, LV_OBJ_FLAG_HIDDEN);
+    }, LV_EVENT_CANCEL, nullptr);
+
+
+    g_wifi.shown_scan = -2;
+    wifi_tick(nullptr);
+    if (GCodeWiFi_ScanCount() < 0) GCodeWiFi_Scan();   // первый поиск — сразу
+}
+
+// ── Линейки: источник координат, тип, разрешение, направление (BACKLOG-028) ──
+// Сохранение — POS_SET: STM32 пишет во флеш и перезапускается (прерывания линеек настраиваются при старте).
+struct ScalesUi { lv_obj_t* back; lv_obj_t* src[3]; lv_obj_t* val[8]; lv_obj_t* status; int32_t edit[9]; bool dirty; uint8_t seen_seq; };
+static ScalesUi g_sc = {};
+static const char* const SCALE_TYPES[6] = { "\xD0\x9D\xD0\x95\xD0\xA2", "\xD0\x9A\xD0\xB2\xD0\xB0\xD0\xB4\xD1\x80\xD0\xB0\xD1\x82\xD1\x83\xD1\x80\xD0\xB0", "Sylvac 48", "BIN6", "iGaging 21", "Digimatic" };
+
+static void scales_close() { if (g_sc.back) { lv_obj_del(g_sc.back); g_sc.back = nullptr; } }
+
+static void scales_refresh()
+{
+    const LatheData& d = uart_protocol.getData();
+    for (int i = 0; i < 3; i++) {
+        bool on = g_sc.edit[0] == i;
+        lv_obj_set_style_bg_color(g_sc.src[i], lv_color_hex(on ? 0x0a3a2a : 0x10202c), 0);
+        lv_obj_set_style_text_color(lv_obj_get_child(g_sc.src[i], 0), lv_color_hex(on ? 0x00ff88 : 0x6a9fb5), 0);
+    }
+    for (int ax = 0; ax < 2; ax++) {
+        const int32_t* e = &g_sc.edit[1 + ax * 4];
+        char b[24];
+        lv_label_set_text(g_sc.val[ax * 4 + 0], SCALE_TYPES[e[0] >= 0 && e[0] < 6 ? e[0] : 0]);
+        snprintf(b, sizeof(b), "%ld.%03ld", (long)(e[1] / 1000), (long)(e[1] % 1000));       // мкм на импульс
+        lv_label_set_text(g_sc.val[ax * 4 + 1], b);
+        lv_label_set_text(g_sc.val[ax * 4 + 2], e[2] ? "\xD0\x9E\xD0\x91\xD0\xA0\xD0\x90\xD0\xA2\xD0\x9D\xD0\x9E\xD0\x95" : "\xD0\x9F\xD0\xA0\xD0\xAF\xD0\x9C\xD0\x9E\xD0\x95");
+        lv_label_set_text(g_sc.val[ax * 4 + 3], e[3] ? "\xD0\x98\xD0\x9D\xD0\x92\xD0\x95\xD0\xA0\xD0\xA1\xD0\x9D\xD0\xAB\xD0\x99" : "\xD0\x9F\xD0\xA0\xD0\xAF\xD0\x9C\xD0\x9E\xD0\x99");
+        for (int k = 0; k < 4; k++)
+            lv_obj_set_style_text_color(g_sc.val[ax * 4 + k], lv_color_hex(
+                (d.pos_valid && e[k] != d.pos_cfg[1 + ax * 4 + k]) ? 0xffcc00 :
+                g_sc.edit[0] == 2 ? 0xe0e0e0 : 0x5a6a7a), 0);
+    }
+}
+
+static void scales_tick(lv_timer_t*)
+{
+    if (!g_sc.back) return;
+    const LatheData& d = uart_protocol.getData();
+    if (d.cfg_res_seq != g_sc.seen_seq) {
+        g_sc.seen_seq = d.cfg_res_seq;
+        bool ok = !strcmp(d.cfg_res, "OK");
+        lv_label_set_text(g_sc.status, ok ? "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E, \xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\x97\xD0\x90\xD0\x9F\xD0\xA3\xD0\xA1\xD0\x9A" : d.cfg_res);
+        lv_obj_set_style_text_color(g_sc.status, lv_color_hex(ok ? 0x00ff88 : 0xff5555), 0);
+        if (ok) g_sc.dirty = false;
+    }
+    if (!g_sc.dirty && d.pos_valid) memcpy(g_sc.edit, d.pos_cfg, sizeof(g_sc.edit));
+    scales_refresh();
+}
+
+static void scales_changed() { g_sc.dirty = true; lv_label_set_text(g_sc.status, "\xD0\x9D\xD0\x95 \xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E");
+                               lv_obj_set_style_text_color(g_sc.status, lv_color_hex(0xffcc00), 0); scales_refresh(); }
+
+static void scales_show()
+{
+    scales_close();
+    const LatheData& d = uart_protocol.getData();
+    memcpy(g_sc.edit, d.pos_cfg, sizeof(g_sc.edit));
+    g_sc.dirty = false;
+    g_sc.seen_seq = d.cfg_res_seq;
+    lv_obj_t* back = lv_obj_create(lv_layer_top());
+    g_sc.back = back;
+    lv_obj_set_size(back, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_obj_set_pos(back, 0, 0);
+    lv_obj_set_style_bg_color(back, lv_color_hex(0x000814), 0);
+    lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(back, 0, 0);
+    lv_obj_set_style_radius(back, 0, 0);
+    lv_obj_set_style_pad_all(back, 0, 0);
+    lv_obj_clear_flag(back, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* title = lv_label_create(back);
+    lv_obj_set_pos(title, UX(16), UY(6));
+    lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
+    lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
+    lv_label_set_text(title, "\xD0\x9A\xD0\x9E\xD0\x9E\xD0\xA0\xD0\x94\xD0\x98\xD0\x9D\xD0\x90\xD0\xA2\xD0\xAB \xD0\x98 \xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x99\xD0\x9A\xD0\x98");
+
+    g_sc.status = lv_label_create(back);
+    lv_obj_set_width(g_sc.status, UX(200));
+    lv_obj_set_pos(g_sc.status, UX(264), UY(10));
+    lv_obj_set_style_text_font(g_sc.status, &font_dejavu_14, 0);
+    lv_obj_set_style_text_align(g_sc.status, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_long_mode(g_sc.status, LV_LABEL_LONG_DOT);
+    lv_label_set_text(g_sc.status, d.pos_valid ? "" : "\xD0\x9D\xD0\x95\xD0\xA2 \xD0\x94\xD0\x90\xD0\x9D\xD0\x9D\xD0\xAB\xD0\xA5 \xD0\x9E\xD0\xA2 STM32");
+    lv_obj_set_style_text_color(g_sc.status, lv_color_hex(0xff8800), 0);
+
+    // Источник координат: 3 кнопки
+    static const char* SRC[3] = { "\xD0\x91\xD0\x95\xD0\x97 \xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x95\xD0\x9A", "\xD0\x91\xD0\x9B\xD0\x9E\xD0\x9A DRO", "\xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x99\xD0\x9A\xD0\x98" };
+    for (int i = 0; i < 3; i++) {
+        lv_obj_t* b = cfg_button(back, SRC[i], 0x10202c, 0x6a9fb5);
+        lv_obj_set_size(b, UX(146), UY(30)); lv_obj_set_pos(b, UX(16) + i * UX(150), UY(38));
+        g_sc.src[i] = b;
+        lv_obj_add_event_cb(b, [](lv_event_t* e) {
+            g_sc.edit[0] = (int)(intptr_t)lv_event_get_user_data(e); scales_changed();
+        }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    }
+    // Линейки по осям
+    const int X_Z = UX(200), X_X = UX(336), COL_W = UX(128), Y0 = UY(96), DY = UY(30), RH = UY(27);
+    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y, "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X };
+    for (int c = 0; c < 2; c++) {
+        lv_obj_t* h = lv_label_create(back);
+        lv_obj_set_style_text_font(h, &font_dejavu_14, 0);
+        lv_obj_set_style_text_color(h, lv_color_hex(0x6a9fb5), 0);
+        lv_label_set_recolor(h, true);
+        lv_label_set_text(h, heads[c]);
+        lv_obj_set_pos(h, c ? X_X : X_Z, UY(76));
+    }
+    static const char* ROWS[4] = { "\xD0\xA2\xD0\x98\xD0\x9F", "\xD0\x9C\xD0\x9A\xD0\x9C \xD0\x9D\xD0\x90 \xD0\x98\xD0\x9C\xD0\x9F\xD0\xA3\xD0\x9B\xD0\xAC\xD0\xA1", "\xD0\x9D\xD0\x90\xD0\x9F\xD0\xA0\xD0\x90\xD0\x92\xD0\x9B\xD0\x95\xD0\x9D\xD0\x98\xD0\x95", "\xD0\xA1\xD0\x98\xD0\x93\xD0\x9D\xD0\x90\xD0\x9B" };
+    for (int r = 0; r < 4; r++) {
+        lv_obj_t* n = lv_label_create(back);
+        lv_obj_set_style_text_font(n, &font_dejavu_16, 0);
+        lv_obj_set_style_text_color(n, lv_color_hex(0x9ab8c8), 0);
+        lv_label_set_text(n, ROWS[r]);
+        lv_obj_set_pos(n, UX(16), Y0 + r * DY + UY(5));
+        for (int ax = 0; ax < 2; ax++) {
+            lv_obj_t* b = cfg_button(back, "--", 0x10202c, 0xe0e0e0);
+            lv_obj_set_size(b, COL_W, RH); lv_obj_set_pos(b, ax ? X_X : X_Z, Y0 + r * DY);
+            g_sc.val[ax * 4 + r] = lv_obj_get_child(b, 0);
+            lv_obj_add_event_cb(b, [](lv_event_t* e) {
+                int k = (int)(intptr_t)lv_event_get_user_data(e);      // ось × 4 + строка
+                int32_t& v = g_sc.edit[1 + k];
+                switch (k % 4) {
+                    case 0: v = (v + 1) % 6; scales_changed(); break;   // тип — по кругу
+                    case 1: {                                          // разрешение, мкм на импульс
+                        char init[16]; snprintf(init, sizeof(init), "%ld.%03ld", (long)(v / 1000), (long)(v % 1000));
+                        numpad_show("\xD0\x9C\xD0\x9A\xD0\x9C \xD0\x9D\xD0\x90 \xD0\x98\xD0\x9C\xD0\x9F\xD0\xA3\xD0\x9B\xD0\xAC\xD0\xA1", "\xD0\xBC\xD0\xBA\xD0\xBC", 3, 3, false, init,
+                                    [](int32_t nm, intptr_t k) { g_sc.edit[1 + k] = nm; scales_changed(); }, k);
+                        break;
+                    }
+                    default: v = !v; scales_changed(); break;           // направление / сигнал
+                }
+            }, LV_EVENT_CLICKED, (void*)(intptr_t)(ax * 4 + r));
+        }
+    }
+
+    const int BY = UY(222), BH = UY(30), BW = UX(140);
+    lv_obj_t* save = cfg_button(back, "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x98\xD0\xA2\xD0\xAC", 0x0a3a2a, 0x00ff88);
+    lv_obj_set_size(save, BW, BH); lv_obj_set_pos(save, UX(16), BY);
+    lv_obj_add_event_cb(save, [](lv_event_t*) {
+        const int32_t* v = g_sc.edit;
+        char cmd[96];
+        snprintf(cmd, sizeof(cmd), "POS_SET:%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", (long)v[0], (long)v[1], (long)v[2],
+                 (long)v[3], (long)v[4], (long)v[5], (long)v[6], (long)v[7], (long)v[8]);
+        uart_protocol.sendButtonPress(cmd);
+        lv_label_set_text(g_sc.status, "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\xAF\xD0\x95\xD0\x9C...");
+    }, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t* def = cfg_button(back, "\xD0\x98\xD0\x97 \xD0\x9A\xD0\x9E\xD0\x9D\xD0\xA4\xD0\x98\xD0\x93\xD0\x90", 0x1a2a3a, 0x9ab8c8);
+    lv_obj_set_size(def, BW, BH); lv_obj_set_pos(def, UX(170), BY);
+    lv_obj_add_event_cb(def, [](lv_event_t*) { uart_protocol.sendButtonPress("POS_DEFAULT"); }, LV_EVENT_LONG_PRESSED, nullptr);
+    lv_obj_add_event_cb(def, [](lv_event_t*) { lv_label_set_text(g_sc.status, "\xD0\x94\xD0\x95\xD0\xA0\xD0\x96\xD0\x98\xD0\xA2\xD0\x95 \xD0\x9D\xD0\x90\xD0\x96\xD0\x90\xD0\xA2\xD0\x9E\xD0\x99"); }, LV_EVENT_SHORT_CLICKED, nullptr);
+    lv_obj_t* close_btn = cfg_button(back, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);
+    lv_obj_set_size(close_btn, BW, BH); lv_obj_set_pos(close_btn, UX(324), BY);
+    lv_obj_add_event_cb(close_btn, [](lv_event_t*) { scales_close(); }, LV_EVENT_CLICKED, nullptr);
+    scales_refresh();
+}
+
+static void create_settings_hub(lv_obj_t* screen)
+{
+    lv_obj_t* ov = lv_obj_create(screen);
+    g_hub.ov = ov;
+    lv_obj_set_size(ov, SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_obj_set_pos(ov, 0, 0);
+    lv_obj_set_style_bg_color(ov, lv_color_hex(0x000814), 0);
+    lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(ov, 0, 0);
+    lv_obj_set_style_radius(ov, 0, 0);
+    lv_obj_set_style_pad_all(ov, 0, 0);
+    lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(ov, LV_OBJ_FLAG_HIDDEN);
+
+    lv_obj_t* title = lv_label_create(ov);
+    lv_obj_set_pos(title, UX(16), UY(6));
+    lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
+    lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
+    lv_label_set_text(title, "\xD0\x9D\xD0\x90\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x99\xD0\x9A\xD0\x98");
+
+    lv_obj_t* close_btn = cfg_button(ov, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);
+    lv_obj_set_size(close_btn, UX(110), UY(28)); lv_obj_set_pos(close_btn, UX(354), UY(4));
+    lv_obj_add_event_cb(close_btn, [](lv_event_t*) { lv_obj_add_flag(g_hub.ov, LV_OBJ_FLAG_HIDDEN); }, LV_EVENT_CLICKED, nullptr);
+
+    // Плитки 2×2
+    struct Tile { const char* text; lv_event_cb_t cb; };
+    static const Tile tiles[] = {
+        { "\xD0\x9C\xD0\x95\xD0\xA5\xD0\x90\xD0\x9D\xD0\x98\xD0\x9A\xD0\x90",  [](lv_event_t*) { cfg_open(); } },
+        { "\xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90",   [](lv_event_t*) { cal_show(); } },
+        { "WI-FI",  [](lv_event_t*) { wifi_show(); } },
+        { "\xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x99\xD0\x9A\xD0\x98",[](lv_event_t*) { scales_show(); } },
+    };
+    for (int i = 0; i < 4; i++) {
+        lv_obj_t* b = cfg_button(ov, tiles[i].text, 0x10202c, 0xe0e0e0);
+        lv_obj_set_size(b, UX(220), UY(54));
+        lv_obj_set_pos(b, UX(16) + (i % 2) * UX(228), UY(40) + (i / 2) * UY(62));
+        lv_obj_set_style_text_font(lv_obj_get_child(b, 0), &font_tahoma_bold_22, 0);
+        lv_obj_add_event_cb(b, tiles[i].cb, LV_EVENT_CLICKED, nullptr);
+    }
+
+    g_hub.info = lv_label_create(ov);
+    lv_obj_set_width(g_hub.info, UX(448));
+    lv_obj_set_pos(g_hub.info, UX(16), UY(170));
+    lv_obj_set_style_text_font(g_hub.info, &font_dejavu_16, 0);
+    lv_obj_set_style_text_color(g_hub.info, lv_color_hex(0x9ab8c8), 0);
+    lv_label_set_long_mode(g_hub.info, LV_LABEL_LONG_DOT);
+
+    g_hub.addr = lv_label_create(ov);
+    lv_obj_set_width(g_hub.addr, UX(448));
+    lv_obj_set_pos(g_hub.addr, UX(16), UY(196));
+    lv_obj_set_style_text_font(g_hub.addr, &font_tahoma_bold_28, 0);   // в 40 есть только цифры и пара букв
+    lv_obj_set_style_text_color(g_hub.addr, lv_color_hex(0xffcc00), 0);
+    lv_label_set_long_mode(g_hub.addr, LV_LABEL_LONG_DOT);
+
+    lv_timer_create(hub_tick, 500, nullptr);
+    lv_timer_create(scales_tick, 300, nullptr);
+    lv_timer_create(wifi_tick, 300, nullptr);
+}
+
 static void create_settings_menu(lv_obj_t* screen)
 {
     lv_obj_t* ov = lv_obj_create(screen);
@@ -1978,20 +2390,10 @@ static void create_settings_menu(lv_obj_t* screen)
 
     lv_timer_create(cfg_tick, 200, nullptr);
 
-    // Tap on ⚠ warn icon → show WiFi info; double-tap → also open settings
+    // Тап по ⚠ — раздел НАСТРОЙКИ (механика, калибровка, Wi-Fi, линейки; адрес точки доступа)
     if (g_ui.warn_bg) {
         lv_obj_add_flag(g_ui.warn_bg, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(g_ui.warn_bg, [](lv_event_t*) {
-            static uint32_t s_wtap = 0; uint32_t now = millis();
-            bool dbl = (now - s_wtap) < 400; s_wtap = now;
-            char msg[48];
-            const char* ip = GCodeWiFi_GetIP();
-            bool is_ap = GCodeWiFi_IsAP();
-            snprintf(msg, sizeof(msg), is_ap ? "AP: %s" : "http://els.local/ (%s)",
-                     (ip && *ip) ? ip : "...");
-            show_alert(msg);
-            if (dbl) cfg_open();
-        }, LV_EVENT_CLICKED, nullptr);
+        lv_obj_add_event_cb(g_ui.warn_bg, [](lv_event_t*) { hub_open(); }, LV_EVENT_CLICKED, nullptr);
     }
 }
 
@@ -2209,6 +2611,7 @@ lv_obj_t* create_dark_pro_ui()
     // CONTENT PANEL (компоновка K — единственная; вариант I убран)
     // =========================================================
     create_k_content(screen);
+    create_settings_hub(screen);     // раздел НАСТРОЙКИ — под окном механики
     create_settings_menu(screen);
     apply_layout_widgets(g_wk);
 

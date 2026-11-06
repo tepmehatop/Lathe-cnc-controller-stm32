@@ -286,6 +286,7 @@ void Display_Send_All()
 
   // [STM32] Механика станка (настройки, BACKLOG-028)
   e2_mech_send();
+  e2_pos_send();
 
   // [STM32] Можно ли задавать оси с экрана (нет — при блоке DRO, там оси задаются на блоке)
   Display_Send_Int("AXIS_EDIT", e2_axis_editable() ? 1 : 0);
@@ -632,6 +633,10 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     else if (prm.startsWith("CFG_SET:") || prm == "CFG_DEFAULT") {
       e2_mech_from_display(prm.c_str());
       Display_Send_All();
+    }
+    // [STM32] POS_SET:<9 чисел> / POS_DEFAULT — источник координат и линейки (BACKLOG-028)
+    else if (prm.startsWith("POS_SET:") || prm == "POS_DEFAULT") {
+      e2_pos_from_display(prm.c_str());
     }
     // [STM32] CAL:<Z|X>:<мкм хода> — калибровка шага винта и люфта по линейкам (BACKLOG-029)
     else if (prm.startsWith("CAL:")) {

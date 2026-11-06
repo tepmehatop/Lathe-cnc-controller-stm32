@@ -18,7 +18,7 @@
 #include "../Core/els_config.h"
 #include <Arduino.h>
 
-#if USE_DRO_HS800
+// [BACKLOG-028] драйвер в прошивке всегда; запускается, если источник координат в настройках — блок DRO
 
 // ============================================================
 // USART2 через STM32duino HardwareSerial
@@ -174,15 +174,4 @@ uint8_t  DRV_DRO_IsNewPacket(void)     { return s_new; }
 uint32_t DRV_DRO_GetPacketCount(void)  { return s_pkt_ok; }
 uint32_t DRV_DRO_GetErrorCount(void)   { return s_pkt_err; }
 
-#else
-// USE_DRO_HS800 = 0 — всё пустые стабы
-void     DRV_DRO_Init(void)            {}
-void     DRV_DRO_Process(void)         {}
-int32_t  DRV_DRO_GetX(void)            { return 0; }
-int32_t  DRV_DRO_GetY(void)            { return 0; }
-uint8_t  DRV_DRO_GetBtn(void)          { return 0; }
-uint8_t  DRV_DRO_GetBtnB(void)         { return 0; }
-uint8_t  DRV_DRO_IsNewPacket(void)     { return 0; }
-uint32_t DRV_DRO_GetPacketCount(void)  { return 0; }
-uint32_t DRV_DRO_GetErrorCount(void)   { return 0; }
-#endif
+

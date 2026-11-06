@@ -218,6 +218,14 @@ void UartProtocol::parseCommand(const char* cmd)
     else if (strcmp(command, "AXIS_EDIT") == 0) {
         data_.axis_edit = (uint8_t)atoi(params);
     }
+    else if (strcmp(command, "POS") == 0) {
+        long v[9];
+        if (sscanf(params, "%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+                   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]) == 9) {
+            for (int i = 0; i < 9; i++) data_.pos_cfg[i] = (int32_t)v[i];
+            data_.pos_valid = 1;
+        }
+    }
     else if (strcmp(command, "CFG") == 0) {
         long v[9];
         if (sscanf(params, "%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",

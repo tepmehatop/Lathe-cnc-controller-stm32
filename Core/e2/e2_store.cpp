@@ -7,6 +7,12 @@
 
 #define E2_STORE_ADDR   0x080E0000UL
 
+void e2_reboot(void)
+{
+   delay(300);                      // дать уйти ответу экрану
+   NVIC_SystemReset();
+}
+
 bool e2_store_read(void* buf, uint32_t len)
 {
    memcpy(buf, (const void*)E2_STORE_ADDR, len);

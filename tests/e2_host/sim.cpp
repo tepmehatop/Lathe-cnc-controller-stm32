@@ -564,7 +564,19 @@ static void test_mech() {
     CHECK(e2_mech.z_mc == 4 && DISPLAY_UART.out.find("<CFG_RES:МИКРОШАГ", o) != std::string::npos, "микрошаг 3 с экрана не отклонён");
     touch("CFG_DEFAULT"); run_ms(20);
     CHECK(!memcmp(&e2_mech, &E2_MECH_CONFIG, sizeof e2_mech), "CFG_DEFAULT не вернул els_config.h");
+    // 5. Источник координат и линейки с экрана: сохранить и перезапуск; при загрузке — из флеша
+    extern bool g_stub_rebooted;
+    g_stub_rebooted = false;
+    touch("POS_SET:2,4,10000,1,0,1,5000,0,1"); run_ms(20);
+    CHECK(g_stub_rebooted && e2_pos.source == POS_SOURCE_SCALES && e2_pos.ax[0].type == SCALE_IGAGING21 &&
+          e2_pos.ax[1].sig_inv == 1, "POS_SET не применился (перезапуск %d, источник %d)", g_stub_rebooted, e2_pos.source);
+    e2_pos = E2_POS_CONFIG; e2_mech_load();
+    CHECK(e2_pos.source == POS_SOURCE_SCALES && e2_pos.ax[0].nm_per_count == 10000, "POS не сохранился во флеш");
+    g_stub_rebooted = false;
+    touch("POS_SET:2,9,10000,1,0,1,5000,0,1"); run_ms(20);
+    CHECK(!g_stub_rebooted, "неверный тип линейки принят");
     memset(g_stub_flash, 0xFF, sizeof g_stub_flash);
+    e2_pos = E2_POS_CONFIG;
 }
 
 static void test_hand() {

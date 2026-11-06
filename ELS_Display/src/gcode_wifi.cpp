@@ -22,6 +22,7 @@
 #include <WiFiServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#include <Preferences.h>
 #if CONFIG_ESP_HOSTED_ENABLED
 #include "esp_hosted.h"
 #include "esp_hosted_host_fw_ver.h"
@@ -53,6 +54,33 @@ static char              s_req_path[96] = {};
 static bool              s_notify_pending = false;
 static char              s_notify_ip[20] = {};
 static bool              s_notify_ap = false;
+
+// Сеть роутера — из NVS (задаётся на экране: НАСТРОЙКИ → WI-FI); нет в NVS — из wifi_config.h.
+// Запросы экрана (подключиться/забыть/поиск) выполняет WiFi-задача — WiFi-вызовы длятся секундами.
+static char              s_sta_ssid[33] = {};
+static char              s_sta_pass[65] = {};
+static portMUX_TYPE      s_cfg_mux = portMUX_INITIALIZER_UNLOCKED;
+static bool              s_cfg_req = false;      // новая сеть или «забыть» (ssid пустой)
+static char              s_new_ssid[33] = {}, s_new_pass[65] = {};
+static volatile bool     s_scan_req = false, s_scan_busy = false;
+static char              s_scan_list[GCW_SCAN_MAX][33];
+static volatile int      s_scan_n = -1;          // -1 — поиска ещё не было
+
+static void sta_load() {
+    Preferences p;
+    if (p.begin("wifi", true)) {
+        String ss = p.getString("ssid", ""), pw = p.getString("pass", "");
+        bool have = p.isKey("ssid");
+        p.end();
+        if (have) {                      // сохранено с экрана (пустой — «забыть»: только точка доступа)
+            strlcpy(s_sta_ssid, ss.c_str(), sizeof(s_sta_ssid));
+            strlcpy(s_sta_pass, pw.c_str(), sizeof(s_sta_pass));
+            return;
+        }
+    }
+    strlcpy(s_sta_ssid, WIFI_STA_SSID, sizeof(s_sta_ssid));
+    strlcpy(s_sta_pass, WIFI_STA_PASS, sizeof(s_sta_pass));
+}
 
 static void post_exec_request(GcwReq req, const char* path = nullptr) {
     portENTER_CRITICAL(&s_req_mux);
@@ -412,7 +440,7 @@ static void handle_status(WiFiClient& cl) {
         "{\"mode\":\"%s\",\"ssid\":\"%s\",\"ip\":\"%s\","
         "\"fc\":%d,\"tb\":%lu,\"fb\":%lu}",
         ap ? "AP" : "STA",
-        ap ? WIFI_AP_SSID : WIFI_STA_SSID,
+        ap ? WIFI_AP_SSID : s_sta_ssid,
         s_ip, fc,
         (unsigned long)total, (unsigned long)(total - used));
     send_ok_json(cl, buf);
@@ -716,7 +744,8 @@ static void wifi_init_impl() {
     }
     if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
 
-    const char* ssid = WIFI_STA_SSID;
+    sta_load();
+    const char* ssid = s_sta_ssid;
     if (ssid && ssid[0] != '\0') {
         Serial.printf("[gcode] WiFi STA → %s\n", ssid);
         wait_coprocessor();
@@ -726,7 +755,7 @@ static void wifi_init_impl() {
         delay(500);
         WiFi.mode(WIFI_STA);
         WiFi.setSleep(false);
-        WiFi.begin(ssid, WIFI_STA_PASS);
+        WiFi.begin(ssid, s_sta_pass);
         s_state  = GCW_CONNECTING;
         s_conn_t = millis();
     } else {
@@ -734,7 +763,54 @@ static void wifi_init_impl() {
     }
 }
 
+// Запросы экрана: новая сеть роутера / «забыть», поиск сетей
+static void wifi_screen_requests() {
+    bool cfg = false;
+    portENTER_CRITICAL(&s_cfg_mux);
+    if (s_cfg_req) {
+        cfg = true; s_cfg_req = false;
+        memcpy(s_sta_ssid, s_new_ssid, sizeof(s_sta_ssid));
+        memcpy(s_sta_pass, s_new_pass, sizeof(s_sta_pass));
+    }
+    portEXIT_CRITICAL(&s_cfg_mux);
+    if (cfg) {
+        Preferences p;
+        if (p.begin("wifi", false)) { p.putString("ssid", s_sta_ssid); p.putString("pass", s_sta_pass); p.end(); }
+        Serial.printf("[wifi] сеть роутера с экрана: %s\n", s_sta_ssid[0] ? s_sta_ssid : "(нет — только точка доступа)");
+        if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
+        WiFi.softAPdisconnect(true);
+        WiFi.disconnect(true);
+        delay(200);
+        if (s_sta_ssid[0]) {
+            WiFi.mode(WIFI_STA);
+            WiFi.setSleep(false);
+            WiFi.begin(s_sta_ssid, s_sta_pass);
+            s_state  = GCW_CONNECTING;
+            s_conn_t = millis();
+        } else {
+            start_ap();
+        }
+    }
+    if (s_scan_req) {
+        s_scan_req = false; s_scan_busy = true;
+        if (WiFi.getMode() == WIFI_AP) WiFi.mode(WIFI_AP_STA);   // в режиме точки доступа поиск не работает
+        int n = WiFi.scanNetworks();
+        Serial.printf("[wifi] поиск сетей: %d\n", n);
+        int k = 0;
+        for (int i = 0; i < n && k < GCW_SCAN_MAX; i++) {
+            String ss = WiFi.SSID(i);
+            if (!ss.length()) continue;
+            bool dup = false;
+            for (int j = 0; j < k; j++) if (ss == s_scan_list[j]) dup = true;
+            if (!dup) strlcpy(s_scan_list[k++], ss.c_str(), sizeof(s_scan_list[0]));
+        }
+        WiFi.scanDelete();
+        s_scan_n = k; s_scan_busy = false;
+    }
+}
+
 static void wifi_process_impl() {
+    wifi_screen_requests();
     // Обработка клиентов
     if (s_srv && s_srv->hasClient()) {
         WiFiClient cl = s_srv->accept();
@@ -761,7 +837,7 @@ static void wifi_process_impl() {
                 int n = WiFi.scanNetworks();
                 int rssi = 0;
                 for (int i = 0; i < n; i++)
-                    if (WiFi.SSID(i) == WIFI_STA_SSID) { rssi = WiFi.RSSI(i); break; }
+                    if (WiFi.SSID(i) == s_sta_ssid) { rssi = WiFi.RSSI(i); break; }
                 Serial.printf("[wifi] scan: сетей=%d, сеть роутера %s%s\n", n,
                               rssi ? "видна, RSSI=" : "не найдена", rssi ? String(rssi).c_str() : "");
                 WiFi.scanDelete();
@@ -783,7 +859,7 @@ static void wifi_process_impl() {
             s_conn_t = millis();
             WiFi.disconnect(true);
             delay(100);
-            WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASS);
+            WiFi.begin(s_sta_ssid, s_sta_pass);
         } else if (s_srv && millis() - s_srv_start_t > 30000
                          && millis() - s_last_client_t > 30000) {
             // Watchdog: сервер запущен >30с, но ни одного клиента → перезапускаем
@@ -793,7 +869,7 @@ static void wifi_process_impl() {
         }
     } else if (s_state == GCW_AP) {
         // Повторная попытка STA каждые 60 секунд (если SSID задан)
-        const char* ssid = WIFI_STA_SSID;
+        const char* ssid = s_sta_ssid;
         if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
             Serial.println("[gcode] AP → retrying STA...");
             log_hosted_versions();
@@ -802,7 +878,7 @@ static void wifi_process_impl() {
             delay(100);
             WiFi.mode(WIFI_STA);
             WiFi.setSleep(false);
-            WiFi.begin(ssid, WIFI_STA_PASS);
+            WiFi.begin(ssid, s_sta_pass);
             s_state  = GCW_CONNECTING;
             s_conn_t = millis();
         }
@@ -843,6 +919,19 @@ void GCodeWiFi_Process() {
 }
 
 const char* GCodeWiFi_GetIP()      { return s_ip; }
+const char* GCodeWiFi_GetStaSsid() { return s_sta_ssid; }
+const char* GCodeWiFi_GetApSsid()  { return WIFI_AP_SSID; }
+const char* GCodeWiFi_GetApPass()  { return WIFI_AP_PASS; }
+void GCodeWiFi_SetSta(const char* ssid, const char* pass) {
+    portENTER_CRITICAL(&s_cfg_mux);
+    strlcpy(s_new_ssid, ssid ? ssid : "", sizeof(s_new_ssid));
+    strlcpy(s_new_pass, pass ? pass : "", sizeof(s_new_pass));
+    s_cfg_req = true;
+    portEXIT_CRITICAL(&s_cfg_mux);
+}
+void GCodeWiFi_Scan()              { s_scan_n = -1; s_scan_req = true; }
+int  GCodeWiFi_ScanCount()         { return (s_scan_req || s_scan_busy) ? -1 : s_scan_n; }
+const char* GCodeWiFi_ScanSsid(int i) { return (i >= 0 && i < s_scan_n) ? s_scan_list[i] : ""; }
 bool GCodeWiFi_IsConnected()       { return s_state == GCW_CONNECTED || s_state == GCW_AP; }
 bool GCodeWiFi_IsAP()              { return s_state == GCW_AP; }
 httpd_handle_t GCodeWiFi_GetHttpd(){ return nullptr; }
