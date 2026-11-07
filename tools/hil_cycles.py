@@ -208,6 +208,7 @@ def esp_shot(esp, path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--esp', default='/dev/cu.usbmodem14801')
+    ap.add_argument('--mega', default='/dev/cu.usbserial-1410')
     ap.add_argument('--out', required=True)
     ap.add_argument('--only', default=None)
     ap.add_argument('--timeout', type=float, default=240)
@@ -215,6 +216,12 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     stm, esp, dec = cd.Stm32(), cd.Esp(a.esp), cd.lcd_decoder()
+    # Mega — как настоящий блок DRO: следует за моторами (иначе «качание» показаний не связано с движением,
+    # и контроль пропуска шагов / доводка X по линейке справедливо останавливают цикл)
+    from follow_hil import Mega
+    mega = Mega(a.mega)
+    for c in ('w0', 'kz2500', 'kx1250', 'lz0', 'lx0', 'f1', 'o'):
+        mega.cmd(c)
     sp = Spindle(stm)
     results = []
     try:
