@@ -591,6 +591,24 @@ static void test_mech() {
     e2_pos = E2_POS_CONFIG;
 }
 
+// Калибровка по индикатору (BACKLOG-029): фазы CAL_STEP — люфт, ход, возврат; счётчики не меняются
+static void test_cal_step() {
+    printf("[%7.1f с] [cal-step] ", t_ns / 1e9); printf("калибровка по индикатору: фазы движения\n");
+    controls_neutral(); select_mode(2); run_ms(100);
+    long m0 = Motor_X_Pos, p0 = s_x.count;
+    long steps10 = lround(10.0 / (SCREW_X / 100.0) * MOTOR_X_STEP_PER_REV * McSTEP_X);
+    long pmax = p0;
+    for (int ph = 1; ph <= 3; ph++) {
+        size_t o = DISPLAY_UART.out.size();
+        char b[40]; snprintf(b, sizeof b, "CAL_STEP:X:%d:10000", ph); touch(b); run_ms(50);
+        char want[16]; snprintf(want, sizeof want, "<CAL_STEP:%d>", ph);
+        CHECK(DISPLAY_UART.out.find(want, o) != std::string::npos, "нет ответа %s", want);
+        if (ph == 2) pmax = s_x.count;
+    }
+    CHECK(pmax - p0 == steps10, "фаза 2: %ld импульсов, ожидалось %ld (10 мм)", pmax - p0, steps10);
+    CHECK(s_x.count == p0 && Motor_X_Pos == m0, "после фаз ось не на месте: импульсов %+ld, счётчик %+ld", s_x.count - p0, Motor_X_Pos - m0);
+}
+
 static void test_hand() {
     printf("[%7.1f с] [hand] ", t_ns / 1e9); printf("РГИ: ось Z, x1, 25 щелчков\n");
     select_mode(1);
@@ -1317,6 +1335,7 @@ int main() {
     test_limit_no_switch();
     test_axis_set();
     test_steploss();
+    test_cal_step();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();

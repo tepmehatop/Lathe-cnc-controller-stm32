@@ -132,3 +132,45 @@ void e2_cal_from_display(const char* prm)
    Serial.print(F("[CAL] ")); Serial.print(ax); Serial.print(' ');
    Serial.println(err ? err : b);
 }
+
+// Калибровка по индикатору / штангенциркулю (без линеек, BACKLOG-029). Экран ведёт по шагам, STM32 только двигает
+// ось и отвечает <CAL_STEP:фаза> (или <CAL_ERR:причина>):
+//   1 — выбрать люфт: −1 мм и +1 мм (после этого оператор обнуляет индикатор);
+//   2 — вперёд на ход L (оператор вводит показание → шаг винта = винт × показание / L);
+//   3 — назад на L (показание индикатора — люфт: на развороте каретка недоходит на его величину).
+// Счётчики ядра не меняются: за все фазы ось возвращается на место. Компенсация люфта на время — выключена.
+// Команда экрана: CAL_STEP:<Z|X>:<фаза>:<мкм хода>
+void e2_cal_step_from_display(const char* prm)
+{
+   char ax = prm[9];
+   int phase = atoi(prm + 11);
+   const char* p2 = strchr(prm + 11, ':');
+   long len_um = p2 ? atol(p2 + 1) : 0;
+   const char* err = nullptr;
+   if ((ax != 'Z' && ax != 'X') || phase < 1 || phase > 3) err = "НЕВЕРНАЯ КОМАНДА";
+   else if (!e2_machine_idle()) err = "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
+   if (!err) {
+      const E2Mech& m = e2_mech;
+      double spu = ax == 'Z' ? (double)m.z_steps * m.z_mc / (m.z_screw * 10.0) : (double)m.x_steps * m.x_mc / (m.x_screw * 10.0);
+      long one = lround(1000 * spu), steps = lround(len_um * spu);    // шагов на 1 мм / на ход
+      long& bl = ax == 'Z' ? e2_bl_z : e2_bl_x;
+      long bl_saved = bl; bl = 0;
+      bool ena = ax == 'Z' ? Read_Z_Ena_State : Read_X_Ena_State;
+      if (!ena) { if (ax == 'Z') Motor_Z_Enable(); else Motor_X_Enable(); }
+      e2_cal_abort = false; e2_cal_joy = true;
+      memset(e2_cal_rx, 0, sizeof(e2_cal_rx));
+      if (phase == 1)      { e2_cal_move(ax, -one); e2_cal_move(ax, one); }
+      else if (phase == 2) e2_cal_move(ax, steps);
+      else                 e2_cal_move(ax, -steps);
+      e2_scale_reref();
+      if (!ena) {                                   // Motor_*_Disable() у автора — блок без do-while
+         if (ax == 'Z') { Motor_Z_Disable(); } else { Motor_X_Disable(); }
+      }
+      bl = bl_saved;
+      if (e2_cal_abort) err = "ПРЕРВАНО";
+   }
+   if (err) { Display_Send_CMD("CAL_ERR", err); Beep_Error(); return; }
+   char b[8]; snprintf(b, sizeof(b), "%d", phase);
+   Display_Send_CMD("CAL_STEP", b);
+   Beep();
+}

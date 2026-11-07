@@ -1692,6 +1692,8 @@ static lv_obj_t* cfg_button(lv_obj_t* parent, const char* text, uint32_t bg, uin
 // TOUCH CAL:<Z|X>:<мкм хода> — STM32 проезжает 3 раза туда-обратно и отвечает CAL_RES / CAL_ERR.
 // ПРИМЕНИТЬ — шаг винта (округлённый до 0.01 мм, как хранит ядро) и люфт в настройки → CFG_SET.
 // ============================================================================
+// Два способа: 0 — по линейкам (станок меряет сам), 1 — по индикатору / штангенциркулю (без линеек):
+// STM32 по шагам двигает ось (CAL_STEP), показания вводит оператор, результат считает экран.
 struct CalUi {
     lv_obj_t* back;
     lv_obj_t* len_lbl[2];     // ход Y / X
@@ -1699,8 +1701,24 @@ struct CalUi {
     lv_obj_t* apply;
     int32_t   len_mm[2];
     uint8_t   seen_seq;
+    lv_obj_t* tab[2];
+    lv_obj_t* help;
+    lv_obj_t* next;           // ДАЛЕЕ — по индикатору: индикатор обнулён
+    int       method;
+    int       ist;            // по индикатору: 0 — нет, 1 — люфт выбирается, 2 — ждём «обнулён», 3 — едет на L,
+                              // 4 — ввод показания, 5 — возврат, 6 — ввод показания после возврата
+    char      iax;
+    int32_t   ilen_um, im1_um;
 };
 static CalUi g_cal = { nullptr, {nullptr, nullptr}, nullptr, nullptr, {20, 10}, 0 };
+
+static void cal_method_refresh();
+static void cal_send_step(int phase)
+{
+    char cmd[40];
+    snprintf(cmd, sizeof(cmd), "CAL_STEP:%c:%d:%ld", g_cal.iax, phase, (long)g_cal.ilen_um);
+    uart_protocol.sendButtonPress(cmd);
+}
 
 static void cfg_send_edit();   // СОХРАНИТЬ из «МЕХАНИКА СТАНКА»
 
@@ -1731,6 +1749,35 @@ static void cal_tick(lv_timer_t*)
     if (d.cal_seq == g_cal.seen_seq) return;
     g_cal.seen_seq = d.cal_seq;
     char t[200];
+    if (d.cal_state == 4) {                                   // по индикатору: фаза выполнена
+        int ph = atoi(d.cal_text);
+        if (ph == 1) {
+            g_cal.ist = 2;
+            cal_status("\xD0\x9E\xD0\xB1\xD0\xBD\xD1\x83\xD0\xBB\xD0\xB8\xD1\x82\xD0\xB5 \xD0\xB8\xD0\xBD\xD0\xB4\xD0\xB8\xD0\xBA\xD0\xB0\xD1\x82\xD0\xBE\xD1\x80 \xD0\xB8 \xD0\xBD\xD0\xB0\xD0\xB6\xD0\xBC\xD0\xB8\xD1\x82\xD0\xB5 \xD0\x94\xD0\x90\xD0\x9B\xD0\x95\xD0\x95", 0xffcc00);
+            lv_obj_clear_flag(g_cal.next, LV_OBJ_FLAG_HIDDEN);
+        } else if (ph == 2) {
+            g_cal.ist = 4;
+            numpad_show("\xD0\x9F\xD0\x9E\xD0\x9A\xD0\x90\xD0\x97\xD0\x90\xD0\x9D\xD0\x98\xD0\x95 \xD0\x98\xD0\x9D\xD0\x94\xD0\x98\xD0\x9A\xD0\x90\xD0\xA2\xD0\x9E\xD0\xA0\xD0\x90", "\xD0\xBC\xD0\xBC", 3, 3, false, nullptr, [](int32_t v, intptr_t) {
+                g_cal.im1_um = v; g_cal.ist = 5;
+                cal_status("\xD0\x92\xD0\xBE\xD0\xB7\xD0\xB2\xD1\x80\xD0\xB0\xD1\x82 \xD0\xBD\xD0\xB0 \xD1\x85\xD0\xBE\xD0\xB4...", 0x6a9fb5);
+                cal_send_step(3);
+            }, 0);
+        } else if (ph == 3) {
+            g_cal.ist = 6;
+            numpad_show("\xD0\x9F\xD0\x9E\xD0\x9A\xD0\x90\xD0\x97\xD0\x90\xD0\x9D\xD0\x98\xD0\x95 \xD0\x9F\xD0\x9E\xD0\xA1\xD0\x9B\xD0\x95 \xD0\x92\xD0\x9E\xD0\x97\xD0\x92\xD0\xA0\xD0\x90\xD0\xA2\xD0\x90", "\xD0\xBC\xD0\xBC", 3, 2, true, nullptr, [](int32_t v, intptr_t) {
+                g_cal.ist = 0;
+                const LatheData& d = uart_protocol.getData();
+                int zi = g_cal.iax == 'Z';
+                int32_t screw_um = d.cfg[zi ? 3 : 6] * 10;              // шаг винта сейчас, мкм
+                if (g_cal.ilen_um <= 0 || g_cal.im1_um <= 0) return;
+                // проехали L по шагам — индикатор показал m1: реальный шаг винта = шаг × m1 / L
+                int32_t screw_new = (int32_t)((int64_t)screw_um * g_cal.im1_um / g_cal.ilen_um);
+                uart_protocol.setCalResult(g_cal.iax, screw_new, v < 0 ? -v : v);
+            }, 0);
+        }
+        return;
+    }
+    if (d.cal_state != 4 && g_cal.ist && d.cal_state == 3) g_cal.ist = 0;
     if (d.cal_state == 1) {
         snprintf(t, sizeof(t), "\xD0\x98\xD0\x94\xD0\x81\xD0\xA2 \xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90 %s: %s",   // ИДЁТ КАЛИБРОВКА Y: 1/3
                  d.cal_ax == 'Z' ? "Y" : "X", strchr(d.cal_text, ':') ? strchr(d.cal_text, ':') + 1 : "");
@@ -1758,6 +1805,19 @@ static void cal_tick(lv_timer_t*)
     }
 }
 
+static void cal_method_refresh()
+{
+    for (int i = 0; i < 2; i++) {
+        bool on = g_cal.method == i;
+        lv_obj_set_style_bg_color(g_cal.tab[i], lv_color_hex(on ? 0x0a3a2a : 0x10202c), 0);
+        lv_obj_set_style_text_color(lv_obj_get_child(g_cal.tab[i], 0), lv_color_hex(on ? 0x00ff88 : 0x6a9fb5), 0);
+    }
+    lv_label_set_text(g_cal.help, g_cal.method ? "\xD0\x98\xD0\xBD\xD0\xB4\xD0\xB8\xD0\xBA\xD0\xB0\xD1\x82\xD0\xBE\xD1\x80 (\xD0\xB8\xD0\xBB\xD0\xB8 \xD1\x88\xD1\x82\xD0\xB0\xD0\xBD\xD0\xB3\xD0\xB5\xD0\xBD\xD1\x86\xD0\xB8\xD1\x80\xD0\xBA\xD1\x83\xD0\xBB\xD1\x8C) \xD1\x83\xD0\xBF\xD0\xBE\xD1\x80\xD0\xBE\xD0\xBC \xD0\xB2 \xD0\xBA\xD0\xB0\xD1\x80\xD0\xB5\xD1\x82\xD0\xBA\xD1\x83 \xD0\xB8\xD0\xBB\xD0\xB8 \xD1\x81\xD1\x83\xD0\xBF\xD0\xBF\xD0\xBE\xD1\x80\xD1\x82. \xD0\x9E\xD1\x81\xD1\x8C \xD0\xB2\xD1\x8B\xD0\xB1\xD0\xB5\xD1\x80\xD0\xB5\xD1\x82 \xD0\xBB\xD1\x8E\xD1\x84\xD1\x82, \xD0\xB2\xD1\x8B \xD0\xBE\xD0\xB1\xD0\xBD\xD1\x83\xD0\xBB\xD0\xB8\xD1\x82\xD0\xB5 \xD0\xB8\xD0\xBD\xD0\xB4\xD0\xB8\xD0\xBA\xD0\xB0\xD1\x82\xD0\xBE\xD1\x80, \xD0\xBE\xD1\x81\xD1\x8C \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xB4\xD0\xB5\xD1\x82 \xD0\xB2\xD0\xBF\xD0\xB5\xD1\x80\xD1\x91\xD0\xB4 \xD0\xBD\xD0\xB0 \xD1\x85\xD0\xBE\xD0\xB4 \xD0\xB8 \xD0\xB2\xD0\xB5\xD1\x80\xD0\xBD\xD1\x91\xD1\x82\xD1\x81\xD1\x8F: \xD0\xB2\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xB8\xD1\x82\xD0\xB5 \xD0\xBE\xD0\xB1\xD0\xB0 \xD0\xBF\xD0\xBE\xD0\xBA\xD0\xB0\xD0\xB7\xD0\xB0\xD0\xBD\xD0\xB8\xD1\x8F." : "\xD0\xA3\xD0\xB1\xD0\xB5\xD1\x80\xD0\xB8\xD1\x82\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB3\xD0\xBE\xD1\x82\xD0\xBE\xD0\xB2\xD0\xBA\xD1\x83 \xD0\xB8 \xD0\xBE\xD1\x82\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xB8\xD1\x82\xD0\xB5 \xD1\x80\xD0\xB5\xD0\xB7\xD0\xB5\xD1\x86. \xD0\x9E\xD1\x81\xD1\x8C 3 \xD1\x80\xD0\xB0\xD0\xB7\xD0\xB0 \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xB4\xD0\xB5\xD1\x82 \xD0\xB2\xD0\xBF\xD0\xB5\xD1\x80\xD1\x91\xD0\xB4 \xD0\xBD\xD0\xB0 \xD1\x85\xD0\xBE\xD0\xB4 + 1 \xD0\xBC\xD0\xBC \xD0\xB8 \xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD1\x82\xD0\xBD\xD0\xBE \xD0\xB8 \xD0\xB2\xD0\xB5\xD1\x80\xD0\xBD\xD1\x91\xD1\x82\xD1\x81\xD1\x8F \xD0\xBD\xD0\xB0 \xD0\xBC\xD0\xB5\xD1\x81\xD1\x82\xD0\xBE. \xD0\x9F\xD1\x80\xD0\xB5\xD1\x80\xD0\xB2\xD0\xB0\xD1\x82\xD1\x8C: \xD0\xB4\xD0\xB6\xD0\xBE\xD0\xB9\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xBE\xD0\xBC \xD0\xB8\xD0\xBB\xD0\xB8 \xD0\xA1\xD0\xA2\xD0\x9E\xD0\x9F.");
+    lv_obj_add_flag(g_cal.next, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(g_cal.apply, LV_OBJ_FLAG_HIDDEN);
+    cal_status("", 0x6a9fb5);
+}
+
 static void cal_show()
 {
     cal_close();
@@ -1776,34 +1836,35 @@ static void cal_show()
     lv_obj_set_pos(title, UX(16), UY(6));
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
-    lv_label_set_text(title, "\xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90 "
-                             "\xD0\x9F\xD0\x9E \xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x99\xD0\x9A\xD0\x90\xD0\x9C");   // КАЛИБРОВКА ПО ЛИНЕЙКАМ
+    lv_label_set_text(title, "\xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90");   // КАЛИБРОВКА
 
-    lv_obj_t* help = lv_label_create(back);
-    lv_obj_set_width(help, UX(448));
-    lv_obj_set_pos(help, UX(16), UY(36));
-    lv_obj_set_style_text_font(help, &font_dejavu_14, 0);
-    lv_obj_set_style_text_color(help, lv_color_hex(0x9ab8c8), 0);
-    lv_label_set_long_mode(help, LV_LABEL_LONG_WRAP);
-    // Уберите заготовку и отведите резец. Ось 3 раза проедет вперёд на ход + 1 мм и обратно и вернётся
-    // на место: поставьте суппорт так, чтобы хватило хода. Прервать: джойстиком или СТОП.
-    // Только символы из шрифтов экрана: без «—», «…», «≤» (иначе квадратики)
-    lv_label_set_text(help,
-        "\xD0\xA3\xD0\xB1\xD0\xB5\xD1\x80\xD0\xB8\xD1\x82\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB3\xD0\xBE\xD1\x82\xD0\xBE\xD0\xB2\xD0\xBA\xD1\x83 "
-        "\xD0\xB8 \xD0\xBE\xD1\x82\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xB8\xD1\x82\xD0\xB5 \xD1\x80\xD0\xB5\xD0\xB7\xD0\xB5\xD1\x86. "
-        "\xD0\x9E\xD1\x81\xD1\x8C 3 \xD1\x80\xD0\xB0\xD0\xB7\xD0\xB0 \xD0\xBF\xD1\x80\xD0\xBE\xD0\xB5\xD0\xB4\xD0\xB5\xD1\x82 "
-        "\xD0\xB2\xD0\xBF\xD0\xB5\xD1\x80\xD1\x91\xD0\xB4 \xD0\xBD\xD0\xB0 \xD1\x85\xD0\xBE\xD0\xB4 + 1 \xD0\xBC\xD0\xBC "
-        "\xD0\xB8 \xD0\xBE\xD0\xB1\xD1\x80\xD0\xB0\xD1\x82\xD0\xBD\xD0\xBE \xD0\xB8 \xD0\xB2\xD0\xB5\xD1\x80\xD0\xBD\xD1\x91\xD1\x82\xD1\x81\xD1\x8F "
-        "\xD0\xBD\xD0\xB0 \xD0\xBC\xD0\xB5\xD1\x81\xD1\x82\xD0\xBE: \xD0\xBF\xD0\xBE\xD1\x81\xD1\x82\xD0\xB0\xD0\xB2\xD1\x8C\xD1\x82\xD0\xB5 "
-        "\xD1\x81\xD1\x83\xD0\xBF\xD0\xBF\xD0\xBE\xD1\x80\xD1\x82 \xD1\x82\xD0\xB0\xD0\xBA, \xD1\x87\xD1\x82\xD0\xBE\xD0\xB1\xD1\x8B "
-        "\xD1\x85\xD0\xB2\xD0\xB0\xD1\x82\xD0\xB8\xD0\xBB\xD0\xBE \xD1\x85\xD0\xBE\xD0\xB4\xD0\xB0. "
-        "\xD0\x9F\xD1\x80\xD0\xB5\xD1\x80\xD0\xB2\xD0\xB0\xD1\x82\xD1\x8C: \xD0\xB4\xD0\xB6\xD0\xBE\xD0\xB9\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xBE\xD0\xBC "
-        "\xD0\xB8\xD0\xBB\xD0\xB8 \xD0\xA1\xD0\xA2\xD0\x9E\xD0\x9F.");
+    // Способ: ПО ЛИНЕЙКАМ / ПО ИНДИКАТОРУ (без линеек и блока DRO — сразу по индикатору)
+    static const char* TABS[2] = { "\xD0\x9F\xD0\x9E \xD0\x9B\xD0\x98\xD0\x9D\xD0\x95\xD0\x99\xD0\x9A\xD0\x90\xD0\x9C", "\xD0\x9F\xD0\x9E \xD0\x98\xD0\x9D\xD0\x94\xD0\x98\xD0\x9A\xD0\x90\xD0\xA2\xD0\x9E\xD0\xA0\xD0\xA3" };
+    g_cal.method = uart_protocol.getData().pos_valid && uart_protocol.getData().pos_cfg[0] == 0 ? 1 : 0;
+    g_cal.ist = 0;
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t* b = cfg_button(back, TABS[i], 0x10202c, 0x6a9fb5);
+        lv_obj_set_size(b, UX(136), UY(26)); lv_obj_set_pos(b, UX(188) + i * UX(140), UY(4));
+        lv_obj_set_style_text_font(lv_obj_get_child(b, 0), &font_dejavu_14, 0);
+        g_cal.tab[i] = b;
+        lv_obj_add_event_cb(b, [](lv_event_t* e) {
+            g_cal.method = (int)(intptr_t)lv_event_get_user_data(e);
+            g_cal.ist = 0;
+            cal_method_refresh();
+        }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    }
+
+    g_cal.help = lv_label_create(back);
+    lv_obj_set_width(g_cal.help, UX(448));
+    lv_obj_set_pos(g_cal.help, UX(16), UY(36));
+    lv_obj_set_style_text_font(g_cal.help, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(g_cal.help, lv_color_hex(0x9ab8c8), 0);
+    lv_label_set_long_mode(g_cal.help, LV_LABEL_LONG_WRAP);
 
     const char* names[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y,   // ПРОДОЛЬНАЯ Y
                              "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X }; // ПОПЕРЕЧНАЯ X
     for (int i = 0; i < 2; i++) {
-        int y = UY(100) + i * UY(38);
+        int y = UY(104) + i * UY(36);
         lv_obj_t* n = lv_label_create(back);
         lv_obj_set_style_text_font(n, &font_dejavu_16, 0);
         lv_obj_set_style_text_color(n, lv_color_hex(0x9ab8c8), 0);
@@ -1826,6 +1887,15 @@ static void cal_show()
         lv_obj_set_size(go, UX(150), UY(32)); lv_obj_set_pos(go, UX(314), y);
         lv_obj_add_event_cb(go, [](lv_event_t* e) {
             intptr_t i = (intptr_t)lv_event_get_user_data(e);
+            lv_obj_add_flag(g_cal.apply, LV_OBJ_FLAG_HIDDEN);
+            if (g_cal.method == 1) {                            // по индикатору: сначала выбрать люфт
+                g_cal.iax = i ? 'X' : 'Z';
+                g_cal.ilen_um = g_cal.len_mm[i] * 1000;
+                g_cal.ist = 1;
+                cal_send_step(1);
+                cal_status("\xD0\x92\xD1\x8B\xD0\xB1\xD0\xB8\xD1\x80\xD0\xB0\xD1\x8E \xD0\xBB\xD1\x8E\xD1\x84\xD1\x82...", 0x6a9fb5);
+                return;
+            }
             char cmd[32];
             snprintf(cmd, sizeof(cmd), "CAL:%c:%ld", i ? 'X' : 'Z', (long)g_cal.len_mm[i] * 1000);
             uart_protocol.sendButtonPress(cmd);
@@ -1836,8 +1906,8 @@ static void cal_show()
 
     g_cal.status = lv_label_create(back);
     lv_obj_set_width(g_cal.status, UX(448));
-    lv_obj_set_pos(g_cal.status, UX(16), UY(174));
-    lv_obj_set_style_text_font(g_cal.status, &font_dejavu_16, 0);
+    lv_obj_set_pos(g_cal.status, UX(16), UY(176));
+    lv_obj_set_style_text_font(g_cal.status, &font_dejavu_14, 0);
     lv_label_set_long_mode(g_cal.status, LV_LABEL_LONG_WRAP);
     lv_label_set_text(g_cal.status, "");
 
@@ -1857,6 +1927,17 @@ static void cal_show()
         cal_close();                                             // ответ — в строке статуса «МЕХАНИКА СТАНКА»
     }, LV_EVENT_CLICKED, nullptr);
 
+    g_cal.next = cfg_button(back, "\xD0\x94\xD0\x90\xD0\x9B\xD0\x95\xD0\x95", 0x0a3a2a, 0x00ff88);
+    lv_obj_set_size(g_cal.next, BW, BH); lv_obj_set_pos(g_cal.next, UX(16), BY);
+    lv_obj_add_flag(g_cal.next, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(g_cal.next, [](lv_event_t*) {         // индикатор обнулён — ехать на ход
+        if (g_cal.ist != 2) return;
+        g_cal.ist = 3;
+        lv_obj_add_flag(g_cal.next, LV_OBJ_FLAG_HIDDEN);
+        cal_status("\xD0\x95\xD0\xB4\xD1\x83 \xD0\xB2\xD0\xBF\xD0\xB5\xD1\x80\xD1\x91\xD0\xB4 \xD0\xBD\xD0\xB0 \xD1\x85\xD0\xBE\xD0\xB4...", 0x6a9fb5);
+        cal_send_step(2);
+    }, LV_EVENT_CLICKED, nullptr);
+
     lv_obj_t* stop = cfg_button(back, "\xD0\xA1\xD0\xA2\xD0\x9E\xD0\x9F", 0x3a1010, 0xff7070);   // СТОП
     lv_obj_set_size(stop, BW, BH); lv_obj_set_pos(stop, UX(170), BY);
     lv_obj_add_event_cb(stop, [](lv_event_t*) { uart_protocol.sendButtonPress("CAL_STOP"); }, LV_EVENT_CLICKED, nullptr);
@@ -1864,6 +1945,7 @@ static void cal_show()
     lv_obj_t* close_btn = cfg_button(back, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);   // ЗАКРЫТЬ
     lv_obj_set_size(close_btn, BW, BH); lv_obj_set_pos(close_btn, UX(324), BY);
     lv_obj_add_event_cb(close_btn, [](lv_event_t*) { cal_close(); }, LV_EVENT_CLICKED, nullptr);
+    cal_method_refresh();
 }
 
 // ============================================================================

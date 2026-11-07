@@ -243,7 +243,8 @@ void UartProtocol::parseCommand(const char* cmd)
                 data_.cal_state = 2;
             }
         } else {
-            data_.cal_state = !strcmp(command, "CAL_RUN") ? 1 : 3;
+            // CAL_RUN — идёт, CAL_STEP:<фаза> — фаза калибровки по индикатору выполнена, CAL_ERR — ошибка
+            data_.cal_state = !strcmp(command, "CAL_RUN") ? 1 : !strcmp(command, "CAL_STEP") ? 4 : 3;
             if (data_.cal_state == 1) data_.cal_ax = params[0];
             strncpy(data_.cal_text, params, sizeof(data_.cal_text) - 1);
             data_.cal_text[sizeof(data_.cal_text) - 1] = 0;

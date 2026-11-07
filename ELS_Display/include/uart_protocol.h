@@ -87,7 +87,7 @@ typedef struct {
     int32_t  pos_cfg[12];
     uint8_t  pos_valid;
     // Калибровка по линейкам (BACKLOG-029): <CAL_RUN:Z:1/3>, <CAL_RES:Z,мкм винта,мкм люфта,нм на шаг>, <CAL_ERR:…>
-    uint8_t  cal_state;      // 0 — нет, 1 — идёт, 2 — результат, 3 — ошибка
+    uint8_t  cal_state;      // 0 — нет, 1 — идёт, 2 — результат, 3 — ошибка, 4 — фаза по индикатору выполнена
     char     cal_ax;
     char     cal_text[64];   // ход (1/3) или причина ошибки
     int32_t  cal_screw_um, cal_bl_um, cal_k_nm;
@@ -181,6 +181,11 @@ public:
     void setSphereOptimistic(int16_t v) { data_.sphere_radius = v; }
     void setTotalToothOptimistic(uint16_t v) { data_.total_tooth = v; }
     void setCurrentToothOptimistic(uint16_t v) { data_.current_tooth = v; }
+    // Калибровка по индикатору: результат считает экран (показания вводит оператор)
+    void setCalResult(char ax, int32_t screw_um, int32_t bl_um) {
+        data_.cal_ax = ax; data_.cal_screw_um = screw_um; data_.cal_bl_um = bl_um; data_.cal_k_nm = 0;
+        data_.cal_state = 2; data_.cal_seq++;
+    }
     void setThreadOptimistic(int16_t mm_x100, const char* name) {
         data_.thread_mm = mm_x100;
         strncpy(data_.thread_name, name, sizeof(data_.thread_name) - 1);

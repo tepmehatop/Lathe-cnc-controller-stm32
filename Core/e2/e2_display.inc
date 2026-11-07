@@ -639,6 +639,9 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
       e2_pos_from_display(prm.c_str());
     }
     // [STM32] CAL:<Z|X>:<мкм хода> — калибровка шага винта и люфта по линейкам (BACKLOG-029)
+    else if (prm.startsWith("CAL_STEP:")) {
+      e2_cal_step_from_display(prm.c_str());
+    }
     else if (prm.startsWith("CAL:")) {
       e2_cal_from_display(prm.c_str());
     }
