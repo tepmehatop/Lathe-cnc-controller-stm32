@@ -1,9 +1,10 @@
 // [STM32] Линейки в автоциклах (BACKLOG-025). Подключается в конце e2_core.cpp, после e2_calib.inc.
 //
 // 1. Направление и масштаб линейки — по ходу оси от любой остановки больше 2 мм (шаги против линейки; люфт
-//    до 0.5 мм на оценку почти не влияет, сторона люфта для этого не нужна). Если масштаб
+//    до 0.5 мм на оценку почти не влияет, сторона люфта для этого не нужна; скачок показания на стоящей оси —
+//    ноль на блоке DRO — принимается). Если масштаб
 //    не сходится с механикой больше чем в 1.4 раза (например, блок DRO показывает X в диаметрах) — функции
-//    этой оси выключаются, на экран — сообщение.
+//    этой оси выключаются, на экран — сообщение; следующий сошедшийся ход их включает обратно.
 // 2. Контроль пропуска шагов: на каждой остановке оси (300 мс без шагов — линейка успела обновиться) приращение
 //    линейки сравнивается с приращением счётчика шагов. Расхождение больше допуска — сообщение и блокировка
 //    движения от джойстика, пока джойстик не отпущен. Счётчик ядра — положение каретки только при настроенном
@@ -80,20 +81,28 @@ void e2_scale_track(void)
       if (d) t.mdir = d;
       if (m != t.m_seen) { t.m_seen = m; t.still_ms = now; continue; }
       if (now - t.still_ms < E2_STILL_MS) continue;
-      if (!e2_scale_axis_ok(ax) || !e2_scale_fresh(ax)) { t.ref = t.sref = false; continue; }
+      bool present = e2_pos.source != POS_SOURCE_STEPS &&
+                     (e2_pos.source != POS_SOURCE_SCALES || DRV_Scales_Present(ax ? SCALE_AXIS_X : SCALE_AXIS_Z));
+      if (!present || !e2_scale_fresh(ax)) { t.ref = t.sref = false; continue; }
       int32_t s = e2_scale_now(ax);
       double k = e2_um_per_step(ax);
-      if (!e2_scale_sign[ax]) {                          // направление и масштаб линейки
-         if (!t.sref) { t.sm = m; t.ss = s; t.sref = true; }
+      if (!e2_scale_sign[ax] || e2_scale_bad[ax]) {      // направление и масштаб линейки
+         if (!t.sref || m == t.sm) { t.sm = m; t.ss = s; t.sref = true; }   // стоим: скачок (ноль на DRO) — принять
          else if (fabs((m - t.sm) * k) >= 2000) {
             double r = (s - t.ss) / ((m - t.sm) * k);
+            t.sm = m; t.ss = s;
             if (fabs(r) < 0.7 || fabs(r) > 1.4) {
+               if (!e2_scale_bad[ax])
+                  Display_Send_CMD("ALERT", ax ? "ЛИНЕЙКА X НЕ СОВПАДАЕТ С МЕХАНИКОЙ" : "ЛИНЕЙКА Z НЕ СОВПАДАЕТ С МЕХАНИКОЙ");
                e2_scale_bad[ax] = true;
-               Display_Send_CMD("ALERT", ax ? "ЛИНЕЙКА X НЕ СОВПАДАЕТ С МЕХАНИКОЙ" : "ЛИНЕЙКА Z НЕ СОВПАДАЕТ С МЕХАНИКОЙ");
                Serial.print(F("[SCALE] масштаб линейки / шаги = ")); Serial.println(r);
-            } else e2_scale_sign[ax] = r > 0 ? 1 : -1;
+            } else {                                     // сошлось (в том числе после ложного «не совпадает»)
+               e2_scale_bad[ax] = false;
+               e2_scale_sign[ax] = r > 0 ? 1 : -1;
+            }
          }
       }
+      if (e2_scale_bad[ax]) { t.ref = false; continue; }
       // контроль шагов — когда сторона люфта известна (до первого движения счётчик — ещё не каретка)
       if (!(ax ? e2_bl_loaded_x : e2_bl_loaded_z)) { t.ref = false; continue; }
       if (!t.ref) { t.m = m; t.s = s; t.ref = true; t.turned = false; continue; }

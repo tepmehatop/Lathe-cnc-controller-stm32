@@ -14,7 +14,14 @@ static bool e2_cal_abort = false;
 static bool e2_cal_joy = true;           // джойстик прерывает (калибровка); доводка X в цикле — нет
 static char e2_cal_rx[16];
 
-// Линейки/DRO обновить; заодно смотреть, не пришёл ли от экрана CAL_STOP и не тронут ли джойстик
+// Линейки/DRO обновить; заодно смотреть, не пришёл ли от экрана СТОП (калибровка, G-код) и не тронут ли джойстик
+// Окно приёма — пробелы, не нули: strstr остановился бы на нуле, пока короткая команда его не вытеснит
+static void e2_cal_rx_clear(void)
+{
+   memset(e2_cal_rx, ' ', sizeof(e2_cal_rx) - 1);
+   e2_cal_rx[sizeof(e2_cal_rx) - 1] = 0;
+}
+
 static void e2_cal_poll(void)
 {
    e2_pos_update();
@@ -22,7 +29,7 @@ static void e2_cal_poll(void)
       memmove(e2_cal_rx, e2_cal_rx + 1, sizeof(e2_cal_rx) - 2);
       e2_cal_rx[sizeof(e2_cal_rx) - 2] = (char)DISPLAY_UART.read();
       e2_cal_rx[sizeof(e2_cal_rx) - 1] = 0;
-      if (strstr(e2_cal_rx, "CAL_STOP")) e2_cal_abort = true;
+      if (strstr(e2_cal_rx, "STOP>")) e2_cal_abort = true;    // <TOUCH:CAL_STOP> / <GCODE:STOP>
    }
    if (e2_cal_joy && (Joy_Read & 0x0F) != 0x0F) e2_cal_abort = true;
 }
@@ -74,7 +81,7 @@ static const char* e2_calibrate(char ax, int32_t len_um, int32_t* screw_um, int3
    bool ena = ax == 'Z' ? Read_Z_Ena_State : Read_X_Ena_State;
    if (!ena) { if (ax == 'Z') Motor_Z_Enable(); else Motor_X_Enable(); }
    e2_cal_abort = false;
-   memset(e2_cal_rx, 0, sizeof(e2_cal_rx));
+   e2_cal_rx_clear();
 
    double k_sum = 0, b_sum = 0; int k_n = 0, b_n = 0;
    int32_t s_prev = 0; bool have_prev = false;
@@ -158,7 +165,7 @@ void e2_cal_step_from_display(const char* prm)
       bool ena = ax == 'Z' ? Read_Z_Ena_State : Read_X_Ena_State;
       if (!ena) { if (ax == 'Z') Motor_Z_Enable(); else Motor_X_Enable(); }
       e2_cal_abort = false; e2_cal_joy = true;
-      memset(e2_cal_rx, 0, sizeof(e2_cal_rx));
+      e2_cal_rx_clear();
       if (phase == 1)      { e2_cal_move(ax, -one); e2_cal_move(ax, one); }
       else if (phase == 2) e2_cal_move(ax, steps);
       else                 e2_cal_move(ax, -steps);

@@ -209,9 +209,15 @@ static void spindle_edge() {
     if (!cw && spindle_phase == 0) spindle_lines--;
 }
 
+// Отложенная строка с дисплея: придёт в UART в момент s_later_t (посреди блокирующего движения)
+static std::string s_later;
+static uint64_t s_later_t = 0;
+static void inject_later(const std::string& str, double ms) { s_later = str; s_later_t = t_ns + (uint64_t)(ms * 1e6); }
+
 // Продвинуть время до t_end, обрабатывая события
 static void run_until(uint64_t t_end, bool allow_loop) {
     for (;;) {
+        if (!s_later.empty() && t_ns >= s_later_t) { if (getenv("SIM_LATERDBG")) printf("      [later] t=%.3f %s", t_ns / 1e9, s_later.c_str()); DISPLAY_UART.inject(s_later); s_later.clear(); }
         uint64_t nxt = t_end; int ev = -1;
         for (int i = 0; i < 3; i++) if (s_timers[i].cb) {
             if (!s_ts[i].t_cnt0) s_ts[i].t_cnt0 = t_ns;       // таймер только что запущен
@@ -638,6 +644,59 @@ static void test_physical_dupes() {
     SelectMenu = 1; SET_IN(E2_PIN_HAND_X1, 1); g_stub_scale_present[1] = 0; run_ms(50);
 #endif
     controls_neutral(); run_ms(50);
+}
+
+// G-код (BACKLOG-001): строки <GCODE:…> в режиме M8, ответ <OK> / <ERR:…>
+static std::string gcode(const char* line, double ms = 200) {
+    size_t o = DISPLAY_UART.out.size();
+    DISPLAY_UART.inject(std::string("<GCODE:") + line + ">\n"); run_ms(ms);
+    size_t p = DISPLAY_UART.out.find("<OK>", o), e = DISPLAY_UART.out.find("<ERR:", o);
+    if (e != std::string::npos && (p == std::string::npos || e < p))
+        return DISPLAY_UART.out.substr(e + 5, DISPLAY_UART.out.find('>', e) - e - 5);
+    return p != std::string::npos ? "OK" : "НЕТ ОТВЕТА";
+}
+static void test_gcode() {
+#if ELS_POS_SOURCE == POS_SOURCE_STEPS
+    printf("[%7.1f с] [gcode] ", t_ns / 1e9); printf("G-код: M8, G0/G1/G91/G2, стоп, упоры\n");
+    controls_neutral(); select_mode(1); run_ms(100);
+    std::string r = gcode("G0 Z-1");
+    CHECK(r.find("M8") != std::string::npos, "вне M8 принято: %s", r.c_str());
+    select_mode(8); run_ms(200);
+    touch("AXIS:Z:0"); touch("AXIS:X:0"); run_ms(50);
+    CHECK(gcode("G21 G90 G7") == "OK", "модальные не приняты");
+    r = gcode("G0 Z-5 X4", 3000);
+    CHECK(r == "OK" && shown_z() == -5000 && shown_x() == 2000, "G0 Z-5 X4(⌀): %s, Z=%ld X=%ld", r.c_str(), shown_z(), shown_x());
+    r = gcode("G1 Z-10 F300", 4000);
+    CHECK(r == "OK" && shown_z() == -10000, "G1 Z-10: %s, Z=%ld", r.c_str(), shown_z());
+    r = gcode("G91 G1 X-1 F120", 3000); gcode("G90");
+    CHECK(r == "OK" && shown_x() == 1500, "G91 X-1(⌀): %s, X=%ld (ожидалось 1500 — радиус)", r.c_str(), shown_x());
+    gcode("G0 Z0 X0", 5000);
+    r = gcode("G2 Z-5 X10 R5", 8000);                          // четверть окружности: (0,0) → (−5, 5 радиус)
+    CHECK(r == "OK" && shown_z() == -5000 && shown_x() == 5000, "G2 R5: %s, Z=%ld X=%ld", r.c_str(), shown_z(), shown_x());
+    // стоп посреди хода: STOP уже в буфере, когда начинается движение
+    long z0 = Motor_Z_Pos;
+    size_t o = DISPLAY_UART.out.size();
+    inject_later("<GCODE:STOP>\n", 1500);                    // «Стоп» на веб-странице через 1.5 с хода
+    if (getenv("SIM_LATERDBG")) printf("      [later] запланировано на t=%.3f\n", s_later_t / 1e9);
+    DISPLAY_UART.inject("<GCODE:G1 Z-40 F200>\n"); run_ms(4000);
+    CHECK(DISPLAY_UART.out.find("ОСТАНОВЛЕНО", o) != std::string::npos && Motor_Z_Pos != z0 &&
+          labs(Motor_Z_Pos - z0) < lround(35.0 / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z),
+          "стоп посреди хода не сработал (Z %+ld шагов)", Motor_Z_Pos - z0);
+    // упор: левый поставлен в текущей точке — дальше влево (Z+) нельзя
+    gcode("G0 Z0 X0", 15000);
+    select_mode(1); SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
+    bool lim = limit_Left_flag;
+    select_mode(8); run_ms(200);
+    r = gcode(Limit_Pos_Left > Motor_Z_Pos - 4 ? "G0 Z-20" : "G0 Z20", 200);   // за упор — в сторону роста Motor_Z_Pos
+    long zl = Motor_Z_Pos;
+    std::string r2 = gcode(shown_z() < 0 ? "G0 Z5" : "G0 Z-5", 200);
+    CHECK(!lim || r2.find("УПОР") != std::string::npos || r.find("УПОР") != std::string::npos,
+          "движение за упор принято (%s / %s, упор %d)", r.c_str(), r2.c_str(), lim);
+    (void)zl;
+    select_mode(1); SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
+    printf("    G0/G1/G91/G2 — в цель, стоп — %s\n", "есть");
+    controls_neutral(); run_ms(100);
+#endif
 }
 
 static void test_hand() {
@@ -1368,6 +1427,7 @@ int main() {
     test_steploss();
     test_cal_step();
     test_physical_dupes();
+    test_gcode();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();

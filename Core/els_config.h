@@ -139,6 +139,11 @@
 #define STEP_LOSS_TOL_UM            150
 #endif
 
+// G-код (режим M8, docs/GCODE.md): скорость ускоренного хода G0, мм/мин
+#ifndef GCODE_RAPID_MM_MIN
+#define GCODE_RAPID_MM_MIN          600
+#endif
+
 #ifndef BACKLASH_Z_UM
 #define BACKLASH_Z_UM        0        // люфт продольного винта (Z), мкм; 0 — без компенсации
 #endif

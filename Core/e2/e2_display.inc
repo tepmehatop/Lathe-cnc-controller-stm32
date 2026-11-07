@@ -512,9 +512,9 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     }
     return;
   }
-  // [STM32] GCODE:<строка> — вкладка GCode дисплея. В 7e2 исполнителя G-кода нет: отказ, чтобы дисплей не ждал
+  // [STM32] GCODE:<строка> — G-код с дисплея (файлы — веб-страница дисплея), исполнитель — e2_gcode.inc
   if (cmd == "GCODE") {
-    Display_Send_CMD("ERR", "GCODE не поддерживается");
+    e2_gcode_line(prm.c_str());
     return;
   }
   if (cmd == "READY") {

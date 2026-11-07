@@ -152,6 +152,8 @@ void e2_mech_from_display(const char* prm);   // CFG_SET / CFG_DEFAULT
 void e2_pos_send(void);                // <POS:…> — источник координат и линейки
 void e2_pos_from_display(const char* prm);    // POS_SET / POS_DEFAULT (сохранить и перезапустить)
 void e2_cal_from_display(const char* prm);
+void e2_gcode_line(const char* line);    // <GCODE:…> — строка G-кода (BACKLOG-001)
+void e2_gcode_reset(void);
 void e2_cal_step_from_display(const char* prm);   // CAL_STEP:<Z|X>:<фаза>:<мкм> — калибровка по индикатору
 void e2_scale_reref(void);             // линейки: новая опорная точка (BACKLOG-025)
 void e2_scale_track(void);

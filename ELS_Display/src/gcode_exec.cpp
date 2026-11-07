@@ -9,7 +9,8 @@
 #include <LittleFS.h>
 #include <Arduino.h>
 
-#define ACK_TIMEOUT_MS 5000
+// Строка — одно движение на STM32: длинный проход идёт минутами. Без ответа 10 мин — продолжить (без STM32)
+#define ACK_TIMEOUT_MS 600000
 
 static GcSendFn  s_send_fn   = nullptr;
 static GcExecSt  s_state     = GCE_IDLE;
@@ -115,6 +116,8 @@ bool GCodeExec_Run(const char* filepath) {
 }
 
 void GCodeExec_Stop() {
+    // STM32 исполняет строку — остановить движение (он ищет «STOP>» во входящих байтах)
+    if (s_send_fn && (s_state == GCE_WAITING_ACK || s_state == GCE_RUNNING || s_state == GCE_PAUSED)) s_send_fn("STOP");
     close_file();
     s_state = GCE_IDLE;
     Serial.println("[gce] Stopped");

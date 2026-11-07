@@ -938,6 +938,7 @@ void e2_diam_from_keys(long mx0)
 
 void e2_axis_set(char axis, int32_t um)
 {
+   e2_gcode_reset();                          // показание оси сменилось — опорная точка G-кода заново
    if (e2_pos.source == POS_SOURCE_DRO_UART) return;
    if (e2_pos.source == POS_SOURCE_SCALES) {
       if (axis == 'D' && DRV_Scales_Present(SCALE_AXIS_X)) {
@@ -956,6 +957,32 @@ void e2_axis_set(char axis, int32_t um)
    if (axis == 'Z')      Z_pos  = -lroundf(um / 10.0f * spu_z);
    else if (axis == 'X') X_pos  = -lroundf(um / 10.0f * spu_x);
    else if (axis == 'D') MX_pos = -lroundf(um / 10.0f * spu_x / 2);
+}
+
+// [STM32] Позиции Size_*_mm / MSize_X_mm — как в loop() автора (там они и считались). Вынесено, чтобы
+// обновлять экран и во время блокирующих движений (G-код, BACKLOG-001).
+void e2_pos_refresh(void)
+{
+  if (e2_pos.source != POS_SOURCE_STEPS) {      // [STM32] источник — из настроек (было #ifdef USE_DRO_HS800)
+  e2_pos_update();                             // [STM32] вместо DRO_Process(): dro_pos_x/y от блока DRO или линеек
+  {
+    // Print.ino показывает минус когда переменная ПОЛОЖИТЕЛЬНАЯ (инвертированная логика).
+    // Инвертируем оба знака чтобы на LCD и ESP32 отображалось то же что на HS800-2.
+    int32_t new_x = -(dro_pos_x / 10L);
+    int32_t new_z = -(dro_pos_y / 10L);
+    int32_t new_d = -(e2_diam_um / 10L);
+    if (new_x != Size_X_mm || new_z != Size_Z_mm || new_d != MSize_X_mm) {
+      Size_X_mm  = new_x;
+      Size_Z_mm  = new_z;
+      MSize_X_mm = new_d;                      // [STM32] диаметр со своим нулём (было −dro_pos_x/5)
+      Display_On_Position_Change();
+    }
+  }
+  } else {
+  MSize_X_mm = MX_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X / 2 * McSTEP_X);   //перерасчёт в миллиметры диаметр заготовки
+  Size_X_mm  = X_pos  / ((float)MOTOR_X_STEP_PER_REV / SCREW_X     * McSTEP_X);   //перерасчёт в миллиметры X
+  Size_Z_mm  = Z_pos  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z     * McSTEP_Z);   //перерасчёт в миллиметры Z
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -999,26 +1026,7 @@ void loop()
   lcd.flush();                                 // [STM32] вывод изменений на LCD2004 (не дольше 2 мс)
   e2_service();                                // [STM32] обороты, LCD2004-строка для тестов, линейки
  
-  if (e2_pos.source != POS_SOURCE_STEPS) {      // [STM32] источник — из настроек (было #ifdef USE_DRO_HS800)
-  e2_pos_update();                             // [STM32] вместо DRO_Process(): dro_pos_x/y от блока DRO или линеек
-  {
-    // Print.ino показывает минус когда переменная ПОЛОЖИТЕЛЬНАЯ (инвертированная логика).
-    // Инвертируем оба знака чтобы на LCD и ESP32 отображалось то же что на HS800-2.
-    int32_t new_x = -(dro_pos_x / 10L);
-    int32_t new_z = -(dro_pos_y / 10L);
-    int32_t new_d = -(e2_diam_um / 10L);
-    if (new_x != Size_X_mm || new_z != Size_Z_mm || new_d != MSize_X_mm) {
-      Size_X_mm  = new_x;
-      Size_Z_mm  = new_z;
-      MSize_X_mm = new_d;                      // [STM32] диаметр со своим нулём (было −dro_pos_x/5)
-      Display_On_Position_Change();
-    }
-  }
-  } else {
-  MSize_X_mm = MX_pos / ((float)MOTOR_X_STEP_PER_REV / SCREW_X / 2 * McSTEP_X);   //перерасчёт в миллиметры диаметр заготовки
-  Size_X_mm  = X_pos  / ((float)MOTOR_X_STEP_PER_REV / SCREW_X     * McSTEP_X);   //перерасчёт в миллиметры X
-  Size_Z_mm  = Z_pos  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z     * McSTEP_Z);   //перерасчёт в миллиметры Z
-  }
+  e2_pos_refresh();                            // [STM32] позиции для LCD2004 и экрана (шаги / блок DRO / линейки)
   OTSKOK_Z_mm  = OTSKOK_Z  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры отскок
   TENSION_Z_mm = TENSION_Z / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры натяг
   
@@ -2234,3 +2242,4 @@ void e2_service(void)
 #include "orig/aFeed.ino"
 #include "e2_calib.inc"                     // [STM32] калибровка по линейкам (BACKLOG-029)
 #include "e2_scalefix.inc"                  // [STM32] линейки в автоциклах (BACKLOG-025)
+#include "e2_gcode.inc"                     // [STM32] исполнитель G-кода (BACKLOG-001)

@@ -578,7 +578,7 @@ static const char* const MODE_STRS[] = {
     "\xD0\x9A\xD0\x9E\xD0\x9D\xD0\xA3\xD0\xA1 >",                        // КОНУС >
     "\xD0\xA8\xD0\x90\xD0\xA0",                                            // ШАР
     "\xD0\x94\xD0\x95\xD0\x9B\xD0\x98\xD0\x9B\xD0\x9A\xD0\x90",          // ДЕЛИЛКА
-    "\xD0\xA0\xD0\x95\xD0\x97\xD0\x95\xD0\xA0\xD0\x92",                  // РЕЗЕРВ
+    "G-\xD0\x9A\xD0\x9E\xD0\x94",                                  // G-КОД (M8; у автора — «Резерв», BACKLOG-001)
 };
 
 static const char* const SUBMODE_STRS[] = {
@@ -1110,7 +1110,7 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
 static bool rows_show_axes()
 {
     switch (uart_protocol.getData().select_menu) {
-        case 1:  return s_last_mode != MODE_DIVIDER && s_last_mode != MODE_RESERVE;
+        case 1:  return s_last_mode != MODE_DIVIDER;                 // M8 (G-код) — тоже: ноль перед программой
         case 2:  return s_last_mode == MODE_FEED;
         case 3:  return s_last_mode != MODE_FEED && s_last_mode != MODE_RESERVE;
     }
@@ -3290,10 +3290,8 @@ static void apply_mode_layout(LatheMode mode)
             lv_label_set_text(g_ui.primary_unit,
                 "\xD0\xA3\xD0\x93\xD0\x9E\xD0\x9B \xC2\xB0");              // УГОЛ °
             break;
-        case MODE_RESERVE:
-            lv_label_set_text(g_ui.primary_unit,
-                "\xD0\xA0\xD0\x95\xD0\x96\xD0\x98\xD0\x9C "
-                "\xD0\x9D\xD0\x95\xD0\x94\xD0\x9E\xD0\xA1\xD0\xA2\xD0\xA3\xD0\x9F\xD0\x95\xD0\x9D");  // РЕЖИМ НЕДОСТУПЕН
+        case MODE_RESERVE:                                         // M8 — G-код (BACKLOG-001)
+            lv_label_set_text(g_ui.primary_unit, "G-\xD0\x9A\xD0\x9E\xD0\x94");
             break;
         default:
             lv_label_set_text(g_ui.primary_unit, "---");
@@ -3452,14 +3450,14 @@ static void apply_mode_layout(LatheMode mode)
             if (g_ui.row4_box) lv_obj_add_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             break;
 
-        case MODE_RESERVE:
+        case MODE_RESERVE:                                         // M8 — G-код: позиции и строка программы
             lv_label_set_text(g_ui.secondary_unit, "");
-            lv_label_set_text(g_ui.row1_title, "");
-            lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x4a6a7a), 0);
-            lv_label_set_text(g_ui.row2_title, "");
-            lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x4a6a7a), 0);
-            lv_label_set_text(g_ui.row3_title, "");
-            lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x4a6a7a), 0);
+            lv_label_set_text(g_ui.row1_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);   // ПОЗИЦИЯ Y
+            lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
+            lv_label_set_text(g_ui.row2_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);   // ПОЗИЦИЯ X
+            lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
+            lv_label_set_text(g_ui.row3_title, "\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x9A\xD0\x90");
+            lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x6a9fb5), 0);
             if (g_ui.row4_box) lv_obj_add_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             break;
         default:
@@ -4739,6 +4737,32 @@ static void apply_sm_layout(LatheMode mode, uint8_t sm)
     }
 }
 
+// M8 — G-код: состояние программы (исполнитель на дисплее, файлы — веб-страница), строка и процент
+static void gcode_status_update()
+{
+    char b[48], l[32];
+    GcExecSt st = GCodeExec_GetState();
+    const char* t; uint32_t col = 0x00d4ff;
+    switch (st) {
+        case GCE_RUNNING: case GCE_WAITING_ACK: case GCE_DWELL:
+            snprintf(b, sizeof(b), "N%d", GCodeExec_GetLine()); t = b; col = 0x00ff88; break;
+        case GCE_PAUSED: t = "\xD0\x9F\xD0\x90\xD0\xA3\xD0\x97\xD0\x90"; col = 0xffcc00; break;
+        case GCE_DONE:   t = "\xD0\x93\xD0\x9E\xD0\xA2\xD0\x9E\xD0\x92\xD0\x9E"; col = 0x00ff88; break;
+        case GCE_ERROR:  t = "\xD0\x9E\xD0\xA8\xD0\x98\xD0\x91\xD0\x9A\xD0\x90"; col = 0xff5555; break;
+        default:         t = "\xD0\x93\xD0\x9E\xD0\xA2\xD0\x9E\xD0\x92"; break;
+    }
+    lv_label_set_text(g_ui.primary_val, t);
+    if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, t);
+    lv_obj_set_style_text_color(g_ui.primary_val, lv_color_hex(col), 0);
+    if (st == GCE_IDLE) snprintf(l, sizeof(l), "--");
+    else snprintf(l, sizeof(l), "%d  %d%%", GCodeExec_GetLine(), GCodeExec_GetProgress());
+    lv_label_set_text(g_ui.row3_val, st == GCE_ERROR ? GCodeExec_GetError() : l);
+    lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(st == GCE_ERROR ? 0xff5555 : 0xe0e0e0), 0);
+    const char* f = GCodeExec_GetFilename();
+    snprintf(b, sizeof(b), "G-\xD0\x9A\xD0\x9E\xD0\x94%s%s", f && *f ? ": " : "", f && *f ? (strrchr(f, '/') ? strrchr(f, '/') + 1 : f) : "");
+    lv_label_set_text(g_ui.primary_unit, b);
+}
+
 static void update_ui_values(const LatheData& data)
 {
     if (!g_ui.primary_val) return;  // UI не инициализирован
@@ -5229,6 +5253,8 @@ static void update_ui_values(const LatheData& data)
             lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(0x555555), 0);
             break;
     }
+
+    if (data.mode == MODE_RESERVE) gcode_status_update();   // M8 — G-код: поверх общих значений
 }
 
 // ============================================================================
@@ -6072,6 +6098,7 @@ void setup()
         uart_protocol.sendGCodeLine(line);
     });
     uart_protocol.setGCodeResponseCallback([](bool ok, const char* err) {
+        Serial.printf("[GC] %s%s\n", ok ? "OK" : "ERR:", ok ? "" : (err ? err : "?"));   // стенд читает ответ
         GCodeExec_OnAck(ok, err);
     });
 
@@ -6172,7 +6199,10 @@ void loop()
                     if (c == '>') {
                         usb_inj_buf[usb_inj_len - 1] = '\0';  // без '>'
                         int tx, ty, tms = 120;
-                        if (strncmp(usb_inj_buf, "<BTN:", 5) == 0) {
+                        if (strncmp(usb_inj_buf, "<GCLINE:", 8) == 0) {      // стенд: строка G-кода в STM32
+                            uart_protocol.sendGCodeLine(usb_inj_buf + 8);
+                            Serial.printf("[GCLINE→STM32] %s\n", usb_inj_buf + 8);
+                        } else if (strncmp(usb_inj_buf, "<BTN:", 5) == 0) {
                             uart_protocol.sendButtonPress(usb_inj_buf + 5);
                             Serial.printf("[BTN→STM32] TOUCH:%s\n", usb_inj_buf + 5);
                         } else if (sscanf(usb_inj_buf, "<TAP:%d,%d,%d", &tx, &ty, &tms) >= 2) {
