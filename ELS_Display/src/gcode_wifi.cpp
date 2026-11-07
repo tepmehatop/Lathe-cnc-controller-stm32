@@ -148,7 +148,7 @@ li span{flex:1}
 <h2>Файлы GCode</h2>
 <ul id="fl"><li><span>Загрузка...</span></li></ul>
 <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
-<input type="file" id="fi" accept=".gcode,.nc,.tap,.txt">
+<input type="file" id="fi" accept=".gcode,.nc,.ngc,.tap,.txt">
 <button onclick="up()">Загрузить</button>
 </div>
 <div id="prog"></div>
@@ -161,8 +161,7 @@ li span{flex:1}
 </div>
 
 <script>
-const PORT=8080;
-const BASE='http://'+location.hostname+':'+PORT;
+const BASE='';  // тот же адрес и порт, что у страницы (раньше — жёстко :8080, а сервер на 80)
 
 // ─── Статус WiFi ─────────────────────────────────────────────────────────────
 async function loadSt(){
@@ -727,6 +726,9 @@ static void wait_coprocessor() {
 #endif
 }
 
+static void sta_connect();
+static uint32_t s_retry_t = 0;   // последняя попытка begin() — повтор каждые 10 с в окне подключения
+
 static void wifi_init_impl() {
     // Причина отказа подключения к роутеру — в лог (коды wifi_err_reason_t:
     // 15/202/204 — пароль/рукопожатие, 201 — сеть не найдена)
@@ -747,20 +749,36 @@ static void wifi_init_impl() {
     sta_load();
     const char* ssid = s_sta_ssid;
     if (ssid && ssid[0] != '\0') {
-        Serial.printf("[gcode] WiFi STA → %s\n", ssid);
+        Serial.printf("[gcode] WiFi STA → %s (пароль: %u симв.)\n", ssid, (unsigned)strlen(s_sta_pass));
         wait_coprocessor();
         WiFi.persistent(false);
         WiFi.setAutoReconnect(false);
-        WiFi.disconnect(true);
-        delay(500);
-        WiFi.mode(WIFI_STA);
-        WiFi.setSleep(false);
-        WiFi.begin(ssid, s_sta_pass);
-        s_state  = GCW_CONNECTING;
-        s_conn_t = millis();
+        sta_connect();
     } else {
         start_ap();
     }
+}
+
+// Подключение к роутеру — одна последовательность для старта, повтора из точки доступа и ввода с экрана
+// (раньше при старте и повторе была другая: после перезагрузки дисплей не подключался, а с экрана — да)
+static void sta_connect() {
+    if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
+    WiFi.softAPdisconnect(true);
+    WiFi.disconnect(true);
+    delay(200);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    // 10.1" (ESP32-P4 + C6 через esp_hosted, слейв 2.1.10): без поиска сетей перед begin() подключение не
+    // начинается вовсе (после перезагрузки — «disconnected» и тишина); с экрана работало, потому что экран
+    // Wi-Fi сначала ищет сети
+    int n = WiFi.scanNetworks();
+    Serial.printf("[wifi] перед подключением: сетей %d\n", n);
+    WiFi.scanDelete();
+    delay(1000);
+    WiFi.begin(s_sta_ssid, s_sta_pass);
+    s_state  = GCW_CONNECTING;
+    s_conn_t = millis();
+    s_retry_t = millis();
 }
 
 // Запросы экрана: новая сеть роутера / «забыть», поиск сетей
@@ -777,17 +795,11 @@ static void wifi_screen_requests() {
         Preferences p;
         if (p.begin("wifi", false)) { p.putString("ssid", s_sta_ssid); p.putString("pass", s_sta_pass); p.end(); }
         Serial.printf("[wifi] сеть роутера с экрана: %s\n", s_sta_ssid[0] ? s_sta_ssid : "(нет — только точка доступа)");
-        if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
-        WiFi.softAPdisconnect(true);
-        WiFi.disconnect(true);
-        delay(200);
-        if (s_sta_ssid[0]) {
-            WiFi.mode(WIFI_STA);
-            WiFi.setSleep(false);
-            WiFi.begin(s_sta_ssid, s_sta_pass);
-            s_state  = GCW_CONNECTING;
-            s_conn_t = millis();
-        } else {
+        if (s_sta_ssid[0]) sta_connect();
+        else {
+            if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
+            WiFi.disconnect(true);
+            delay(200);
             start_ap();
         }
     }
@@ -823,6 +835,15 @@ static void wifi_process_impl() {
 
     // Состояния WiFi
     if (s_state == GCW_CONNECTING) {
+        if (WiFi.status() != WL_CONNECTED && millis() - s_retry_t > 10000 &&
+            millis() - s_conn_t < WIFI_STA_TIMEOUT_MS - 5000) {
+            // C6 (esp_hosted) иногда «забывает» первую попытку — повторить, не дожидаясь перехода в AP
+            s_retry_t = millis();
+            Serial.println("[wifi] повтор подключения");
+            WiFi.disconnect(false);
+            delay(300);
+            WiFi.begin(s_sta_ssid, s_sta_pass);
+        }
         if (WiFi.status() == WL_CONNECTED) {
             IPAddress ip = WiFi.localIP();
             if (ip[0] == 0) return;
@@ -873,14 +894,7 @@ static void wifi_process_impl() {
         if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
             Serial.println("[gcode] AP → retrying STA...");
             log_hosted_versions();
-            if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
-            WiFi.softAPdisconnect(true);
-            delay(100);
-            WiFi.mode(WIFI_STA);
-            WiFi.setSleep(false);
-            WiFi.begin(ssid, s_sta_pass);
-            s_state  = GCW_CONNECTING;
-            s_conn_t = millis();
+            sta_connect();
         }
     }
 }

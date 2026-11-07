@@ -3261,6 +3261,8 @@ static void apply_common_sm3_layout()
 // ============================================================================
 static void apply_mode_layout(LatheMode mode)
 {
+    // M8 (G-код) — в основном поле слова (ГОТОВ, ПАУЗА…): tahoma 40 содержит только цифры и пару букв
+    lv_obj_set_style_text_font(g_ui.primary_val, mode == MODE_RESERVE ? &font_tahoma_bold_28 : &font_tahoma_bold_40, 0);
     // Выходим из редактирования если активно (скрывает стрелки и восстанавливает цвет)
     if (g_edit_param.active) exit_edit_mode();
 
@@ -4756,7 +4758,12 @@ static void gcode_status_update()
     lv_obj_set_style_text_color(g_ui.primary_val, lv_color_hex(col), 0);
     if (st == GCE_IDLE) snprintf(l, sizeof(l), "--");
     else snprintf(l, sizeof(l), "%d  %d%%", GCodeExec_GetLine(), GCodeExec_GetProgress());
-    lv_label_set_text(g_ui.row3_val, st == GCE_ERROR ? GCodeExec_GetError() : l);
+    // ячейка узкая — причина ошибки целиком в сообщении (один раз при переходе в ошибку)
+    static GcExecSt s_prev = GCE_IDLE;
+    if (st == GCE_ERROR && s_prev != GCE_ERROR) show_alert(GCodeExec_GetError());
+    s_prev = st;
+    lv_label_set_text(g_ui.row3_val, st == GCE_ERROR ? "\xD0\x9E\xD0\xA8\xD0\x98\xD0\x91\xD0\x9A\xD0\x90" : l);
+    lv_label_set_long_mode(g_ui.row3_val, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(st == GCE_ERROR ? 0xff5555 : 0xe0e0e0), 0);
     const char* f = GCodeExec_GetFilename();
     snprintf(b, sizeof(b), "G-\xD0\x9A\xD0\x9E\xD0\x94%s%s", f && *f ? ": " : "", f && *f ? (strrchr(f, '/') ? strrchr(f, '/') + 1 : f) : "");

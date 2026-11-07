@@ -22,7 +22,8 @@
 struct E2Gc {
    bool  abs = true, diam = true;     // G90 / G7
    float unit = 1.0f;                 // мм на единицу (G21 — 1, G20 — 25.4)
-   float feed = 100;                  // F, мм/мин
+   float feed = 100;                  // F: мм/мин или мм/об (per_rev)
+   bool  per_rev = false;             // G95 / G99 (Fanuc) — подача на оборот
    int   motion = 0;                  // модальное G0/G1/G2/G3
    float z = 0, x = 0;                // текущее положение программы, мм (x — радиус)
    bool  known = false;               // опорная точка снята
@@ -131,8 +132,14 @@ static const char* e2_gc_exec(const char* line)
          case 21: e2_gc.unit = 1.0f;  break;
          case 90: e2_gc.abs = true;   break;
          case 91: e2_gc.abs = false;  break;
-         case 94: break;
-         case 95: return "G95 (ПОДАЧА НА ОБОРОТ) НЕ ПОДДЕРЖИВАЕТСЯ";
+         case 94: case 98: e2_gc.per_rev = false; break;              // мм/мин (ISO / Fanuc)
+         case 95: case 99: e2_gc.per_rev = true;  break;              // мм/об — по оборотам шпинделя
+         case 50: {                                                   // Fanuc: S — предел оборотов; X/Z — смена координат
+            float t;
+            if (e2_gc_word(line, 'X', &t) || e2_gc_word(line, 'Z', &t)) return "G50 X/Z (СМЕНА КООРДИНАТ) НЕ ПОДДЕРЖИВАЕТСЯ";
+            return nullptr;
+         }
+         case 96: case 97: break;                                     // скорость резания / обороты — шпиндель вручную
          case 28: {
             const char* err = e2_gc_goto(e2_gc.z, 0, GCODE_RAPID_MM_MIN);
             return err ? err : e2_gc_goto(0, 0, GCODE_RAPID_MM_MIN);
@@ -148,7 +155,13 @@ static const char* e2_gc_exec(const char* line)
    float tz = hz ? (e2_gc.abs ? z : e2_gc.z + z) : e2_gc.z;
    float tx = hx ? (e2_gc.abs ? x : e2_gc.x + x) : e2_gc.x;
    if (e2_gc.motion == 0) return e2_gc_goto(tz, tx, GCODE_RAPID_MM_MIN);
-   if (e2_gc.motion == 1) return e2_gc_goto(tz, tx, e2_gc.feed);
+   // подача на оборот: мм/мин = F × обороты (обороты меряются раз в 250 мс; синхронизации со шпинделем нет)
+   float feed = e2_gc.feed;
+   if (e2_gc.per_rev && e2_gc.motion) {
+      if (e2_rpm == 0) return "ВКЛЮЧИТЕ ШПИНДЕЛЬ (ПОДАЧА НА ОБОРОТ)";
+      feed = e2_gc.feed * e2_rpm;
+   }
+   if (e2_gc.motion == 1) return e2_gc_goto(tz, tx, feed);
    // дуга: центр — I (по X, радиус) и K (по Z) от начала, или R
    float ci, ck;
    bool hi = e2_gc_word(line, 'I', &ci), hk = e2_gc_word(line, 'K', &ck), hr;
@@ -177,7 +190,7 @@ static const char* e2_gc_exec(const char* line)
    for (int i = 1; i <= segs; i++) {
       float a = a0 + da * i / segs;
       float pz = i == segs ? tz : cz + rad * cosf(a), px = i == segs ? tx : cx + rad * sinf(a);
-      const char* err = e2_gc_goto(pz, px, e2_gc.feed);
+      const char* err = e2_gc_goto(pz, px, feed);
       if (err) return err;
    }
    return nullptr;
@@ -189,6 +202,7 @@ void e2_gcode_line(const char* line)
    const char* err = nullptr;
    while (*line == ' ') line++;
    if (!strcmp(line, "STOP")) { Display_Send_CMD("OK", nullptr); return; }   // стоп между строками — уже стоим
+   if (*line == 'O' || *line == '%') { Display_Send_CMD("OK", nullptr); return; }   // номер программы, начало/конец ленты
    static int s_mode = -1;
    if (Mode != s_mode) { s_mode = Mode; e2_gc.known = false; }      // вошли в M8 — опорная точка заново
    if (Mode != Mode_Reserve) err = "ВКЛЮЧИТЕ РЕЖИМ M8 (G-КОД)";

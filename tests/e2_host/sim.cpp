@@ -1395,6 +1395,32 @@ int main() {
         }
         return 0;
     }   // проверки — под механику автора
+    // SIM_GCFILE=файл — прогнать программу G-кода в M8, как исполнитель дисплея (без комментариев; M0/M2/M30/G4 —
+    // на дисплее). Шпиндель 600 об/мин (подача на оборот). Печать: каждая строка — ответ и положение.
+    if (const char* gf = getenv("SIM_GCFILE")) {
+        controls_neutral(); select_mode(8); run_ms(200);
+        touch("AXIS:Z:0"); touch("AXIS:X:0"); spindle(600); run_ms(500);
+        FILE* f = fopen(gf, "r"); if (!f) { printf("нет файла %s\n", gf); return 1; }
+        char raw[256]; int n = 0, bad = 0;
+        while (fgets(raw, sizeof raw, f)) {
+            std::string l; bool par = false;
+            for (char* c = raw; *c && *c != ';' && *c != '\n' && *c != '\r'; c++) {
+                if (*c == '(') { par = true; continue; } if (*c == ')') { par = false; continue; }
+                if (!par) l += (char)toupper((unsigned char)*c);
+            }
+            while (!l.empty() && l[0] == ' ') l.erase(0, 1);
+            if (l.empty()) continue;
+            n++;
+            if (l.find("M30") != std::string::npos || l.find("M02") != std::string::npos || l.find("M2 ") == 0) break;
+            std::string r = gcode(l.c_str(), 200);
+            for (int i = 0; i < 600 && r == "НЕТ ОТВЕТА"; i++) { run_ms(500); r = DISPLAY_UART.out.rfind("<OK>") != std::string::npos ? "OK" : r; }
+            printf("  %-28s %-6s Z %8.3f  X(⌀) %8.3f\n", l.c_str(), r.c_str(), shown_z() / 1000.0, shown_x() * 2 / 1000.0);
+            if (r != "OK") bad++;
+        }
+        fclose(f); spindle(0);
+        printf("строк %d, ошибок %d\n", n, bad);
+        return bad ? 1 : 0;
+    }
     if (getenv("SIM_BACKLASH")) {                    // эксперимент: люфт и точность автоциклов
         controls_neutral(); run_ms(200);
         test_backlash();
