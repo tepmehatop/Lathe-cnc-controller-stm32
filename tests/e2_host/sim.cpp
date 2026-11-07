@@ -380,10 +380,12 @@ static void test_feed(int feed) {
     // 7e2: Timer5 срабатывает раз в (OCR5A+1) линий, каждое срабатывание — полшага
     double expect_avr = (double)ENC_LINE_PER_REV / (2.0 * (Feed_Divisor + 1));
     double ideal = feed / 100.0 / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z;
-    CHECK(fabs(spr - expect_avr) < 0.05, "шагов/об %.3f, по формуле 7e2 %.3f", spr, expect_avr);
+    CHECK(fabs(spr - expect_avr) < 0.002 * expect_avr, "шагов/об %.3f, по формуле 7e2 %.3f", spr, expect_avr);
 #if FEED_EXACT
     // BACKLOG-020: подача равна заданной с точностью до округления целого периода таймера
-    CHECK(fabs(spr - ideal) / ideal < 0.03, "подача %.2f: шагов/об %.3f, задано %.3f (FEED_EXACT)", feed / 100.0, spr, ideal);
+    // период таймера — целое число линий: ошибка не больше половины линии на период
+    double period = ENC_LINE_PER_REV / (2.0 * ideal);
+    CHECK(fabs(spr - ideal) / ideal < 0.5 / period + 0.005, "подача %.2f: шагов/об %.3f, задано %.3f (FEED_EXACT)", feed / 100.0, spr, ideal);
 #endif
     printf("    шагов/об %.3f (по формуле: %.3f; задано %.3f)\n", spr, expect_avr, ideal);
     SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800);
@@ -598,7 +600,7 @@ static void test_hand() {
     hand_turn(25, 20); run_ms(1500);
     long dz = Motor_Z_Pos - z0;
     long expect = 25L * HC_SCALE_1 * MOTOR_Z_STEP_PER_REV * McSTEP_Z / SCREW_Z;
-    CHECK(dz == expect, "РГИ Z: %ld шагов, ожидалось %ld", dz, expect);
+    CHECK(labs(dz - expect) <= McSTEP_Z / 2, "РГИ Z: %ld шагов, ожидалось %ld (ядро округляет до полного шага)", dz, expect);
     CHECK(s_z.count - p0 == dz, "по выводу %ld, по счётчику %ld", s_z.count - p0, dz);
     printf("    Z +%ld шагов (ожидалось %ld)\n", dz, expect);
     hand_turn(-25, 20); run_ms(1500);
@@ -631,9 +633,17 @@ static bool setup_z_limits(double len_ms) {
     if (limit_Front_flag) { SET_IN(E2_PIN_LIM_FRONT, 0); run_ms(150); SET_IN(E2_PIN_LIM_FRONT, 1); run_ms(100); }
     if (limit_Rear_flag)  { SET_IN(E2_PIN_LIM_REAR, 0);  run_ms(150); SET_IN(E2_PIN_LIM_REAR, 1);  run_ms(100); }
     SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100);
-    SET_IN(E2_PIN_JOY_RAPID, 0); SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(len_ms); SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
+    // ускоренно влево: len_ms при механике автора; ядро ставит левый упор не ближе тормозного пути
+    // ((MIN_RAPID − MAX_RAPID) × REPEAt × 2 шагов), а ускоренный ход ограничен частотой шагов — при большем
+    // микрошаге он медленнее в мм/с, поэтому ехать, пока не отъедем на тормозной путь с запасом
+    long need = Limit_Pos_Right + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2 * 5 / 4;
+    SET_IN(E2_PIN_JOY_RAPID, 0); SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(len_ms);
+    for (int i = 0; i < 100 && Motor_Z_Pos < need; i++) run_ms(50);
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
     SET_IN(E2_PIN_LIM_LEFT, 0); run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1); run_ms(100);
-    SET_IN(E2_PIN_JOY_RIGHT, 0); run_ms(len_ms + 3000); SET_IN(E2_PIN_JOY_RIGHT, 1); run_ms(1500);
+    SET_IN(E2_PIN_JOY_RIGHT, 0); run_ms(len_ms + 3000);
+    for (int i = 0; i < 200 && Motor_Z_Pos != Limit_Pos_Right; i++) run_ms(50);
+    SET_IN(E2_PIN_JOY_RIGHT, 1); run_ms(1500);
     SET_IN(E2_PIN_JOY_RAPID, 1); run_ms(100);
     return limit_Left_flag && limit_Right_flag && Motor_Z_Pos == Limit_Pos_Right;
 }
@@ -790,7 +800,8 @@ static void test_cone(int idx, double slope) {
     double dx_mm = (Motor_X_Pos - x0) * (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
     double k = fabs(dx_mm / dz_mm);
     double x_step_mm = (SCREW_X / 100.0) / (MOTOR_X_STEP_PER_REV * McSTEP_X);
-    CHECK(fabs(fabs(dx_mm) - slope * fabs(dz_mm)) <= 4 * x_step_mm, "уклон %.4f, ожидалось %.4f (X %.4f мм вместо %.4f)", k, slope, fabs(dx_mm), slope * fabs(dz_mm));
+    // 4 шага X или 0.1 % (делитель конуса хранится с 4 знаками после запятой)
+    CHECK(fabs(fabs(dx_mm) - slope * fabs(dz_mm)) <= fmax(4 * x_step_mm, 0.001 * fabs(dx_mm)), "уклон %.4f, ожидалось %.4f (X %.4f мм вместо %.4f)", k, slope, fabs(dx_mm), slope * fabs(dz_mm));
     printf("    Z %.3f мм, X %.3f мм (радиус), уклон %.4f\n", dz_mm, dx_mm, k);
     spindle(0); run_ms(50);
 }
@@ -900,8 +911,9 @@ static void test_thread_multistart() {
     SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(60000.0 / 200 * 10);
     double spr = steps_per_rev(5);
     SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800); spindle(0); run_ms(50); touch("PH:1");
-    printf("    шагов/об %.2f (ожидалось %d — ход 2.00 мм)\n", spr, 800);
-    CHECK(fabs(spr - 800) < 0.5, "2 захода: шагов/об %.2f", spr);
+    double want = 2.0 / (SCREW_Z / 100.0) * MOTOR_Z_STEP_PER_REV * McSTEP_Z;   // ход 2.00 мм за оборот
+    printf("    шагов/об %.2f (ожидалось %.0f — ход 2.00 мм)\n", spr, want);
+    CHECK(fabs(spr - want) < 0.5, "2 захода: шагов/об %.2f, ожидалось %.0f", spr, want);
 }
 
 // Тахометр: в режиме резьбы (INT0) — импульс на каждый оборот шпинделя
@@ -978,7 +990,9 @@ static void run_cyc(const CycCase& c) {
     s_env_zmin = s_env_zmax = z0; s_env_xmin = s_env_xmax = x0; s_env_on = true;
     SET_IN(E2_PIN_JOY_LEFT, 0);                           // старт: джойстик в сторону реза и держать
     double t = 0;
-    while (!Complete_flag && t < 900000) { run_ms(100); t += 100; }
+    // ускоренный ход ограничен частотой шагов: при микрошаге больше 4 он медленнее в мм/с — больше времени
+    double t_max = 900000.0 * (McSTEP_Z > 4 ? McSTEP_Z / 4.0 * 1.5 : 1.0);
+    while (!Complete_flag && t < t_max) { run_ms(100); t += 100; }
     bool done = Complete_flag;
     run_ms(200);
     std::string lcd_end = lcd_text();

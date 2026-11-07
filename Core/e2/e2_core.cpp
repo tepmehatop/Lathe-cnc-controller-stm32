@@ -392,6 +392,10 @@ byte Mode_Old = 0;
 #define DELAY_INTO_KEYCYCLE  0        // Интервал срабатывания автонажатия кнопок меню.      Значения от 1 до DELAY_ENTER_KEYCYCLE
 #define LINEIKA (MOTOR_X_STEP_PER_REV * McSTEP_X / LIN_X )
 #define TENS    (MOTOR_Z_STEP_PER_REV * McSTEP_Z / SCREW_Z )
+// [STM32] Сдвиг старта следующего захода многозаходной резьбы — на шаг резьбы, точно (у автора — через TENS,
+// целое «шагов на 0.01 мм»: при шагах/винте не кратных теряется дробь), округлено до полного шага, как позиции
+#define E2_THREAD_START_SHIFT \
+   (lround((double)MOTOR_Z_STEP_PER_REV * McSTEP_Z * Thread_Info[Thread_Step].Step * 100 / SCREW_Z / McSTEP_Z) * McSTEP_Z)
 
 enum Mode
 {

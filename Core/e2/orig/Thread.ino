@@ -327,7 +327,7 @@ void Thread_Ext_Left()
       c_flag = false;
       d_flag = false;
       
-      Limit_Pos_Right = (Limit_Pos_Right + (TENS * Thread_Info[Thread_Step].Step)* 100); 
+      Limit_Pos_Right = (Limit_Pos_Right + E2_THREAD_START_SHIFT);   // [STM32] было (TENS * Step)* 100: TENS целое — при винте 1.5 мм сдвиг 1.41 вместо 1.50 мм 
       Thread_Right(c_flag, d_flag);
       Step = 3;
    }
@@ -457,7 +457,7 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
       c_flag = false;
       d_flag = false;
       
-      Limit_Pos_Left = (Limit_Pos_Left - (TENS * Thread_Info[Thread_Step].Step)* 100); 
+      Limit_Pos_Left = (Limit_Pos_Left - E2_THREAD_START_SHIFT);   // [STM32] было (TENS * Step)* 100: TENS целое — при винте 1.5 мм сдвиг 1.41 вместо 1.50 мм 
       Thread_Left(c_flag, d_flag);
       Step = 3;
    }
@@ -588,7 +588,7 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
       c_flag = false;
       d_flag = false;
       
-      Limit_Pos_Right = (Limit_Pos_Right + (TENS * Thread_Info[Thread_Step].Step)* 100);
+      Limit_Pos_Right = (Limit_Pos_Right + E2_THREAD_START_SHIFT);   // [STM32] было (TENS * Step)* 100: TENS целое — при винте 1.5 мм сдвиг 1.41 вместо 1.50 мм
       Thread_Right(c_flag, d_flag);
       Step = 3;
    } 
@@ -720,7 +720,7 @@ void Thread_Int_Right()  ///////////////////////////////////////////////////////
       c_flag = false;
       d_flag = false;
       
-      Limit_Pos_Left = (Limit_Pos_Left - (TENS * Thread_Info[Thread_Step].Step)* 100); 
+      Limit_Pos_Left = (Limit_Pos_Left - E2_THREAD_START_SHIFT);   // [STM32] было (TENS * Step)* 100: TENS целое — при винте 1.5 мм сдвиг 1.41 вместо 1.50 мм 
       Thread_Left(c_flag, d_flag);
       Step = 3;
    }
