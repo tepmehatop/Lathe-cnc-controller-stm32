@@ -95,267 +95,263 @@ static void post_exec_request(GcwReq req, const char* path = nullptr) {
 // ─── HTML ─────────────────────────────────────────────────────────────────────
 
 static const char HTML_PAGE[] = R"rawhtml(<!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ELS GCode</title>
+<title>Токарный станок — G-код</title>
 <style>
+:root{--bg:#0f1420;--card:#171e2d;--line:#263247;--text:#e6ebf3;--dim:#8a97ab;--acc:#3fb6f0;--ok:#43c463;--warn:#f0a330;--err:#ef5350;--done:#ff8a50}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#1a1a2e;color:#e0e0f0;font-family:monospace;padding:10px;font-size:13px}
-h1{color:#4fc3f7;margin-bottom:10px;font-size:17px}
-.bar{background:#0d2137;padding:7px 10px;border-radius:4px;margin-bottom:10px;font-size:12px;color:#aac}
-.sec{background:#16213e;border-radius:6px;padding:10px;margin-bottom:10px}
-h2{color:#7986cb;font-size:13px;margin-bottom:8px;border-bottom:1px solid #2a3a5a;padding-bottom:4px}
-button{background:#1976d2;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px}
-button:hover{background:#1565c0}
-.del{background:#c62828}.del:hover{background:#b71c1c}
-.grn{background:#2e7d32}.grn:hover{background:#1b5e20}
-.org{background:#e65100}.org:hover{background:#bf360c}
-input[type=file]{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:5px;border-radius:4px;font-family:monospace;font-size:12px}
-select{background:#0d2137;color:#e0e0f0;border:1px solid #3a5068;padding:4px 6px;border-radius:4px;font-size:12px;flex:1;min-width:0}
-ul{list-style:none}
-li{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #1e2e40}
-li:last-child{border-bottom:none}
-li span{flex:1}
-#viewer{background:#0a1628;padding:8px;border-radius:4px;white-space:pre;font-size:11px;max-height:280px;overflow:auto}
-#prog{font-size:12px;color:#aaa;margin-top:6px;min-height:16px}
-.tag{font-size:10px;color:#888;margin-left:4px}
-.pbg{background:#0d2137;border-radius:3px;height:8px;margin:6px 0}
-.pf{background:#4fc3f7;height:8px;border-radius:3px;width:0%;transition:width .3s}
-#traj{background:#0a1628;border-radius:4px;display:block;width:100%;height:180px}
-#exst{font-size:12px;min-height:18px;margin-bottom:4px}
+body{background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;padding:14px;max-width:1100px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin-bottom:12px}
+h1{font-size:20px;font-weight:600}
+#net{color:var(--dim);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+h2{font-size:14px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,input[type=file]{background:#0c111b;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:15px}
+select{flex:1;min-width:180px}
+button{border:0;border-radius:7px;padding:9px 16px;font-size:15px;font-weight:600;color:#fff;background:#2b6cb0;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.go{background:#2f9e4f}.pause{background:#c27c12}.stop{background:#c83a37}.ghost{background:#24304a}
+#state{font-size:18px;font-weight:600;margin:12px 0 6px}
+.bar{height:8px;background:#0c111b;border-radius:4px;overflow:hidden}
+.bar div{height:100%;width:0;background:var(--acc);transition:width .4s}
+#err{display:none;margin-top:10px;padding:10px 12px;border-radius:7px;background:#3a1618;color:#ffb3b0;font-weight:600}
+#cv{width:100%;height:340px;display:block;background:#0b1019;border-radius:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;color:var(--dim);font-size:13px}
+.legend i{display:inline-block;width:22px;height:0;vertical-align:middle;margin-right:6px;border-top:3px solid}
+#info{color:var(--dim);font-size:13px;margin-top:6px}
+#code{max-height:300px;overflow:auto;background:#0b1019;border-radius:8px;font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;padding:6px 0}
+#code div{padding:0 10px;white-space:pre}
+#code div.cur{background:#3a2a14;color:#ffd08a}
+#code div.done{color:#6f7d92}
+#code div.cm{color:#6b8f71;font-style:italic}
+#code span{display:inline-block;width:3.2em;color:#4c5b74;text-align:right;margin-right:12px}
+#files div{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+#files div:last-child{border-bottom:0}
+#files b{flex:1;font-weight:500;word-break:break-all}
+#files small{color:var(--dim)}
+#files button{padding:6px 12px;font-size:14px}
+#upmsg{color:var(--dim);font-size:13px;margin-top:8px}
 </style>
 </head>
 <body>
-<h1>ELS GCode Manager</h1>
-<div class="bar" id="st">...</div>
+<header><h1>Токарный станок — G-код</h1><span id="net">…</span></header>
 
-<div class="sec">
-<h2>GCode Runner</h2>
-<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-<select id="rsel"><option value="">-- выберите файл --</option></select>
-<button class="grn" onclick="runGc()">&#9654; Старт</button>
-<button class="org" id="pbtn" onclick="pauseGc()">&#9646;&#9646; Пауза</button>
-<button class="del" onclick="stopGc()">&#9632; Стоп</button>
+<div class="card">
+<h2>Программа</h2>
+<div class="row">
+<select id="sel" onchange="pick(this.value)"><option value="">— выберите файл —</option></select>
+<button class="go" id="bgo" onclick="run()">Старт</button>
+<button class="pause" id="bpa" onclick="post('/api/pause')">Пауза</button>
+<button class="stop" onclick="post('/api/stop')">Стоп</button>
 </div>
-<div id="exst" style="color:#7986cb">IDLE</div>
-<div class="pbg"><div class="pf" id="pf"></div></div>
-<canvas id="traj" width="460" height="180"></canvas>
+<div id="state">Нет программы</div>
+<div class="bar"><div id="pf"></div></div>
+<div id="err"></div>
 </div>
 
-<div class="sec">
-<h2>Файлы GCode</h2>
-<ul id="fl"><li><span>Загрузка...</span></li></ul>
-<div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
-<input type="file" id="fi" accept=".gcode,.nc,.ngc,.tap,.txt">
+<div class="card">
+<h2>Траектория резца</h2>
+<canvas id="cv"></canvas>
+<div class="legend">
+<span><i style="border-color:#5b6b82;border-top-style:dashed"></i>ускоренный ход G0</span>
+<span><i style="border-color:#3fb6f0"></i>резание G1/G2/G3</span>
+<span><i style="border-color:#ff8a50"></i>уже выполнено</span>
+<span><i style="border-color:#ffd54a;border-top-width:8px;width:8px;border-radius:4px"></i>резец сейчас</span>
+</div>
+<div id="info"></div>
+</div>
+
+<div class="card">
+<h2>Код программы</h2>
+<div id="code"><div>Выберите файл</div></div>
+</div>
+
+<div class="card">
+<h2>Файлы</h2>
+<div id="files"></div>
+<div class="row" style="margin-top:10px">
+<input type="file" id="fi" accept=".nc,.gcode,.ngc,.tap,.txt">
 <button onclick="up()">Загрузить</button>
 </div>
-<div id="prog"></div>
-</div>
-
-<div class="sec" id="viewsec" style="display:none">
-<h2>Просмотр: <span id="vn" style="color:#e0e0f0"></span>
-<button onclick="document.getElementById('viewsec').style.display='none'" style="font-size:10px;padding:2px 6px;float:right">&#x2715;</button></h2>
-<div id="viewer"></div>
+<div id="upmsg">Обычный текстовый G-код: .nc .gcode .ngc .tap .txt</div>
 </div>
 
 <script>
-const BASE='';  // тот же адрес и порт, что у страницы (раньше — жёстко :8080, а сервер на 80)
+const $=id=>document.getElementById(id);
+let prog=null, curFile='', lastLine=-1;
+const STATE={IDLE:'Нет программы',RUNNING:'Выполняется',WAITING_ACK:'Выполняется',DWELL:'Пауза G4',PAUSED:'Пауза',DONE:'Готово',ERROR:'Ошибка'};
+const COLOR={RUNNING:'#43c463',WAITING_ACK:'#43c463',DWELL:'#3fb6f0',PAUSED:'#f0a330',DONE:'#3fb6f0',ERROR:'#ef5350'};
 
-// ─── Статус WiFi ─────────────────────────────────────────────────────────────
-async function loadSt(){
-  try{
-    const d=await(await fetch(BASE+'/api/status')).json();
-    document.getElementById('st').innerHTML=
-      'WiFi: <b>'+d.mode+'</b> | IP: <b>'+d.ip+'</b> | Файлов: '+d.fc+' | Свободно: '+(d.fb/1024).toFixed(0)+' КБ';
-  }catch(e){document.getElementById('st').textContent='Ошибка связи';}
+async function j(u,o){const r=await fetch(u,o);return r.json();}
+async function post(u){try{await fetch(u,{method:'POST'});}catch(e){}}
+
+async function net(){
+  try{const d=await j('/api/status');
+    $('net').textContent=(d.mode=='STA'?'Wi-Fi: '+d.ssid:'Точка доступа')+' · '+d.ip+' · свободно '+(d.fb/1024|0)+' КБ';
+  }catch(e){$('net').textContent='нет связи со станком';}
 }
 
-// ─── Файлы ───────────────────────────────────────────────────────────────────
-async function loadFiles(){
+async function files(){
   try{
-    const files=await(await fetch(BASE+'/api/files')).json();
-    const ul=document.getElementById('fl');
-    const sel=document.getElementById('rsel');
-    ul.innerHTML='';
-    // rebuild runner dropdown, preserve selection
-    const prev=sel.value;
-    while(sel.options.length>1) sel.remove(1);
-    if(!files.length){ul.innerHTML='<li><span style="color:#667">Нет файлов</span></li>';return;}
-    files.forEach(f=>{
-      const li=document.createElement('li');
-      li.innerHTML='<span>'+f.name+'<span class="tag">('+
-        (f.size>=1024?(f.size/1024).toFixed(1)+' КБ':f.size+' Б')+')</span></span>'+
-        '<button onclick="loadTraj(\''+f.name+'\')" style="font-size:11px;padding:3px 7px">График</button>'+
-        '<button onclick="view(\''+f.name+'\')">Просмотр</button>'+
-        '<button class="del" onclick="del(\''+f.name+'\')">Удалить</button>';
-      ul.appendChild(li);
-      const opt=document.createElement('option');
-      opt.value=f.name; opt.textContent=f.name;
-      sel.appendChild(opt);
+    const fl=await j('/api/files'), box=$('files'), sel=$('sel'), keep=sel.value;
+    box.innerHTML=''; while(sel.options.length>1) sel.remove(1);
+    if(!fl.length) box.innerHTML='<div><b style="color:#8a97ab">Файлов нет — загрузите программу</b></div>';
+    fl.forEach(f=>{
+      const d=document.createElement('div');
+      d.innerHTML='<b>'+f.name+'</b><small>'+(f.size>=1024?(f.size/1024).toFixed(1)+' КБ':f.size+' Б')+'</small>'+
+        '<button class="ghost">Открыть</button><button class="stop">Удалить</button>';
+      d.children[2].onclick=()=>{sel.value=f.name;pick(f.name);};
+      d.children[3].onclick=()=>del(f.name);
+      box.appendChild(d);
+      const o=document.createElement('option'); o.value=o.textContent=f.name; sel.appendChild(o);
     });
-    if(prev) sel.value=prev;
-  }catch(e){document.getElementById('fl').innerHTML='<li><span>Ошибка</span></li>';}
+    sel.value=curFile||keep;
+  }catch(e){}
 }
-
-async function view(n){
-  try{
-    const t=await(await fetch(BASE+'/api/file?name='+encodeURIComponent(n))).text();
-    document.getElementById('vn').textContent=n;
-    document.getElementById('viewer').textContent=t;
-    document.getElementById('viewsec').style.display='block';
-    document.getElementById('viewsec').scrollIntoView({behavior:'smooth'});
-  }catch(e){alert('Ошибка');}
-}
-
 async function del(n){
-  if(!confirm('Удалить "'+n+'"?'))return;
-  await fetch(BASE+'/api/file?name='+encodeURIComponent(n),{method:'DELETE'});
-  loadFiles();
+  if(!confirm('Удалить «'+n+'»?')) return;
+  await fetch('/api/file?name='+encodeURIComponent(n),{method:'DELETE'}); files();
 }
-
 async function up(){
-  const fi=document.getElementById('fi');
-  if(!fi.files.length){alert('Выберите файл');return;}
-  const file=fi.files[0];
-  const pr=document.getElementById('prog');
-  pr.textContent='Загрузка...';
-  try{
-    const r=await fetch(BASE+'/api/file?name='+encodeURIComponent(file.name),{method:'PUT',body:file});
-    const d=await r.json();
-    pr.textContent=d.ok?'Загружено: '+d.name:'Ошибка: '+d.error;
-    if(d.ok){loadFiles();fi.value='';}
-  }catch(e){pr.textContent='Ошибка сети';}
+  const f=$('fi').files[0]; if(!f){$('upmsg').textContent='Выберите файл на компьютере';return;}
+  $('upmsg').textContent='Загрузка…';
+  try{const d=await j('/api/file?name='+encodeURIComponent(f.name),{method:'PUT',body:f});
+    $('upmsg').textContent=d.ok?'Загружено: '+d.name:'Ошибка: '+d.error;
+    if(d.ok){$('fi').value='';await files();$('sel').value=d.name;pick(d.name);}
+  }catch(e){$('upmsg').textContent='Ошибка сети';}
+}
+async function run(){
+  const n=$('sel').value; if(!n){alert('Выберите файл');return;}
+  if(curFile!==n) await pick(n);
+  await post('/api/run?name='+encodeURIComponent(n));
 }
 
-// ─── GCode Runner ─────────────────────────────────────────────────────────────
-const ST_COLOR={IDLE:'#7986cb',RUNNING:'#4caf50',WAITING_ACK:'#4caf50',DWELL:'#26c6da',PAUSED:'#ff9800',DONE:'#4fc3f7',ERROR:'#ef5350'};
-
-async function runGc(){
-  const n=document.getElementById('rsel').value;
-  if(!n){alert('Выберите файл');return;}
-  await fetch(BASE+'/api/run?name='+encodeURIComponent(n),{method:'POST'});
-  loadTraj(n);
+// ── Разбор программы — как исполнитель станка: строки без комментариев, пустые не считаются ──
+function parse(text){
+  const src=[], segs=[]; let n=0;
+  let z=0,x=0, abs=true, diam=true, unit=1, mot=0;
+  for(const raw of text.split(/\r?\n/)){
+    const ln=raw.replace(/\([^)]*\)/g,'').replace(/;.*/,'').trim().toUpperCase();
+    if(!ln){src.push({t:raw,n:0});continue;}
+    n++; src.push({t:raw,n});
+    if(/^[O%]/.test(ln)) continue;
+    const w=c=>{const m=ln.match(new RegExp('(?:^|[^A-Z])'+c+'\\s*(-?[\\d.]+)'));return m?parseFloat(m[1]):null;};
+    for(const g of ln.matchAll(/G\s*(\d+)/g)){
+      const v=+g[1];
+      if(v<=3) mot=v; else if(v==7) diam=true; else if(v==8) diam=false;
+      else if(v==20) unit=25.4; else if(v==21) unit=1; else if(v==90) abs=true; else if(v==91) abs=false;
+      else if(v==28){segs.push({n,a:[z,x],b:[z,0],r:1});segs.push({n,a:[z,0],b:[0,0],r:1});z=0;x=0;}
+    }
+    let Z=w('Z'), X=w('X');
+    if(Z===null&&X===null) continue;
+    let tz=Z===null?z:(abs?Z*unit:z+Z*unit);
+    let tx=X===null?x:(abs?X*unit/(diam?2:1):x+X*unit/(diam?2:1));
+    if(mot>=2){
+      let I=w('I'),K=w('K'),R=w('R'),cz,cx; const cw=mot==2;
+      if(I!==null||K!==null){cz=z+(K||0)*unit;cx=x+(I||0)*unit;}
+      else if(R!==null){
+        R*=unit; const mz=(z+tz)/2,mx=(x+tx)/2,dz=tz-z,dx=tx-x,d=Math.hypot(dz,dx);
+        const h=Math.sqrt(Math.max(R*R-d*d/4,0)), s=(cw?-1:1)*(R>0?1:-1);
+        cz=mz-s*h*dx/d; cx=mx+s*h*dz/d;
+      }
+      if(cz!==undefined){
+        let a0=Math.atan2(x-cx,z-cz),a1=Math.atan2(tx-cx,tz-cz),da=a1-a0,r=Math.hypot(z-cz,x-cx);
+        if(cw){while(da>=0)da-=2*Math.PI;}else{while(da<=0)da+=2*Math.PI;}
+        const k=Math.max(4,Math.ceil(Math.abs(da)*r/0.2)); let pz=z,px=x;
+        for(let i=1;i<=k;i++){const a=a0+da*i/k,qz=i==k?tz:cz+r*Math.cos(a),qx=i==k?tx:cx+r*Math.sin(a);
+          segs.push({n,a:[pz,px],b:[qz,qx],r:0});pz=qz;px=qx;}
+        z=tz;x=tx;continue;
+      }
+    }
+    segs.push({n,a:[z,x],b:[tz,tx],r:mot==0?1:0}); z=tz; x=tx;
+  }
+  return {src,segs,lines:n};
 }
-async function pauseGc(){await fetch(BASE+'/api/pause',{method:'POST'});}
-async function stopGc(){await fetch(BASE+'/api/stop',{method:'POST'});}
 
-let g_exec_line=0;
-async function pollExec(){
+async function pick(n){
+  if(!n){prog=null;curFile='';draw(-1);return;}
   try{
-    const d=await(await fetch(BASE+'/api/exec')).json();
-    const st=d.state||'IDLE';
-    const col=ST_COLOR[st]||'#aaa';
-    let msg=st;
-    if(d.file) msg+=' | '+d.file;
-    if(d.line) msg+=' | Строка: '+d.line;
-    if(d.pct!=null) msg+=' | '+d.pct+'%';
-    if(d.error) msg+=' | '+d.error;
-    document.getElementById('exst').innerHTML='<span style="color:'+col+'">'+msg+'</span>';
-    const pf=document.getElementById('pf');
-    pf.style.width=(d.pct||0)+'%';
-    const pb=document.getElementById('pbtn');
-    pb.textContent=st==='PAUSED'?'▶ Продолжить':'⏸ Пауза';
-    if(d.line && d.line!==g_exec_line){g_exec_line=d.line;drawTrajCursor();}
+    const t=await(await fetch('/api/file?name='+encodeURIComponent(n))).text();
+    prog=parse(t); curFile=n; lastLine=-1; $('sel').value=n;
+    const c=$('code'); c.innerHTML='';
+    prog.src.forEach(l=>{const d=document.createElement('div');d.dataset.n=l.n;if(!l.n)d.className='cm';
+      d.innerHTML='<span>'+(l.n||'')+'</span>'+l.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');c.appendChild(d);});
+    draw(-1);
   }catch(e){}
 }
 
-// ─── 2D Trajectory Visualizer ─────────────────────────────────────────────────
-let g_traj=null; // {moves:[{x,z,rapid}], lineMap:[idx]}
+// ── Рисунок: Z по горизонтали (патрон слева), X — радиус вверх от оси шпинделя, деталь зеркально внизу ──
+function nice(v){const p=Math.pow(10,Math.floor(Math.log10(v))),m=v/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
+function draw(line){
+  const cv=$('cv'),dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#0b1019';g.fillRect(0,0,W,H);
+  g.font='13px -apple-system,Segoe UI,Arial';
+  if(!prog||!prog.segs.length){g.fillStyle='#5b6b82';g.fillText(prog?'В программе нет перемещений':'Выберите файл — здесь будет траектория',16,H/2);$('info').textContent='';return;}
+  // масштаб — по ходам резания (дальние отводы G0 обрезаются краем), ноль всегда в кадре
+  const cut=prog.segs.filter(s=>!s.r), base=cut.length?cut:prog.segs;
+  let zmin=0,zmax=0,xmax=0;
+  for(const s of base)for(const p of [s.a,s.b]){zmin=Math.min(zmin,p[0]);zmax=Math.max(zmax,p[0]);xmax=Math.max(xmax,Math.abs(p[1]));}
+  const pz=((zmax-zmin)||1)*0.08; zmin-=pz; zmax+=pz; xmax*=1.12;
+  const L=46,Rp=16,T=16,B=26, zr=(zmax-zmin)||1, xr=xmax||1;
+  const sc=Math.min((W-L-Rp)/zr,(H-T-B)/(2*xr)*1.0);
+  const cy=T+(H-T-B)/2, ox=L+((W-L-Rp)-zr*sc)/2;
+  const tx=z=>ox+(z-zmin)*sc, ty=x=>cy-x*sc;
+  // сетка и размеры
+  const st=nice(Math.max(zr,2*xr)/8);
+  g.strokeStyle='#18233a';g.lineWidth=1;g.fillStyle='#5b6b82';
+  for(let z=Math.ceil(zmin/st)*st;z<=zmax+1e-9;z+=st){g.beginPath();g.moveTo(tx(z),T);g.lineTo(tx(z),H-B);g.stroke();g.fillText(+z.toFixed(2)+'',tx(z)-8,H-8);}
+  for(let x=0;x<=xr+1e-9;x+=st){for(const s of [1,-1]){g.beginPath();g.moveTo(L,ty(s*x));g.lineTo(W-Rp,ty(s*x));g.stroke();}
+    if(x>0)g.fillText('⌀'+(+(2*x).toFixed(2)),4,ty(x)+4);}
+  g.fillText('Z, мм',W-Rp-40,H-8);
+  g.save();g.beginPath();g.rect(L,T-4,W-L-Rp,H-T-B+8);g.clip();
+  // ось шпинделя
+  g.strokeStyle='#3a4a66';g.setLineDash([10,4,2,4]);g.beginPath();g.moveTo(L,cy);g.lineTo(W-Rp,cy);g.stroke();g.setLineDash([]);
+  // ноль
+  g.fillStyle='#43c463';g.beginPath();g.arc(tx(0),cy,4,0,7);g.fill();g.fillText('0',tx(0)+6,cy-6);
+  // траектория (верх) и её зеркало (низ, бледно — силуэт детали)
+  for(const mir of [-1,1]){
+    for(const s of prog.segs){
+      const done=line>0&&s.n<line, cur=s.n==line;
+      g.lineWidth=mir<0?1:(s.r?1.2:2.2);
+      g.setLineDash(s.r?[6,5]:[]);
+      g.strokeStyle=mir<0?(s.r?'#1d2638':'#1f4a66'):(s.r?'#5b6b82':(done?'#ff8a50':(cur?'#ffd54a':'#3fb6f0')));
+      g.beginPath();g.moveTo(tx(s.a[0]),ty(mir*s.a[1]));g.lineTo(tx(s.b[0]),ty(mir*s.b[1]));g.stroke();
+    }
+  }
+  g.setLineDash([]);g.restore();
+  // резец — конец последнего отрезка текущей строки
+  if(line>0){let p=null;for(const s of prog.segs)if(s.n<=line)p=s.b;
+    if(p){g.fillStyle='#ffd54a';g.beginPath();g.moveTo(tx(p[0]),ty(p[1]));g.lineTo(tx(p[0])+9,ty(p[1])-14);g.lineTo(tx(p[0])-9,ty(p[1])-14);g.fill();}}
+  let az=0,bz=0,mx=0;for(const s of base)for(const p of [s.a,s.b]){az=Math.min(az,p[0]);bz=Math.max(bz,p[0]);mx=Math.max(mx,Math.abs(p[1]));}
+  $('info').textContent='Резание: Z от '+az.toFixed(2)+' до '+bz.toFixed(2)+' мм · наибольший ⌀ '+(2*mx).toFixed(2)+' мм · строк '+prog.lines+' · X в программе — диаметр (G7), если не указано G8';
+}
 
-async function loadTraj(name){
-  document.getElementById('rsel').value=name;
+async function poll(){
   try{
-    const text=await(await fetch(BASE+'/api/file?name='+encodeURIComponent(name))).text();
-    g_traj=parseTraj(text);
-    g_exec_line=0;
-    drawTraj(g_traj,-1);
+    const d=await j('/api/exec'), st=d.state||'IDLE';
+    let t=STATE[st]||st;
+    if(d.file&&st!='IDLE') t+=' · '+d.file;
+    if(d.line&&st!='IDLE'&&st!='DONE') t+=' · строка '+d.line+(prog&&curFile==d.file?' из '+prog.lines:'');
+    if(st=='RUNNING'||st=='WAITING_ACK'||st=='PAUSED') t+=' · '+d.pct+'%';
+    $('state').textContent=t;$('state').style.color=COLOR[st]||'#e6ebf3';
+    $('pf').style.width=(st=='DONE'?100:(d.pct||0))+'%';
+    $('err').style.display=d.error?'block':'none';$('err').textContent=d.error||'';
+    $('bpa').textContent=st=='PAUSED'?'Продолжить':'Пауза';
+    if(d.file&&d.file!==curFile&&st!='IDLE'){$('sel').value=d.file;await pick(d.file);}
+    const ln=(st=='DONE')?1e9:d.line;
+    if(prog&&ln!==lastLine){lastLine=ln;draw(st=='IDLE'?-1:ln);
+      for(const el of $('code').children){const n=+el.dataset.n;
+        el.className=!n?'cm':(n==ln?'cur':(n<ln?'done':''));
+        if(n&&n==ln){const c=$('code');c.scrollTop=el.offsetTop-c.offsetTop-c.clientHeight/2;}}}
   }catch(e){}
 }
-
-function parseTraj(text){
-  const lines=text.split('\n');
-  let cx=0,cz=0,modal_g=0; // modal_g: 0=rapid,1=feed
-  const moves=[];
-  const lineMap=[];
-  let nr=0;
-  for(const raw of lines){
-    let ln=raw.replace(/;.*/,'').replace(/\(.*?\)/g,'').trim().toUpperCase();
-    nr++;
-    if(!ln){lineMap.push(-1);continue;}
-    // detect G word
-    const gm=ln.match(/\bG(\d+(?:\.\d+)?)/);
-    if(gm){const gn=parseFloat(gm[1]);if(gn===0||gn===0.0)modal_g=0;else if(gn===1)modal_g=1;}
-    const xm=ln.match(/X([-\d.]+)/);
-    const zm=ln.match(/Z([-\d.]+)/);
-    if((xm||zm)&&(gm||modal_g!==undefined)){
-      if(xm)cx=parseFloat(xm[1]);
-      if(zm)cz=parseFloat(zm[1]);
-      moves.push({x:cx,z:cz,rapid:modal_g===0});
-      lineMap.push(moves.length-1);
-    }else{lineMap.push(-1);}
-  }
-  return{moves,lineMap};
-}
-
-function drawTraj(traj,curIdx){
-  const cv=document.getElementById('traj');
-  const ctx=cv.getContext('2d');
-  const W=cv.width,H=cv.height;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#0a1628';ctx.fillRect(0,0,W,H);
-  if(!traj||!traj.moves.length){
-    ctx.fillStyle='#3a4a6a';ctx.font='12px monospace';
-    ctx.fillText('Нет данных траектории',10,H/2);return;
-  }
-  const mv=traj.moves;
-  // Bounds
-  let mnx=mv[0].x,mxx=mv[0].x,mnz=mv[0].z,mxz=mv[0].z;
-  for(const m of mv){if(m.x<mnx)mnx=m.x;if(m.x>mxx)mxx=m.x;if(m.z<mnz)mnz=m.z;if(m.z>mxz)mxz=m.z;}
-  const rngx=mxx-mnx||1,rngz=mxz-mnz||1;
-  const PAD=18;
-  const sx=(W-PAD*2)/rngz, sy=(H-PAD*2)/rngx;
-  const sc=Math.min(sx,sy);
-  const ox=PAD+(W-PAD*2-(rngz*sc))/2, oy=PAD+(H-PAD*2-(rngx*sc))/2;
-  const tx=z=>(z-mnz)*sc+ox;
-  const ty=x=>(x-mnx)*sc+oy;
-  // Axes
-  ctx.strokeStyle='#1e3050';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(tx(0),0);ctx.lineTo(tx(0),H);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,ty(0));ctx.lineTo(W,ty(0));ctx.stroke();
-  // Moves
-  ctx.lineWidth=1.5;
-  let px=tx(mv[0].z),py=ty(mv[0].x);
-  for(let i=1;i<mv.length;i++){
-    const m=mv[i];
-    const nx=tx(m.z),ny=ty(m.x);
-    ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,ny);
-    if(m.rapid){ctx.strokeStyle='#37474f';ctx.setLineDash([3,3]);}
-    else{ctx.strokeStyle=i<=curIdx?'#ff8a65':'#29b6f6';ctx.setLineDash([]);}
-    ctx.stroke();
-    px=nx;py=ny;
-  }
-  ctx.setLineDash([]);
-  // Start dot
-  ctx.fillStyle='#66bb6a';ctx.beginPath();ctx.arc(tx(mv[0].z),ty(mv[0].x),4,0,Math.PI*2);ctx.fill();
-  // Cursor
-  if(curIdx>=0&&curIdx<mv.length){
-    const m=mv[curIdx];
-    ctx.fillStyle='#ffee58';ctx.beginPath();ctx.arc(tx(m.z),ty(m.x),5,0,Math.PI*2);ctx.fill();
-  }
-}
-
-function drawTrajCursor(){
-  if(!g_traj) return;
-  const idx=(g_exec_line<g_traj.lineMap.length)?g_traj.lineMap[g_exec_line]:-1;
-  drawTraj(g_traj,idx);
-}
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
-loadSt();loadFiles();
-setInterval(loadSt,10000);
-setInterval(pollExec,800);
+window.onresize=()=>draw(lastLine);
+net();files();poll();setInterval(net,10000);setInterval(poll,700);
 </script>
 </body>
 </html>)rawhtml";
@@ -548,7 +544,7 @@ static void handle_exec_status(WiFiClient& cl) {
     GcExecSt st = GCodeExec_GetState();
     const char* fn = GCodeExec_GetFilename();
     const char* bn = basename_of(fn && fn[0] ? fn : "");
-    char buf[256];
+    char buf[512];
     snprintf(buf, sizeof(buf),
         "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"pct\":%d,\"error\":\"%s\"}",
         exec_state_str(st), bn, GCodeExec_GetLine(),

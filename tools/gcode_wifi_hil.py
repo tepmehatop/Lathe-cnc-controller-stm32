@@ -45,7 +45,7 @@ def main():
         print('файлы:', http('GET', f'{base}/api/files')[:120])
         sp.on(a.rpm); time.sleep(1.0)
         print('запуск:', http('POST', f'{base}/api/run?name={name}')[:80])
-        t0, shot_done, last = time.time(), False, None
+        t0, shot_done, last, seen_run = time.time(), False, None, False
         while time.time() - t0 < 600:
             time.sleep(1.0)
             ex = json.loads(http('GET', f'{base}/api/exec'))
@@ -54,7 +54,11 @@ def main():
                 print('  ', st, 'каретка', mega.pos()); last = st
             if a.shot and not shot_done and ex.get('line', 0) >= 8:
                 hc.esp_shot(esp, a.shot); shot_done = True
-            if str(ex.get('state')) in ('done', 'error', 'idle', '5', '6', '0') and time.time() - t0 > 3:
+            S = str(ex.get('state')).upper()
+            if S in ('RUNNING', 'WAITING_ACK', 'DWELL', 'PAUSED'):
+                seen_run = True
+            # конец — только после запуска: «Готово» прошлой программы держится до старта новой
+            if seen_run and S in ('DONE', 'ERROR', 'IDLE'):
                 break
         z, x = mega.pos()
         want_z, want_x = round(a.z * 1000), round(a.x * 1000 / 2)

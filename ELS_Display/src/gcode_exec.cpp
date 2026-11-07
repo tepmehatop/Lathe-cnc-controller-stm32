@@ -21,7 +21,7 @@ static uint32_t  s_ack_t     = 0;
 static uint32_t  s_dwell_t   = 0;
 static uint32_t  s_dwell_ms  = 0;
 static char      s_filename[64] = {};
-static char      s_error[80]    = {};
+static char      s_error[200]   = {};   // кириллица — 2 байта на букву: 80 обрезали сообщение STM32
 
 // ─── Утилиты ──────────────────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ bool GCodeExec_Run(const char* filepath) {
     if (!s_file || !(*s_file)) {
         delete s_file;
         s_file = nullptr;
-        snprintf(s_error, sizeof(s_error), "File not found: %s", filepath);
+        snprintf(s_error, sizeof(s_error), "Нет файла: %s", filepath);
         s_state = GCE_ERROR;
         Serial.printf("[gce] ERROR: %s\n", s_error);
         return false;
@@ -138,7 +138,7 @@ void GCodeExec_OnAck(bool ok, const char* err) {
     if (ok) {
         s_state = GCE_RUNNING;
     } else {
-        snprintf(s_error, sizeof(s_error), "STM32 ERR L%d: %s", s_line_nr, err ? err : "?");
+        snprintf(s_error, sizeof(s_error), "Строка %d: %s", s_line_nr, err ? err : "?");
         close_file();
         s_state = GCE_ERROR;
         Serial.printf("[gce] ERR: %s\n", s_error);
