@@ -40,6 +40,19 @@ HardwareSerial DISPLAY_UART(E2_APIN(E2_PIN_DISP_RX), E2_APIN(E2_PIN_DISP_TX));
 #define THR_IDX_GPIPE_START  47   // Thread_Info[47] = G 1/16  (46 = 80tpi — последний дюймовый!)
 #define THR_IDX_KPIPE_START  57   // Thread_Info[57] = K 1/16  (56 = G 2 — последний G-трубный!)
 
+// [STM32] Категория резьбы с физических кнопок (BACKLOG-015): ▲/▼ с кнопкой ускоренного хода.
+// dir > 0 — начало следующей категории (на последней — остаться); dir < 0 — начало текущей, если стоим
+// не на нём, иначе начало предыдущей
+static byte e2_thread_cat_step(byte step, int dir)
+{
+  static const byte starts[] = { 0, THR_IDX_INCH_START, THR_IDX_GPIPE_START, THR_IDX_KPIPE_START };
+  int cat = 0;
+  for (int i = 0; i < 4; i++) if (step >= starts[i]) cat = i;
+  if (dir > 0) return cat < 3 ? starts[cat + 1] : step;
+  if (step != starts[cat]) return starts[cat];
+  return cat > 0 ? starts[cat - 1] : step;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ***** ИНИЦИАЛИЗАЦИЯ ***** //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

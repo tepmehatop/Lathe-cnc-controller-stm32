@@ -1541,7 +1541,8 @@ void Key_Up_Pressed()
         {
            if (!Joy_Z_flag && !Joy_X_flag)
            {
-              Thread_Step++;
+              // [STM32] с кнопкой ускоренного хода — к следующей категории (метрич. → дюйм. → G → K), BACKLOG-015
+              Thread_Step = !Button_Rapid ? e2_thread_cat_step(Thread_Step, 1) : Thread_Step + 1;
               if (Thread_Info[Thread_Step].Ks_Div_Z / Ph == 0)
               {Thread_Step--;}
               Ks_Count = 0;
@@ -1688,7 +1689,8 @@ void Key_Down_Pressed()
          {
             if (!Joy_Z_flag && !Joy_X_flag)
             {
-               Thread_Step--;
+               // [STM32] с кнопкой ускоренного хода — к началу категории / предыдущей категории (BACKLOG-015)
+               Thread_Step = !Button_Rapid ? e2_thread_cat_step(Thread_Step, -1) : Thread_Step - 1;
                Ks_Count = 0;
                Km_Count = 0;
                Repeat_Count = 0;
@@ -1774,6 +1776,7 @@ void Key_Down_Pressed()
 // ********** Обработчик нажатия кнопки Left **********
 void Key_Left_Pressed()
 {
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
    if (!button_left_flag)
    {
       switch (Mode)
@@ -1944,11 +1947,13 @@ void Key_Left_Pressed()
       }
       button_left_flag = true;
    }
+   e2_diam_from_keys(e2_mx0);   // [STM32]
 }
 
 // ********** Обработчик нажатия кнопки Right **********
 void Key_Right_Pressed()
 {
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
    if (!button_right_flag)
    {
       switch (Mode)
@@ -2118,6 +2123,7 @@ void Key_Right_Pressed()
       }  
       button_right_flag = true;
    }
+   e2_diam_from_keys(e2_mx0);   // [STM32]
 }
 
 

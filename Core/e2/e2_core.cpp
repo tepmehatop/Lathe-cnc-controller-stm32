@@ -925,6 +925,17 @@ static int32_t e2_diam_um = 0;             // диаметр, мкм (DRO и л�
 
 bool e2_axis_editable(void) { return e2_pos.source != POS_SOURCE_DRO_UART; }
 
+// [STM32] У автора в подрежиме «Ввод * Сброс осей» кнопки ◀/▶ меняют диаметр (MX_pos). При линейках напрямую
+// диаметр считается по линейке X — то же изменение переносим на её ноль диаметра (BACKLOG-015)
+void e2_diam_from_keys(long mx0)
+{
+   long d = MX_pos - mx0;
+   if (!d || e2_pos.source != POS_SOURCE_SCALES || !DRV_Scales_Present(SCALE_AXIS_X)) return;
+   // по шагам: диаметр на экране = −MX_pos × 20 / (шагов на 0.01 мм) мкм
+   float spu = (float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X;
+   e2_diam_off += lroundf(d * 20.0f / spu);
+}
+
 void e2_axis_set(char axis, int32_t um)
 {
    if (e2_pos.source == POS_SOURCE_DRO_UART) return;

@@ -609,6 +609,36 @@ static void test_cal_step() {
     CHECK(s_x.count == p0 && Motor_X_Pos == m0, "после фаз ось не на месте: импульсов %+ld, счётчик %+ld", s_x.count - p0, Motor_X_Pos - m0);
 }
 
+// BACKLOG-015: физические дубли экранных функций
+static void test_physical_dupes() {
+    printf("[%7.1f с] [buttons] ", t_ns / 1e9); printf("физические кнопки: категория резьбы, диаметр при линейках\n");
+    controls_neutral(); select_mode(3); touch("THREAD_STEP:13"); run_ms(100);
+    SET_IN(E2_PIN_JOY_RAPID, 0); run_ms(20);                          // кнопка ускоренного хода нажата
+    touch("KEY:UP");  int a = Thread_Step;
+    touch("KEY:UP");  int b = Thread_Step;
+    touch("KEY:DN");  int c = Thread_Step;
+    touch("KEY:DN");  int d = Thread_Step;
+    SET_IN(E2_PIN_JOY_RAPID, 1); run_ms(20);
+    touch("KEY:UP");  int e = Thread_Step;
+    CHECK(a == THR_IDX_INCH_START && b == THR_IDX_GPIPE_START && c == THR_IDX_INCH_START && d == 0 && e == 1,
+          "категории: %d %d %d %d, без ускоренного %d", a, b, c, d, e);
+    printf("    ▲▲▼▼ с ускоренным: %d → %d → %d → %d; без него ▲: %d\n", a, b, c, d, e);
+#if ELS_POS_SOURCE == POS_SOURCE_SCALES
+    g_stub_scale_present[1] = 1; g_stub_scale_um[1] = 5000; run_ms(50);
+    select_mode(1); SelectMenu = 2;
+    SET_IN(E2_PIN_HAND_X1, 0); SET_IN(E2_PIN_HAND_X10, 1); run_ms(50);
+    long d0 = -(long)MSize_X_mm * 10, mx0 = MX_pos;
+    touch("KEY:LEFT"); run_ms(50);
+    long dd = -(long)MSize_X_mm * 10 - d0, dmx = MX_pos - mx0;
+    float spu = (float)MOTOR_X_STEP_PER_REV / SCREW_X * McSTEP_X;
+    long want = -lroundf(dmx * 20.0f / spu);
+    CHECK(dmx != 0 && labs(dd - want) <= 10, "диаметр кнопкой при линейках: %+ld мкм, ожидалось %+ld (MX %+ld)", dd, want, dmx);
+    printf("    ◀ в «Ввод * Сброс»: диаметр %+ld мкм (по шагам было бы %+ld)\n", dd, want);
+    SelectMenu = 1; SET_IN(E2_PIN_HAND_X1, 1); g_stub_scale_present[1] = 0; run_ms(50);
+#endif
+    controls_neutral(); run_ms(50);
+}
+
 static void test_hand() {
     printf("[%7.1f с] [hand] ", t_ns / 1e9); printf("РГИ: ось Z, x1, 25 щелчков\n");
     select_mode(1);
@@ -1336,6 +1366,7 @@ int main() {
     test_axis_set();
     test_steploss();
     test_cal_step();
+    test_physical_dupes();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();

@@ -157,5 +157,6 @@ void e2_scale_reref(void);             // линейки: новая опорн�
 void e2_scale_track(void);
 bool e2_scale_gate(void);
 bool e2_scale_blocked(void);           // пропуск шагов — движение от джойстика заблокировано              // true — автоцикл в этот раз не вызывать (доводка X / пропуск шагов)    // CAL:<Z|X>:<мкм> — калибровка по линейкам
-bool e2_axis_editable(void);           // ввод/сброс осей с экрана (нет — при блоке DRO)
+bool e2_axis_editable(void);
+void e2_diam_from_keys(long mx0);      // ввод диаметра кнопками ◀/▶ при линейках напрямую           // ввод/сброс осей с экрана (нет — при блоке DRO)
 void e2_axis_set(char axis, int32_t um);   // 'Z', 'X' — позиция, 'D' — диаметр; мкм, как на экране
