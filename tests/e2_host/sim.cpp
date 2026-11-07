@@ -614,10 +614,11 @@ static void test_physical_dupes() {
     printf("[%7.1f с] [buttons] ", t_ns / 1e9); printf("физические кнопки: категория резьбы, диаметр при линейках\n");
     controls_neutral(); select_mode(3); touch("THREAD_STEP:13"); run_ms(100);
     SET_IN(E2_PIN_JOY_RAPID, 0); run_ms(20);                          // кнопка ускоренного хода нажата
-    touch("KEY:UP");  int a = Thread_Step;
-    touch("KEY:UP");  int b = Thread_Step;
-    touch("KEY:DN");  int c = Thread_Step;
-    touch("KEY:DN");  int d = Thread_Step;
+    touch("KEY:UP");  int a = Thread_Step; run_ms(700);              // повтор удержанной кнопки — не чаще 0.6 с
+    touch("KEY:UP");  int b = Thread_Step; touch("KEY:UP");            // повтор сразу — без перехода
+    CHECK(Thread_Step == b, "повтор кнопки сразу перешёл категорию (%d → %d)", b, Thread_Step); run_ms(700);
+    touch("KEY:DN");  int c = Thread_Step; run_ms(700);
+    touch("KEY:DN");  int d = Thread_Step; run_ms(700);
     SET_IN(E2_PIN_JOY_RAPID, 1); run_ms(20);
     touch("KEY:UP");  int e = Thread_Step;
     CHECK(a == THR_IDX_INCH_START && b == THR_IDX_GPIPE_START && c == THR_IDX_INCH_START && d == 0 && e == 1,

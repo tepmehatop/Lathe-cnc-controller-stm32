@@ -42,9 +42,12 @@ HardwareSerial DISPLAY_UART(E2_APIN(E2_PIN_DISP_RX), E2_APIN(E2_PIN_DISP_TX));
 
 // [STM32] Категория резьбы с физических кнопок (BACKLOG-015): ▲/▼ с кнопкой ускоренного хода.
 // dir > 0 — начало следующей категории (на последней — остаться); dir < 0 — начало текущей, если стоим
-// не на нём, иначе начало предыдущей
+// не на нём, иначе начало предыдущей. Удержанная кнопка у автора повторяется — категория не чаще раза в 0.6 с.
 static byte e2_thread_cat_step(byte step, int dir)
 {
+  static uint32_t s_last = 0;
+  if (millis() - s_last < 600) return step;
+  s_last = millis();
   static const byte starts[] = { 0, THR_IDX_INCH_START, THR_IDX_GPIPE_START, THR_IDX_KPIPE_START };
   int cat = 0;
   for (int i = 0; i < 4; i++) if (step >= starts[i]) cat = i;
