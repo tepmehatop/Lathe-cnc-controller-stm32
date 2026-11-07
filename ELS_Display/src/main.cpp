@@ -2069,7 +2069,7 @@ static void wifi_show()
 
 // ── Линейки: источник координат, тип, разрешение, направление (BACKLOG-028) ──
 // Сохранение — POS_SET: STM32 пишет во флеш и перезапускается (прерывания линеек настраиваются при старте).
-struct ScalesUi { lv_obj_t* back; lv_obj_t* src[3]; lv_obj_t* val[8]; lv_obj_t* status; int32_t edit[9]; bool dirty; uint8_t seen_seq; };
+struct ScalesUi { lv_obj_t* back; lv_obj_t* src[3]; lv_obj_t* val[8]; lv_obj_t* opt[2]; lv_obj_t* status; int32_t edit[12]; bool dirty; uint8_t seen_seq; };
 static ScalesUi g_sc = {};
 static const char* const SCALE_TYPES[6] = { "\xD0\x9D\xD0\x95\xD0\xA2", "\xD0\x9A\xD0\xB2\xD0\xB0\xD0\xB4\xD1\x80\xD0\xB0\xD1\x82\xD1\x83\xD1\x80\xD0\xB0", "Sylvac 48", "BIN6", "iGaging 21", "Digimatic" };
 
@@ -2095,6 +2095,17 @@ static void scales_refresh()
             lv_obj_set_style_text_color(g_sc.val[ax * 4 + k], lv_color_hex(
                 (d.pos_valid && e[k] != d.pos_cfg[1 + ax * 4 + k]) ? 0xffcc00 :
                 g_sc.edit[0] == 2 ? 0xe0e0e0 : 0x5a6a7a), 0);
+    }
+    // ДОВОДКА X / КОНТРОЛЬ ШАГОВ (BACKLOG-025) — работают с блоком DRO и с линейками
+    static const char* OPT[2] = { "\xD0\x94\xD0\x9E\xD0\x92\xD0\x9E\xD0\x94\xD0\x9A\xD0\x90 X", "\xD0\x9A\xD0\x9E\xD0\x9D\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x9B\xD0\xAC \xD0\xA8\xD0\x90\xD0\x93\xD0\x9E\xD0\x92" };
+    for (int i = 0; i < 2; i++) {
+        char b[48];
+        bool on = g_sc.edit[9 + i] != 0;
+        snprintf(b, sizeof(b), "%s: %s", OPT[i], on ? "\xD0\x92\xD0\x9A\xD0\x9B" : "\xD0\x92\xD0\xAB\xD0\x9A\xD0\x9B");
+        lv_obj_t* l = lv_obj_get_child(g_sc.opt[i], 0);
+        lv_label_set_text(l, b);
+        bool changed = d.pos_valid && g_sc.edit[9 + i] != d.pos_cfg[9 + i];
+        lv_obj_set_style_text_color(l, lv_color_hex(changed ? 0xffcc00 : g_sc.edit[0] == 0 ? 0x5a6a7a : on ? 0x00ff88 : 0x9ab8c8), 0);
     }
 }
 
@@ -2160,7 +2171,7 @@ static void scales_show()
         }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
     }
     // Линейки по осям
-    const int X_Z = UX(200), X_X = UX(336), COL_W = UX(128), Y0 = UY(96), DY = UY(30), RH = UY(27);
+    const int X_Z = UX(200), X_X = UX(336), COL_W = UX(128), Y0 = UY(88), DY = UY(26), RH = UY(24);
     const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y, "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X };
     for (int c = 0; c < 2; c++) {
         lv_obj_t* h = lv_label_create(back);
@@ -2168,7 +2179,7 @@ static void scales_show()
         lv_obj_set_style_text_color(h, lv_color_hex(0x6a9fb5), 0);
         lv_label_set_recolor(h, true);
         lv_label_set_text(h, heads[c]);
-        lv_obj_set_pos(h, c ? X_X : X_Z, UY(76));
+        lv_obj_set_pos(h, c ? X_X : X_Z, UY(70));
     }
     static const char* ROWS[4] = { "\xD0\xA2\xD0\x98\xD0\x9F", "\xD0\x9C\xD0\x9A\xD0\x9C \xD0\x9D\xD0\x90 \xD0\x98\xD0\x9C\xD0\x9F\xD0\xA3\xD0\x9B\xD0\xAC\xD0\xA1", "\xD0\x9D\xD0\x90\xD0\x9F\xD0\xA0\xD0\x90\xD0\x92\xD0\x9B\xD0\x95\xD0\x9D\xD0\x98\xD0\x95", "\xD0\xA1\xD0\x98\xD0\x93\xD0\x9D\xD0\x90\xD0\x9B" };
     for (int r = 0; r < 4; r++) {
@@ -2198,14 +2209,26 @@ static void scales_show()
         }
     }
 
+    for (int i = 0; i < 2; i++) {                              // ДОВОДКА X / КОНТРОЛЬ ШАГОВ — тап переключает
+        lv_obj_t* b = cfg_button(back, "--", 0x10202c, 0x9ab8c8);
+        lv_obj_set_size(b, UX(220), UY(24)); lv_obj_set_pos(b, UX(16) + i * UX(228), UY(194));
+        lv_obj_set_style_text_font(lv_obj_get_child(b, 0), &font_dejavu_14, 0);
+        g_sc.opt[i] = b;
+        lv_obj_add_event_cb(b, [](lv_event_t* e) {
+            int i = (int)(intptr_t)lv_event_get_user_data(e);
+            g_sc.edit[9 + i] = !g_sc.edit[9 + i]; scales_changed();
+        }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    }
+
     const int BY = UY(222), BH = UY(30), BW = UX(140);
     lv_obj_t* save = cfg_button(back, "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x98\xD0\xA2\xD0\xAC", 0x0a3a2a, 0x00ff88);
     lv_obj_set_size(save, BW, BH); lv_obj_set_pos(save, UX(16), BY);
     lv_obj_add_event_cb(save, [](lv_event_t*) {
         const int32_t* v = g_sc.edit;
         char cmd[96];
-        snprintf(cmd, sizeof(cmd), "POS_SET:%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", (long)v[0], (long)v[1], (long)v[2],
-                 (long)v[3], (long)v[4], (long)v[5], (long)v[6], (long)v[7], (long)v[8]);
+        snprintf(cmd, sizeof(cmd), "POS_SET:%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", (long)v[0], (long)v[1],
+                 (long)v[2], (long)v[3], (long)v[4], (long)v[5], (long)v[6], (long)v[7], (long)v[8],
+                 (long)v[9], (long)v[10], (long)v[11]);
         uart_protocol.sendButtonPress(cmd);
         lv_label_set_text(g_sc.status, "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\xAF\xD0\x95\xD0\x9C...");
     }, LV_EVENT_CLICKED, nullptr);

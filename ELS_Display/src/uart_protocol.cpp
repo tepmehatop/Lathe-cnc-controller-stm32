@@ -219,10 +219,11 @@ void UartProtocol::parseCommand(const char* cmd)
         data_.axis_edit = (uint8_t)atoi(params);
     }
     else if (strcmp(command, "POS") == 0) {
-        long v[9];
-        if (sscanf(params, "%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
-                   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]) == 9) {
-            for (int i = 0; i < 9; i++) data_.pos_cfg[i] = (int32_t)v[i];
+        long v[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150};
+        int n = sscanf(params, "%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld", &v[0], &v[1], &v[2], &v[3],
+                       &v[4], &v[5], &v[6], &v[7], &v[8], &v[9], &v[10], &v[11]);
+        if (n == 9 || n == 12) {                        // 9 — STM32 без доводки/контроля шагов
+            for (int i = 0; i < 12; i++) data_.pos_cfg[i] = (int32_t)v[i];
             data_.pos_valid = 1;
         }
     }

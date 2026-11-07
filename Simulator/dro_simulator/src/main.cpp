@@ -56,7 +56,8 @@ static bool     s_sweep = true;    // по умолчанию позиции «�
 //   STEP Z (PE9)  → D2 (INT4)    DIR Z (PE10) → D4 (PG5)
 //   STEP X (PE13) → D3 (INT5)    DIR X (PE14) → D5 (PE3)     через 1 кОм, GND общий
 // Шаг — спад STEP, DIR = 0 — позиция растёт (DRIVER_SIGNALS_DIRECT = 0 в els_config.h).
-// Команды: f1/f0 — следовать/нет, lz<мкм>/lx<мкм> — люфт, kz<нм>/kx<нм> — нм на шаг, o — обнулить.
+// Команды: f1/f0 — следовать/нет, lz<мкм>/lx<мкм> — люфт, kz<нм>/kx<нм> — нм на шаг, o — обнулить,
+// dz<N>/dx<N> — следующие N шагов оси потерять (срыв мотора: проверка контроля пропуска шагов).
 // ============================================================
 static bool              s_follow = false;
 static volatile int32_t  s_nut[2], s_car[2];      // шаги: гайка (сколько шагов пришло) и каретка
@@ -64,7 +65,9 @@ static volatile int32_t  s_bl_steps[2] = {0, 0};  // люфт, шаги
 static int32_t           s_nm_per_step[2] = {2500, 1250};   // Z: винт 2 мм / 800, X: 1 мм / 800
 static int32_t           s_bl_um[2] = {0, 0};
 
+static volatile int32_t  s_drop[2] = {0, 0};     // пропустить столько следующих шагов (срыв мотора)
 static inline void follow_step(uint8_t ax, bool up) {
+    if (s_drop[ax] > 0) { s_drop[ax]--; return; }
     if (up) { int32_t n = ++s_nut[ax]; if (s_car[ax] < n - s_bl_steps[ax]) s_car[ax] = n - s_bl_steps[ax]; }
     else    { int32_t n = --s_nut[ax]; if (s_car[ax] > n) s_car[ax] = n; }
 }
@@ -224,6 +227,7 @@ static void handle_command(const char* c) {
         case 'l': s_bl_um[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
         case 'k': s_nm_per_step[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
         case 'o': noInterrupts(); s_nut[0] = s_nut[1] = s_car[0] = s_car[1] = 0; interrupts(); break;
+        case 'd': noInterrupts(); s_drop[c[1] == 'x'] = atol(c + 2); interrupts(); break;   // dz/dx<N> — срыв N шагов
     }
     print_state();
 }

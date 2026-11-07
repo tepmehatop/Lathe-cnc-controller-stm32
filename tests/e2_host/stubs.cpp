@@ -25,3 +25,4 @@ bool e2_store_write(const void* b, uint32_t n) { memcpy(g_stub_flash, b, n); ret
 
 bool g_stub_rebooted = false;
 void e2_reboot(void) { g_stub_rebooted = true; }
+uint32_t DRV_DRO_GetPacketCount(void) { return 1; }

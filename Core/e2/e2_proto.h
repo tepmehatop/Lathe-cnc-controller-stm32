@@ -154,6 +154,7 @@ void e2_pos_from_display(const char* prm);    // POS_SET / POS_DEFAULT (сохр
 void e2_cal_from_display(const char* prm);
 void e2_scale_reref(void);             // линейки: новая опорная точка (BACKLOG-025)
 void e2_scale_track(void);
-bool e2_scale_gate(void);              // true — автоцикл в этот раз не вызывать (доводка X / пропуск шагов)    // CAL:<Z|X>:<мкм> — калибровка по линейкам
+bool e2_scale_gate(void);
+bool e2_scale_blocked(void);           // пропуск шагов — движение от джойстика заблокировано              // true — автоцикл в этот раз не вызывать (доводка X / пропуск шагов)    // CAL:<Z|X>:<мкм> — калибровка по линейкам
 bool e2_axis_editable(void);           // ввод/сброс осей с экрана (нет — при блоке DRO)
 void e2_axis_set(char axis, int32_t um);   // 'Z', 'X' — позиция, 'D' — диаметр; мкм, как на экране

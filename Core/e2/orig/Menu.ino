@@ -545,6 +545,7 @@ else if (Mode == Mode_Sphere && err_1_flag == false && err_2_flag == false)
 // ********** Обработчик Джойстик Вверх **********  
 void Joy_UpPressed()
 {
+   if (e2_scale_blocked()) return;   // [STM32] пропуск шагов: стоп джойстика до отпускания (BACKLOG-025)
    flag_j = ON;
    Disa_INT_Hcoder();
    Disable_INT_OCR3A();
@@ -700,6 +701,7 @@ void Joy_UpPressed()
 // ********** Обработчик Джойстик Вниз **********  
 void Joy_DownPressed()
 {
+   if (e2_scale_blocked()) return;   // [STM32] пропуск шагов: стоп джойстика до отпускания (BACKLOG-025)
    flag_j = ON;
    Disa_INT_Hcoder();
    Disable_INT_OCR3A();

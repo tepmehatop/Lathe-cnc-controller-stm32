@@ -31,7 +31,7 @@ static void e2_cal_poll(void)
 static int32_t e2_cal_read(char ax)
 {
    uint32_t t0 = millis();
-   while (millis() - t0 < 300 && !e2_cal_abort) e2_cal_poll();
+   while (millis() - t0 < 300 && !e2_cal_abort) { e2_cal_poll(); delay(1); }
    return ax == 'Z' ? dro_pos_y : dro_pos_x;
 }
 
@@ -50,7 +50,8 @@ static void e2_cal_move(char ax, long n)
       if (ax == 'Z') { Motor_Z_SetPulse(); delayMicroseconds(5); Motor_Z_RemovePulse(); }
       else           { Motor_X_SetPulse(); delayMicroseconds(5); Motor_X_RemovePulse(); }
       if ((i & 15) == 0) e2_cal_poll();
-      while (micros() - t < period) {}
+      uint32_t el = micros() - t;                 // дождаться периода (delayMicroseconds — и в симуляции)
+      if (el < period) delayMicroseconds(period - el);
       t += period;
    }
 }

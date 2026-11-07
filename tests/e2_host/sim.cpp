@@ -105,6 +105,8 @@ static std::string last_disp_pass();
 // Гайка — счёт импульсов STEP на выводе драйвера (столько повернулся винт), каретка — где на самом
 // деле резец. Motor_*_Pos — то, что думает прошивка (с компенсацией люфта — положение каретки).
 static long s_bl_x = 0, s_bl_z = 0;              // люфт, шаги (0 — без люфта)
+static long s_lost_x = 0;                        // пропущенные шаги X: мотор не провернулся (каретка отстала)
+extern int32_t g_stub_dro_x, g_stub_dro_y;
 // положение каретки, шаги (s_car_x/s_car_z объявлены выше)
 static double s_car_x_max = -1e18, s_car_x_min = 1e18;
 static int s_nut_dir_x = 0, s_nut_dir_z = 0;     // направление последнего движения гайки
@@ -125,8 +127,16 @@ static void backlash_follow() {
     f(s_car_x, s_x.count, s_bl_x); f(s_car_z, s_z.count, s_bl_z);
     if (s_car_x > s_car_x_max) s_car_x_max = s_car_x;
     if (s_car_x < s_car_x_min) s_car_x_min = s_car_x;
+    // Блок DRO показывает каретку (не гайку): люфт и пропущенные шаги в нём видны; пакеты — 50 Гц
+    static uint64_t s_dro_t = 0;
+    if (t_ns - s_dro_t >= 20000000ULL) {
+        s_dro_t = t_ns;
+        g_stub_dro_x = lround((s_car_x - s_lost_x) * (SCREW_X * 10.0 / (MOTOR_X_STEP_PER_REV * McSTEP_X)));
+        g_stub_dro_y = lround(s_car_z * (SCREW_Z * 10.0 / (MOTOR_Z_STEP_PER_REV * McSTEP_Z)));
+    }
 }
 
+long e2_dbg_pulses_x(void);
 static void sample_steps() {
     backlash_follow();
     auto chk = [](StepLog& l, uint32_t lvl, uint32_t dir_ccw) {
@@ -209,7 +219,7 @@ static void run_until(uint64_t t_end, bool allow_loop) {
         }
         if (spindle_rpm != 0 && spindle_next <= nxt) { nxt = spindle_next; ev = 3; }
         if (allow_loop && loop_next <= nxt) { nxt = loop_next; ev = 4; }
-        if (ev < 0) { if (t_end > t_ns) t_ns = t_end; sim_now_us = t_ns / 1000; return; }
+        if (ev < 0) { if (t_end > t_ns) t_ns = t_end; sim_now_us = t_ns / 1000; sample_steps(); return; }
         if (nxt > t_ns) t_ns = nxt;            // событие могло «опоздать» из-за delay() внутри loop()
         sim_now_us = t_ns / 1000;
         s_cur_ev = ev;
@@ -1176,10 +1186,47 @@ static void backlash_case(const char* what, int mode, std::function<void()> prep
     printf("    %-36s ноль после движения %s: задано %.3f мм, резец реально %.3f мм, недорез %.3f мм\n",
            what, last_dir > 0 ? "К детали " : "ОТ детали", expect_steps * mm_per, real * mm_per, (expect_steps - real) * mm_per);
     (void)m0;
+    if (getenv("SIM_FIXDBG")) printf("      [доводка] знак %d, ноль цикла %d (s %d m %ld), доведён проход %d, блок %d\n",
+        e2_scale_sign[1], e2_null_ok, (int)e2_null_s, e2_null_m, e2_fixed_pass, e2_loss_block);
+    if (getenv("SIM_FIXDBG")) {
+        const std::string& o = DISPLAY_UART.out;
+        for (const char* w : {"ПРОПУСК", "РАСХОЖДЕНИЕ", "НЕ СОВПАДАЕТ", "НЕ ГОТОВА"}) {
+            size_t p = o.rfind(w);
+            if (p != std::string::npos) printf("      [сообщение] %s\n", o.substr(p, o.find('>', p) - p).c_str());
+        }
+    }
+#if SCALE_FIX_X && ELS_POS_SOURCE == POS_SOURCE_DRO_UART
+    // доводка X по линейке: глубина по линейке от нуля цикла — люфт и сторона подвода не важны
+    CHECK(fabs((expect_steps - real) * mm_per) < 0.010, "%s, ноль %s: с доводкой X недорез %.3f мм",
+          what, last_dir > 0 ? "к детали" : "от детали", (expect_steps - real) * mm_per);
+#endif
     SET_IN(E2_PIN_SUB_EXT, 1); SET_IN(E2_PIN_SUB_MAN, 0); run_ms(200);
     touch("ALERT_OK"); select_mode(1);
     if (limit_Left_flag)  { SET_IN(E2_PIN_LIM_LEFT, 0);  run_ms(150); SET_IN(E2_PIN_LIM_LEFT, 1);  run_ms(100); }
     if (limit_Right_flag) { SET_IN(E2_PIN_LIM_RIGHT, 0); run_ms(150); SET_IN(E2_PIN_LIM_RIGHT, 1); run_ms(100); }
+}
+
+// Пропуск шагов (BACKLOG-025): каретка «теряет» 0.25 мм — на остановке сообщение и блок джойстика
+static void test_steploss() {
+#if STEP_LOSS_CHECK && ELS_POS_SOURCE == POS_SOURCE_DRO_UART   // DRO-заглушка следует за кареткой (линеек в заглушке нет)
+    printf("[%7.1f с] [steploss] ", t_ns / 1e9); printf("контроль пропуска шагов по DRO\n");
+    controls_neutral(); select_mode(2); touch("AFEED:300"); touch("S2"); run_ms(200);
+    jog_x(1, 700); run_ms(500); jog_x(-1, 700); run_ms(500);          // направление линейки (ход > 2 мм), опора
+    CHECK(e2_scale_sign[1] != 0 && !e2_loss_block, "направление линейки X не определено (%d)", e2_scale_sign[1]);
+    size_t o = DISPLAY_UART.out.size();
+    // посреди хода 200 шагов (0.25 мм) не дошли до каретки (стоя на месте скачок DRO — это обнуление блока)
+    // ход в ту же сторону, что и предыдущий: без заданного люфта разворот не сверяется
+    SET_IN(E2_PIN_JOY_DOWN, 0); run_ms(150); s_lost_x += 200; run_ms(150); SET_IN(E2_PIN_JOY_DOWN, 1); run_ms(700);
+    CHECK(e2_loss_block && DISPLAY_UART.out.find("ПРОПУСК ШАГОВ X", o) != std::string::npos,
+          "пропуск 0.25 мм не замечен (блок %d)", e2_loss_block);
+    long m = Motor_X_Pos;
+    SET_IN(E2_PIN_JOY_UP, 0); run_ms(300);
+    CHECK(Motor_X_Pos == m, "при блокировке джойстик двигает X");
+    SET_IN(E2_PIN_JOY_UP, 1); run_ms(1300);
+    CHECK(!e2_loss_block, "блокировка не снялась после отпускания джойстика");
+    s_lost_x = 0; e2_scale_reref();
+    touch("ALERT_OK"); controls_neutral(); run_ms(200);
+#endif
 }
 
 static void test_backlash() {
@@ -1218,7 +1265,14 @@ int main() {
     check_cnt_resets();
     run_ms(500);
     test_boot();
-    if (e2_mech_is_stamp(E2_MECH_CONFIG) && !getenv("SIM_MECH")) test_mech();   // проверки — под механику автора
+    if (e2_mech_is_stamp(E2_MECH_CONFIG) && !getenv("SIM_MECH")) test_mech();
+    if (getenv("SIM_MOVEDBG")) {
+        for (long n : {5L, 8L, -5L, 40L}) {
+            long c0 = s_x.count; e2_cal_abort = false; e2_cal_joy = false; e2_cal_move('X', n); run_ms(5);
+            printf("e2_cal_move(X, %ld): импульсов %ld, каретка %.0f\n", n, s_x.count - c0, s_car_x);
+        }
+        return 0;
+    }   // проверки — под механику автора
     if (getenv("SIM_BACKLASH")) {                    // эксперимент: люфт и точность автоциклов
         controls_neutral(); run_ms(200);
         test_backlash();
@@ -1248,6 +1302,7 @@ int main() {
     test_limit();
     test_limit_no_switch();
     test_axis_set();
+    test_steploss();
     test_thread_ext_cycle(13);
     test_feed_ext_cycle();
     test_x_axis();
@@ -1273,3 +1328,5 @@ int main() {
     printf("\nИТОГ: %d проверок OK, %d FAIL\n", s_pass, s_fail);
     return s_fail ? 1 : 0;
 }
+
+long e2_dbg_pulses_x(void) { return s_x.count; }
