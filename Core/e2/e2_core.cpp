@@ -2199,6 +2199,7 @@ void e2_service(void)
       e2_rpm = rpm;                             // [STM32] для e2_machine_idle()
    }
    e2_scale_track();                             // [STM32] линейки: пропуск шагов (BACKLOG-025)
+   e2_gcode_watch();                             // [STM32] G-код: смена режима — опорная точка заново
    // Значения, которые UartDisplay шлёт только в Display_Send_All, — по изменению (e2_display.inc)
    Display_Watch();
    // Сообщения на новом дисплее горят ровно столько же, сколько на LCD2004: ядро ставит и снимает

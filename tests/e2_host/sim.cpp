@@ -673,6 +673,14 @@ static void test_gcode() {
     gcode("G0 Z0 X0", 5000);
     r = gcode("G2 Z-5 X10 R5", 8000);                          // четверть окружности: (0,0) → (−5, 5 радиус)
     CHECK(r == "OK" && shown_z() == -5000 && shown_x() == 5000, "G2 R5: %s, Z=%ld X=%ld", r.c_str(), shown_z(), shown_x());
+    // между программами: вышли из M8, подвели ось и обнулили её, вернулись — новая программа в новых координатах
+    select_mode(2); touch("AFEED:300"); run_ms(100);
+    SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(600); SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800);
+    touch("AXIS:Z:0"); run_ms(50);
+    select_mode(8); run_ms(200);
+    r = gcode("G0 Z-3", 3000);
+    CHECK(r == "OK" && shown_z() == -3000, "после выхода из M8 и обнуления: %s, Z=%ld (ожидалось -3000)", r.c_str(), shown_z());
+    gcode("G0 Z-5 X10", 3000);
     // стоп посреди хода: STOP уже в буфере, когда начинается движение
     long z0 = Motor_Z_Pos;
     size_t o = DISPLAY_UART.out.size();

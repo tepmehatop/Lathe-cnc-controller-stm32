@@ -202,7 +202,9 @@ void e2_gcode_line(const char* line)
    const char* err = nullptr;
    while (*line == ' ') line++;
    if (!strcmp(line, "STOP")) { Display_Send_CMD("OK", nullptr); return; }   // стоп между строками — уже стоим
-   if (*line == 'O' || *line == '%') { Display_Send_CMD("OK", nullptr); return; }   // номер программы, начало/конец ленты
+   if (*line == '%') { e2_gc.known = false; Display_Send_CMD("OK", nullptr); return; }   // начало программы (дисплей
+                                                                                       // шлёт перед первой строкой) / ленты
+   if (*line == 'O') { Display_Send_CMD("OK", nullptr); return; }                      // номер программы
    static int s_mode = -1;
    if (Mode != s_mode) { s_mode = Mode; e2_gc.known = false; }      // вошли в M8 — опорная точка заново
    if (Mode != Mode_Reserve) err = "ВКЛЮЧИТЕ РЕЖИМ M8 (G-КОД)";
@@ -232,3 +234,10 @@ void e2_gcode_line(const char* line)
 
 // Выход из M8 / ввод оси — положение программы заново с экрана
 void e2_gcode_reset(void) { e2_gc.known = false; }
+
+// Из e2_service(): смена режима — опорная точка заново (между программами оси двигали и обнуляли в другом режиме)
+void e2_gcode_watch(void)
+{
+   static int s_mode = -1;
+   if (Mode != s_mode) { s_mode = Mode; e2_gc.known = false; }
+}

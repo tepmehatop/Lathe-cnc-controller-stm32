@@ -154,6 +154,7 @@ void e2_pos_from_display(const char* prm);    // POS_SET / POS_DEFAULT (сохр
 void e2_cal_from_display(const char* prm);
 void e2_gcode_line(const char* line);    // <GCODE:…> — строка G-кода (BACKLOG-001)
 void e2_gcode_reset(void);
+void e2_gcode_watch(void);
 void e2_cal_step_from_display(const char* prm);   // CAL_STEP:<Z|X>:<фаза>:<мкм> — калибровка по индикатору
 void e2_scale_reref(void);             // линейки: новая опорная точка (BACKLOG-025)
 void e2_scale_track(void);

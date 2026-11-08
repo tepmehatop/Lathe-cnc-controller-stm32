@@ -44,6 +44,7 @@ def main():
         print('загрузка:', http('PUT', f'{base}/api/file?name={name}', open(a.file, 'rb').read())[:80])
         print('файлы:', http('GET', f'{base}/api/files')[:120])
         sp.on(a.rpm); time.sleep(1.0)
+        esp.s.reset_input_buffer()
         print('запуск:', http('POST', f'{base}/api/run?name={name}')[:80])
         t0, shot_done, last, seen_run = time.time(), False, None, False
         while time.time() - t0 < 600:
@@ -60,6 +61,10 @@ def main():
             # конец — только после запуска: «Готово» прошлой программы держится до старта новой
             if seen_run and S in ('DONE', 'ERROR', 'IDLE'):
                 break
+        log = esp.s.read(65536).decode(errors='replace')
+        for l in log.splitlines():
+            if '[gce]' in l or '[GC]' in l:
+                print('    ', l[:110])
         z, x = mega.pos()
         want_z, want_x = round(a.z * 1000), round(a.x * 1000 / 2)
         ok = abs(z - want_z) <= 5 and abs(x - want_x) <= 5 and 'rror' not in str(last)

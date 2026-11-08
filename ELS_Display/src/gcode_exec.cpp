@@ -17,6 +17,7 @@ static GcExecSt  s_state     = GCE_IDLE;
 static File*     s_file      = nullptr;  // указатель: нет глобального конструктора File
 static long      s_file_size = 0;
 static int       s_line_nr   = 0;
+static bool      s_need_start = false;   // перед первой строкой — «%»: STM32 заново снимает опорную точку
 static uint32_t  s_ack_t     = 0;
 static uint32_t  s_dwell_t   = 0;
 static uint32_t  s_dwell_ms  = 0;
@@ -111,6 +112,7 @@ bool GCodeExec_Run(const char* filepath) {
     }
     s_file_size = s_file->size();
     s_state = GCE_RUNNING;
+    s_need_start = true;
     Serial.printf("[gce] Start: %s (%ld B)\n", filepath, s_file_size);
     return true;
 }
@@ -149,6 +151,13 @@ void GCodeExec_Process() {
     switch (s_state) {
 
         case GCE_RUNNING: {
+            if (s_need_start) {                  // начало программы: опорная точка — с текущего положения
+                s_need_start = false;
+                if (s_send_fn) s_send_fn("%");
+                s_ack_t = millis();
+                s_state = GCE_WAITING_ACK;
+                return;
+            }
             if (!s_file || !s_file->available()) {
                 close_file();
                 s_state = GCE_DONE;
