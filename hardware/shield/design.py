@@ -7,7 +7,7 @@
 
 Схемотехника — как у шилда автора 7e2 (Diagram ELS_V7), с поправками на 3.3 В:
   * подтяжки входов 1 кОм — к 3V платы, а не к +5 В;
-  * STEP/DIR/ENA — NPN-ключи (2N3904), вход драйвера «+» на +5 В;
+  * STEP/DIR/ENA — NPN-ключи (MMBT3904), вход драйвера «+» на +5 В;
   * зуммер — через NPN-ключ (BEEPER_ON_LEVEL = 1);
   * светодиоды упоров — от 3V через 220 Ом (горят при «0», как у автора);
   * конденсаторы на линиях энкодера (1 нФ) и РГИ (10 нФ).
@@ -45,11 +45,11 @@ PINS = mcu_pins()
 PIN_TO_NET = {v: k for k, v in PINS.items()}      # PA1 → ENC_A
 
 # ── Библиотеки ────────────────────────────────────────────────────────────────
-FP_R = 'Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal'
-FP_RN = 'Resistor_THT:R_Array_SIP9'
-FP_C = 'Capacitor_THT:C_Disc_D3.0mm_W1.6mm_P2.50mm'
-FP_CP = 'Capacitor_THT:CP_Radial_D6.3mm_P2.50mm'
-FP_Q = 'Package_TO_SOT_THT:TO-92_Inline_Wide'   # шаг 2.54 — зазоры и пайка проще
+# Rev 2 (компактный, как Shield3.0 на Mega): мелочь — SMD 0805 и SOT-23 под платой Discovery (она стоит сверху
+# в гнёздах, зазор ≈ 8 мм), разъёмы — штыревые 2.54 с защёлкой (Molex KK-254 / KF2510) по краям, режимы — IDC.
+FP_R = 'Resistor_SMD:R_0805_2012Metric'
+FP_C = 'Capacitor_SMD:C_0805_2012Metric'
+FP_Q = 'Package_TO_SOT_SMD:SOT-23'              # MMBT3904: 1 = Б, 2 = Э, 3 = К
 # Посадочное место штыревого разъёма: у PinSocket из библиотеки KiCad ряды зеркальны (вывод 2
 # слева от 1), а Discovery вставляется лицом вверх — вывод 2 справа. Паяется гнездо 2×25.
 FP_SOCK = 'Connector_PinHeader_2.54mm:PinHeader_2x25_P2.54mm_Vertical'
@@ -57,9 +57,9 @@ FP_HOLE = 'MountingHole:MountingHole_3.2mm_M3'
 
 
 def fp_term(n):
-    if n == 2:
-        return 'TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal'
-    return f'TerminalBlock_Phoenix:TerminalBlock_Phoenix_MPT-0,5-{n}-2.54_1x{n:02d}_P2.54mm_Horizontal'
+    if n == 9:                                   # режимы — 8 положений + общий: коробка IDC 2×5 (10-й — GND)
+        return 'Connector_IDC:IDC-Header_2x05_P2.54mm_Vertical'
+    return f'Connector_Molex:Molex_KK-254_AE-6410-{n:02d}A_1x{n:02d}_P2.54mm_Vertical'
 
 
 # ── Детали ─────────────────────────────────────────────────────────────────────
@@ -89,18 +89,16 @@ def sock_pins(table):
 part('J1', 'Connector_Generic:Conn_02x25_Odd_Even', FP_SOCK, 'Discovery P1', sock_pins(P1), 'гнездо 2×25 под P1')
 part('J2', 'Connector_Generic:Conn_02x25_Odd_Even', FP_SOCK, 'Discovery P2', sock_pins(P2), 'гнездо 2×25 под P2')
 
-# Подтяжки 1k к 3V — сборки резисторов (вывод 1 общий)
+# Подтяжки 1k к 3V — по резистору 0805 на вход
 PULLUPS = [
     ['MODE_FEED', 'MODE_AFEED', 'MODE_CONE_L', 'MODE_CONE_R', 'MODE_THREAD', 'MODE_SPHERE', 'MODE_DIVIDER', 'MODE_RESERVE'],
     ['SUB_INT', 'SUB_MAN', 'SUB_EXT', 'BTN_LEFT', 'BTN_RIGHT', 'BTN_UP', 'BTN_DOWN', 'BTN_SELECT'],
     ['JOY_LEFT', 'JOY_RIGHT', 'JOY_UP', 'JOY_DOWN', 'JOY_RAPID', 'LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT'],
     ['LIM_REAR', 'HAND_AXIS_Z', 'HAND_AXIS_X', 'HAND_X1', 'HAND_X10', 'ENC_A', 'ENC_B', 'HAND_A'],
 ]
-for i, nets in enumerate(PULLUPS):
-    pins = {1: '+3V'}
-    pins.update({k + 2: n for k, n in enumerate(nets)})
-    part(f'RN{i + 1}', 'Device:R_Network08', FP_RN, '8×1k', pins, 'сборка резисторов с общим выводом')
-part('R1', 'Device:R', FP_R, '1k', {1: '+3V', 2: 'HAND_B'}, 'подтяжка РГИ B')
+PULLUP_NETS = [n for grp in PULLUPS for n in grp] + ['HAND_B']
+for i, n in enumerate(PULLUP_NETS):
+    part(f'R{101 + i}', 'Device:R', FP_R, '1k', {1: '+3V', 2: n}, f'подтяжка {n}')
 
 # Конденсаторы от помех и питания
 part('C1', 'Device:C', FP_C, '1nF', {1: 'ENC_A', 2: 'GND'}, 'энкодер A')
@@ -110,9 +108,9 @@ part('C4', 'Device:C', FP_C, '10nF', {1: 'HAND_B', 2: 'GND'}, 'РГИ B')
 part('C5', 'Device:C', FP_C, '100nF', {1: 'FEED_POT', 2: 'GND'}, 'переменник')
 part('C6', 'Device:C', FP_C, '100nF', {1: '+5V', 2: 'GND'}, '')
 part('C7', 'Device:C', FP_C, '100nF', {1: '+3V', 2: 'GND'}, '')
-part('C8', 'Device:C_Polarized', FP_CP, '100uF 10V', {1: '+5V', 2: 'GND'}, '')
+part('C8', 'Device:C', 'Capacitor_SMD:C_1206_3216Metric', '22uF 10V', {1: '+5V', 2: 'GND'}, 'керамика X5R, низкая — под Discovery')
 
-# NPN-ключи: драйверы (6) и зуммер. 2N3904: 1 = E, 2 = B, 3 = C
+# NPN-ключи: драйверы (6) и зуммер. MMBT3904 (SOT-23): 1 = B, 2 = E, 3 = C
 r = 2
 q = 1
 KEYS = [('Z_STEP', 'Z_PUL_N'), ('Z_DIR', 'Z_DIR_N'), ('Z_ENA', 'Z_ENA_N'),
@@ -121,7 +119,7 @@ for sig, out in KEYS:
     base = 'B_' + sig
     part(f'R{r}', 'Device:R', FP_R, '1k', {1: sig, 2: base}, f'база {sig}'); r += 1
     part(f'R{r}', 'Device:R', FP_R, '10k', {1: base, 2: 'GND'}, 'закрывает ключ при старте'); r += 1
-    part(f'Q{q}', 'Transistor_BJT:2N3904', FP_Q, '2N3904', {1: 'GND', 2: base, 3: out}, f'ключ {sig}'); q += 1
+    part(f'Q{q}', 'Transistor_BJT:Q_NPN_BEC', FP_Q, 'MMBT3904', {1: base, 2: 'GND', 3: out}, f'ключ {sig}'); q += 1
 
 # Светодиоды упоров: 220 Ом между выводом и клеммой катода
 for led in ('LED_LEFT', 'LED_RIGHT', 'LED_FRONT', 'LED_REAR'):
@@ -139,7 +137,7 @@ TERMINALS = [
     ('J5', 'ДРАЙВЕР Z', ['+5V', 'Z_PUL_N', '+5V', 'Z_DIR_N', '+5V', 'Z_ENA_N'], ['PUL+', 'PUL-', 'DIR+', 'DIR-', 'ENA+', 'ENA-']),
     ('J6', 'ДРАЙВЕР X', ['+5V', 'X_PUL_N', '+5V', 'X_DIR_N', '+5V', 'X_ENA_N'], ['PUL+', 'PUL-', 'DIR+', 'DIR-', 'ENA+', 'ENA-']),
     ('J7', 'РЕЖИМ', ['MODE_FEED', 'MODE_AFEED', 'MODE_CONE_L', 'MODE_CONE_R', 'MODE_THREAD', 'MODE_SPHERE',
-                     'MODE_DIVIDER', 'MODE_RESERVE', 'GND'], ['СИН', 'АСИ', 'К<', 'К>', 'РЕЗ', 'ШАР', 'ДЕЛ', 'РЕЗВ', 'GND']),
+                     'MODE_DIVIDER', 'MODE_RESERVE', 'GND'], ['M1', 'M2', 'M4', 'M5', 'M3', 'M6', 'M7', 'M8', 'GND']),
     ('J8', 'ПОДРЕЖИМ', ['SUB_INT', 'SUB_MAN', 'SUB_EXT', 'GND'], ['ВНУТ', 'РУЧ', 'НАР', 'GND']),
     ('J9', 'КНОПКИ', ['BTN_LEFT', 'BTN_RIGHT', 'BTN_UP', 'BTN_DOWN', 'BTN_SELECT', 'GND'], ['ЛЕВ', 'ПРАВ', 'ВВЕРХ', 'ВНИЗ', 'ВЫБ', 'GND']),
     ('J10', 'ДЖОЙСТИК', ['JOY_LEFT', 'JOY_RIGHT', 'JOY_UP', 'JOY_DOWN', 'JOY_RAPID', 'GND'], ['ЛЕВ', 'ПРАВ', 'ВВЕРХ', 'ВНИЗ', 'БЫСТР', 'GND']),
@@ -159,7 +157,11 @@ TERMINALS = [
 ]
 for ref, title, nets, labels in TERMINALS:
     n = len(nets)
-    part(ref, f'Connector:Screw_Terminal_01x{n:02d}', fp_term(n), title, {i + 1: net for i, net in enumerate(nets)},
+    if n == 9:                                   # IDC 2×5: выводы 1…9 по порядку, 10 — GND
+        part(ref, 'Connector_Generic:Conn_02x05_Odd_Even', fp_term(n), title,
+             {**{i + 1: net for i, net in enumerate(nets)}, 10: 'GND'}, ' / '.join(labels + ['GND']))
+        continue
+    part(ref, f'Connector_Generic:Conn_01x{n:02d}', fp_term(n), title, {i + 1: net for i, net in enumerate(nets)},
          ' / '.join(labels))
 
 for i in range(4):

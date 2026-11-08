@@ -51,3 +51,5 @@ dist/
 
 # сторонние инструменты (KiCad MCP-сервер и т. п.) — не в репозитории
 .tools/
+# отчёт DRC от KiCad MCP
+hardware/shield/els_shield_drc_violations.json

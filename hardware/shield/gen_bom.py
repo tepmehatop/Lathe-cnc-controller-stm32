@@ -8,12 +8,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Что покупать — человеческие названия
 BUY = {
-    'Connector_PinHeader_2.54mm:PinHeader_2x25_P2.54mm_Vertical': 'Гнездо (female) 2×25, шаг 2.54 мм, прямое',
-    'Resistor_THT:R_Array_SIP9': 'Резисторная сборка SIP-9, 8 резисторов с общим выводом',
-    'Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal': 'Резистор 0.25 Вт выводной',
-    'Capacitor_THT:C_Disc_D3.0mm_W1.6mm_P2.50mm': 'Конденсатор керамический, шаг 2.5 мм',
-    'Capacitor_THT:CP_Radial_D6.3mm_P2.50mm': 'Конденсатор электролитический D6.3 мм, шаг 2.5 мм',
-    'Package_TO_SOT_THT:TO-92_Inline_Wide': 'Транзистор NPN 2N3904, корпус TO-92 (выводы Э-Б-К)',
+    'Connector_PinHeader_2.54mm:PinHeader_2x25_P2.54mm_Vertical': 'Гнездо (female) 2×25, шаг 2.54 мм, прямое — под Discovery',
+    'Resistor_SMD:R_0805_2012Metric': 'Резистор SMD 0805, 5 %',
+    'Capacitor_SMD:C_0805_2012Metric': 'Конденсатор керамический SMD 0805, X7R, 16 В и выше',
+    'Capacitor_SMD:C_1206_3216Metric': 'Конденсатор керамический SMD 1206, X5R',
+    'Package_TO_SOT_SMD:SOT-23': 'Транзистор NPN SMD SOT-23 (MMBT3904, маркировка 1A; аналог MMBT2222A)',
+    'Connector_IDC:IDC-Header_2x05_P2.54mm_Vertical': 'Вилка IDC 2×5 в корпусе (box header), шаг 2.54 мм, прямая',
     'MountingHole:MountingHole_3.2mm_M3': 'Отверстие под винт M3 (не деталь)',
 }
 
@@ -21,11 +21,9 @@ BUY = {
 def buy_name(fp):
     if fp in BUY:
         return BUY[fp]
-    if 'MKDS' in fp:
-        return 'Клеммник винтовой 2 контакта, шаг 5.08 мм (Phoenix MKDS 1,5/2 или аналог KF301-2P)'
-    if 'MPT' in fp:
-        n = fp.split('_1x')[1][:2]
-        return f'Клеммник винтовой {int(n)} контактов, шаг 2.54 мм (Phoenix MPT 0,5 или аналог KF128/DG128)'
+    if 'KK-254' in fp:
+        n = int(fp.split('_1x')[1][:2])
+        return f'Вилка {n} конт., шаг 2.54 мм, прямая, с защёлкой (KF2510-{n}P / Molex KK-254) + ответная часть'
     return fp
 
 
