@@ -13,6 +13,7 @@ BUY = {
     'Capacitor_SMD:C_0805_2012Metric': 'Конденсатор керамический SMD 0805, X7R, 16 В и выше',
     'Capacitor_SMD:C_1206_3216Metric': 'Конденсатор керамический SMD 1206, X5R',
     'Package_TO_SOT_SMD:SOT-23': 'Транзистор NPN SMD SOT-23 (MMBT3904, маркировка 1A; аналог MMBT2222A)',
+    'Diode_SMD:D_SOD-123': 'Диод Шоттки SOD-123, 1 А 40 В (B5819W или 1N5819W); полоска на корпусе — катод',
     'Connector_IDC:IDC-Header_2x05_P2.54mm_Vertical': 'Вилка IDC 2×5 в корпусе (box header), шаг 2.54 мм, прямая',
     'MountingHole:MountingHole_3.2mm_M3': 'Отверстие под винт M3 (не деталь)',
 }

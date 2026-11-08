@@ -78,7 +78,7 @@ def sock_pins(table):
         if name == 'GND':
             pins[n] = 'GND'
         elif name == '5V':
-            pins[n] = '+5V'
+            pins[n] = '+5V_DISCO'        # 5V Discovery — через диод D1 от +5V шилда (UM1472 п. 4.3: не больше 100 мА наружу)
         elif name == '3V':
             pins[n] = '+3V'
         elif name in PIN_TO_NET and PIN_TO_NET[name] not in ('AUDIO_RESET', 'DRO_TX'):
@@ -108,6 +108,9 @@ part('C4', 'Device:C', FP_C, '10nF', {1: 'HAND_B', 2: 'GND'}, 'РГИ B')
 part('C5', 'Device:C', FP_C, '100nF', {1: 'FEED_POT', 2: 'GND'}, 'переменник')
 part('C6', 'Device:C', FP_C, '100nF', {1: '+5V', 2: 'GND'}, '')
 part('C7', 'Device:C', FP_C, '100nF', {1: '+3V', 2: 'GND'}, '')
+# Питание Discovery от блока 5 В шилда — через диод Шоттки: блок питает Discovery, а USB ST-LINK (без блока)
+# не питает дисплей, LCD и энкодеры через диод D1 самой Discovery (UM1472 п. 4.3)
+part('D1', 'Device:D_Schottky', 'Diode_SMD:D_SOD-123', 'B5819W', {1: '+5V_DISCO', 2: '+5V'}, 'Шоттки 1 А, SOD-123 (B5819W, 1N5819W)')
 part('C8', 'Device:C', 'Capacitor_SMD:C_1206_3216Metric', '22uF 10V', {1: '+5V', 2: 'GND'}, 'керамика X5R, низкая — под Discovery')
 
 # NPN-ключи: драйверы (6) и зуммер. MMBT3904 (SOT-23): 1 = B, 2 = E, 3 = C
@@ -136,8 +139,9 @@ TERMINALS = [
     ('J4', 'ЭНКОДЕР', ['+5V', 'GND', 'ENC_A', 'ENC_B'], ['+5V', 'GND', 'A', 'B']),
     ('J5', 'ДРАЙВЕР Z', ['+5V', 'Z_PUL_N', '+5V', 'Z_DIR_N', '+5V', 'Z_ENA_N'], ['PUL+', 'PUL-', 'DIR+', 'DIR-', 'ENA+', 'ENA-']),
     ('J6', 'ДРАЙВЕР X', ['+5V', 'X_PUL_N', '+5V', 'X_DIR_N', '+5V', 'X_ENA_N'], ['PUL+', 'PUL-', 'DIR+', 'DIR-', 'ENA+', 'ENA-']),
-    ('J7', 'РЕЖИМ', ['MODE_FEED', 'MODE_AFEED', 'MODE_CONE_L', 'MODE_CONE_R', 'MODE_THREAD', 'MODE_SPHERE',
-                     'MODE_DIVIDER', 'MODE_RESERVE', 'GND'], ['M1', 'M2', 'M4', 'M5', 'M3', 'M6', 'M7', 'M8', 'GND']),
+    # вывод N коробки — режим M N (как на экране): положение галетника N паять на вывод N
+    ('J7', 'РЕЖИМ', ['MODE_FEED', 'MODE_AFEED', 'MODE_THREAD', 'MODE_CONE_L', 'MODE_CONE_R', 'MODE_SPHERE',
+                     'MODE_DIVIDER', 'MODE_RESERVE', 'GND'], ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'GND']),
     ('J8', 'ПОДРЕЖИМ', ['SUB_INT', 'SUB_MAN', 'SUB_EXT', 'GND'], ['ВНУТ', 'РУЧ', 'НАР', 'GND']),
     ('J9', 'КНОПКИ', ['BTN_LEFT', 'BTN_RIGHT', 'BTN_UP', 'BTN_DOWN', 'BTN_SELECT', 'GND'], ['ЛЕВ', 'ПРАВ', 'ВВЕРХ', 'ВНИЗ', 'ВЫБ', 'GND']),
     ('J10', 'ДЖОЙСТИК', ['JOY_LEFT', 'JOY_RIGHT', 'JOY_UP', 'JOY_DOWN', 'JOY_RAPID', 'GND'], ['ЛЕВ', 'ПРАВ', 'ВВЕРХ', 'ВНИЗ', 'БЫСТР', 'GND']),

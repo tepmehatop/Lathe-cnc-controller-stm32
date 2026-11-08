@@ -106,7 +106,7 @@ def place_smd(fps, parts):
         y = DY + 3.0
         while y < DY + 97 - 3.0:
             in_hdr = (J1_POS[1] - 2.5 < y < J1_POS[1] + 24 * 2.54 + 2.5) and \
-                     (J1_POS[0] - 3.2 < x < J1_POS[0] + 2.54 + 3.2 or J2_POS[0] - 3.2 < x < J2_POS[0] + 2.54 + 3.2)
+                     (J1_POS[0] - 4.2 < x < J1_POS[0] + 2.54 + 4.2 or J2_POS[0] - 4.2 < x < J2_POS[0] + 2.54 + 4.2)   # SOD-123 длиннее 0805
             if not in_hdr:
                 cells.append((x, y))
             y += SY
@@ -192,7 +192,7 @@ def main_place():
     place_side(fps, SIDE_RIGHT, 'right', 7.0, H - 12.0)
     place_side(fps, SIDE_BOTTOM, 'bottom', 15.0, W - 15.0)
     # ── Мелочь под Discovery ──────────────────────────────────────────────────
-    smd = [p for p in design.PARTS if p['ref'][0] in 'RCQ']
+    smd = [p for p in design.PARTS if p['ref'][0] in 'RCQD']
     place_smd(fps, smd)
     # для ручной сборки на шелкографии мелочи — номинал («1k», «3904»), позиция — в BOM и на слое Fab
     for p in smd:
@@ -228,14 +228,14 @@ def main_place():
         pads = sorted([p for p in f.Pads() if p.GetNumber().isdigit()], key=lambda p: int(p.GetNumber()))
         x0, y0, x1, y1 = bbox(f)
         if ref == 'J7':
-            # IDC: над коробкой — две строки подписей по столбцам: верхняя строка — верхний ряд выводов
+            # IDC: легенда «номер вывода — режим» (вывод 1 — треугольник на корпусе, квадратная площадка)
             labs = labels + ['GND']
-            rows = sorted({round(pcbnew.ToMM(p.GetPosition().y), 2) for p in pads})
-            for pad, lab in zip(pads, labs):
-                v = pad.GetPosition()
-                row = rows.index(round(pcbnew.ToMM(v.y), 2))
-                silk_text(board, lab, pcbnew.ToMM(v.x), y0 - 0.9 - (1.2 if row == 0 else 0), 0.8, 0)
-            silk_text(board, title, (x0 + x1) / 2, y0 - 3.4, 0.9)
+            half = (len(labs) + 1) // 2
+            l1 = '  '.join(f'{i + 1} {labs[i]}' for i in range(half))
+            l2 = '  '.join(f'{i + 1} {labs[i]}' for i in range(half, len(labs)))
+            silk_text(board, l1, (x0 + x1) / 2, y0 - 2.3, 0.8)
+            silk_text(board, l2, (x0 + x1) / 2, y0 - 1.0, 0.8)
+            silk_text(board, title + ' (вывод N = режим M N)', (x0 + x1) / 2, y0 - 3.7, 0.9)
             continue
         side = 'left' if ref in SIDE_LEFT else 'right' if ref in SIDE_RIGHT else 'bottom'
         for pad, lab in zip(pads, labels):
@@ -253,17 +253,8 @@ def main_place():
     silk_text(board, 'ELS shield STM32F4DISCOVERY rev 2', W / 2, 3.2, 1.2)
     silk_text(board, 'DISCOVERY: USB ST-LINK вверх, лицом вверх', W / 2, DY + 6, 1.0)
 
-    # ── Земляные полигоны с двух сторон ───────────────────────────────────────
-    for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
-        z = pcbnew.ZONE(board)
-        z.SetLayer(layer); z.SetNet(nets['GND'])
-        z.SetLocalClearance(MM(0.3)); z.SetMinThickness(MM(0.25))
-        z.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL)
-        z.SetThermalReliefGap(MM(0.4)); z.SetThermalReliefSpokeWidth(MM(0.5))
-        ol = z.Outline(); ol.NewOutline()
-        for x, y in [(0.5, 0.5), (W - 0.5, 0.5), (W - 0.5, H - 0.5), (0.5, H - 0.5)]:
-            ol.Append(MM(x), MM(y))
-        board.Add(z)
+    # Земляные полигоны — после трассировки (fix_zones.py): GND разводится дорожками, как остальные цепи,
+    # иначе площадки в тесных местах (эмиттеры ключей) остаются только на оторванных кусках полигона
 
     os.makedirs(os.path.dirname(DSN), exist_ok=True)
     board.Save(PCB)
@@ -279,10 +270,13 @@ def write_project():
                                      'diff_pair_gap': 0.25, 'diff_pair_width': 0.2, 'diff_pair_via_gap': 0.25,
                                      'wire_width': 6, 'bus_width': 12, 'line_style': 0, 'schematic_color': 'rgba(0, 0, 0, 0.000)',
                                      'pcb_color': 'rgba(0, 0, 0, 0.000)', 'priority': 2147483647 if name == 'Default' else 0}
+    # +5V — дисплей 10.1" (до 1.5 А): дорожки 1.0 мм; +3V и GND — 0.6 мм (GND ещё и полигоны)
     pro = {'meta': {'filename': 'els_shield.kicad_pro', 'version': 1},
-           'net_settings': {'classes': [cls('Default', 0.3, 0.8, 0.4), cls('Power', 0.6, 1.0, 0.5)],
+           'net_settings': {'classes': [cls('Default', 0.3, 0.8, 0.4), cls('Power', 0.6, 1.0, 0.5),
+                                        cls('Power5', 1.0, 1.2, 0.6)],
                             'meta': {'version': 3},
-                            'netclass_patterns': [{'netclass': 'Power', 'pattern': n} for n in ('+5V', '+3V', 'GND')]}}
+                            'netclass_patterns': [{'netclass': 'Power', 'pattern': n} for n in ('+3V', 'GND')] +
+                                                 [{'netclass': 'Power5', 'pattern': n} for n in ('+5V', '+5V_DISCO')]}}
     with open(os.path.join(HERE, 'els_shield.kicad_pro'), 'w', encoding='utf-8') as f:
         json.dump(pro, f, indent=2, ensure_ascii=False)
 
