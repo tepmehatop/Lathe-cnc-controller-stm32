@@ -182,7 +182,7 @@ button:disabled{opacity:.4;cursor:default}
 
 <script>
 const $=id=>document.getElementById(id);
-let prog=null, curFile='', lastLine=-1;
+let prog=null, curFile='', lastLine=-1, planErr='', curStep=0, lastStep=-1;
 const STATE={IDLE:'Нет программы',RUNNING:'Выполняется',WAITING_ACK:'Выполняется',DWELL:'Пауза G4',PAUSED:'Пауза',DONE:'Готово',ERROR:'Ошибка'};
 const COLOR={RUNNING:'#43c463',WAITING_ACK:'#43c463',DWELL:'#3fb6f0',PAUSED:'#f0a330',DONE:'#3fb6f0',ERROR:'#ef5350'};
 
@@ -231,20 +231,25 @@ async function run(){
 }
 
 // ── Разбор программы — как исполнитель станка: строки без комментариев, пустые не считаются ──
-function parse(text){
-  const src=[], segs=[]; let n=0;
+// plan — развёрнутая станком программа (циклы G71/G70): [[номер строки, кадр], …]; рисуется она
+function parse(text,plan){
+  const src=[], segs=[], cmds=[]; let n=0;
   let z=0,x=0, abs=true, diam=true, unit=1, mot=0;
   for(const raw of text.split(/\r?\n/)){
     const ln=raw.replace(/\([^)]*\)/g,'').replace(/;.*/,'').trim().toUpperCase();
     if(!ln){src.push({t:raw,n:0});continue;}
-    n++; src.push({t:raw,n});
+    n++; src.push({t:raw,n}); cmds.push([n,ln]);
+  }
+  let k=0;                                   // k — номер кадра развёрнутой программы (step исполнителя)
+  for(const [n,ln] of (plan||cmds)){
+    k++;
     if(/^[O%]/.test(ln)) continue;
     const w=c=>{const m=ln.match(new RegExp('(?:^|[^A-Z])'+c+'\\s*(-?[\\d.]+)'));return m?parseFloat(m[1]):null;};
     for(const g of ln.matchAll(/G\s*(\d+)/g)){
       const v=+g[1];
       if(v<=3) mot=v; else if(v==7) diam=true; else if(v==8) diam=false;
       else if(v==20) unit=25.4; else if(v==21) unit=1; else if(v==90) abs=true; else if(v==91) abs=false;
-      else if(v==28){segs.push({n,a:[z,x],b:[z,0],r:1});segs.push({n,a:[z,0],b:[0,0],r:1});z=0;x=0;}
+      else if(v==28){if(/[UW]/.test(ln))continue;segs.push({n,k,a:[z,x],b:[z,0],r:1});segs.push({n,k,a:[z,0],b:[0,0],r:1});z=0;x=0;}
     }
     let Z=w('Z'), X=w('X');
     if(Z===null&&X===null) continue;
@@ -263,20 +268,26 @@ function parse(text){
         if(cw){while(da>=0)da-=2*Math.PI;}else{while(da<=0)da+=2*Math.PI;}
         const k=Math.max(4,Math.ceil(Math.abs(da)*r/0.2)); let pz=z,px=x;
         for(let i=1;i<=k;i++){const a=a0+da*i/k,qz=i==k?tz:cz+r*Math.cos(a),qx=i==k?tx:cx+r*Math.sin(a);
-          segs.push({n,a:[pz,px],b:[qz,qx],r:0});pz=qz;px=qx;}
+          segs.push({n,k,a:[pz,px],b:[qz,qx],r:0});pz=qz;px=qx;}
         z=tz;x=tx;continue;
       }
     }
-    segs.push({n,a:[z,x],b:[tz,tx],r:mot==0?1:0}); z=tz; x=tx;
+    segs.push({n,k,a:[z,x],b:[tz,tx],r:mot==0?1:0}); z=tz; x=tx;
   }
-  return {src,segs,lines:n};
+  return {src,segs,lines:n,plan:!!plan};
 }
 
 async function pick(n){
   if(!n){prog=null;curFile='';draw(-1);return;}
   try{
     const t=await(await fetch('/api/file?name='+encodeURIComponent(n))).text();
-    prog=parse(t); curFile=n; lastLine=-1; $('sel').value=n;
+    let plan=null; planErr='';
+    if(/G0*7[01]\b/i.test(t.replace(/\([^)]*\)/g,''))){          // циклы — рисуем развёрнутые станком проходы
+      const p=await(await fetch('/api/plan?name='+encodeURIComponent(n))).text();
+      if(p.startsWith('ERR\t')) planErr=p.slice(4);
+      else plan=p.split('\n').filter(l=>l).map(l=>{const i=l.indexOf('\t');return [+l.slice(0,i),l.slice(i+1)];});
+    }
+    prog=parse(t,plan); curFile=n; lastLine=-1; $('sel').value=n;
     const c=$('code'); c.innerHTML='';
     prog.src.forEach(l=>{const d=document.createElement('div');d.dataset.n=l.n;if(!l.n)d.className='cm';
       d.innerHTML='<span>'+(l.n||'')+'</span>'+l.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');c.appendChild(d);});
@@ -292,6 +303,7 @@ function draw(line){
   g.fillStyle='#0b1019';g.fillRect(0,0,W,H);
   g.font='13px -apple-system,Segoe UI,Arial';
   if(!prog||!prog.segs.length){g.fillStyle='#5b6b82';g.fillText(prog?'В программе нет перемещений':'Выберите файл — здесь будет траектория',16,H/2);$('info').textContent='';return;}
+  const P=prog.plan&&line>0;                  // циклы: ход — по кадрам развёрнутой программы
   // масштаб — по ходам резания (дальние отводы G0 обрезаются краем), ноль всегда в кадре
   const cut=prog.segs.filter(s=>!s.r), base=cut.length?cut:prog.segs;
   let zmin=0,zmax=0,xmax=0;
@@ -316,7 +328,7 @@ function draw(line){
   // траектория (верх) и её зеркало (низ, бледно — силуэт детали)
   for(const mir of [-1,1]){
     for(const s of prog.segs){
-      const done=line>0&&s.n<line, cur=s.n==line;
+      const done=P?s.k<curStep:(line>0&&s.n<line), cur=P?s.k==curStep:s.n==line;
       g.lineWidth=mir<0?1:(s.r?1.2:2.2);
       g.setLineDash(s.r?[6,5]:[]);
       g.strokeStyle=mir<0?(s.r?'#1d2638':'#1f4a66'):(s.r?'#5b6b82':(done?'#ff8a50':(cur?'#ffd54a':'#3fb6f0')));
@@ -325,10 +337,10 @@ function draw(line){
   }
   g.setLineDash([]);g.restore();
   // резец — конец последнего отрезка текущей строки
-  if(line>0){let p=null;for(const s of prog.segs)if(s.n<=line)p=s.b;
+  if(line>0){let p=null;for(const s of prog.segs)if(P?s.k<=curStep:s.n<=line)p=s.b;
     if(p){g.fillStyle='#ffd54a';g.beginPath();g.moveTo(tx(p[0]),ty(p[1]));g.lineTo(tx(p[0])+9,ty(p[1])-14);g.lineTo(tx(p[0])-9,ty(p[1])-14);g.fill();}}
   let az=0,bz=0,mx=0;for(const s of base)for(const p of [s.a,s.b]){az=Math.min(az,p[0]);bz=Math.max(bz,p[0]);mx=Math.max(mx,Math.abs(p[1]));}
-  $('info').textContent='Резание: Z от '+az.toFixed(2)+' до '+bz.toFixed(2)+' мм · наибольший ⌀ '+(2*mx).toFixed(2)+' мм · строк '+prog.lines+' · X в программе — диаметр (G7), если не указано G8';
+  $('info').textContent=(planErr?'Ошибка цикла: '+planErr+' · ':'')+'Резание: Z от '+az.toFixed(2)+' до '+bz.toFixed(2)+' мм · наибольший ⌀ '+(2*mx).toFixed(2)+' мм · строк '+prog.lines+' · X в программе — диаметр (G7), если не указано G8';
 }
 
 async function poll(){
@@ -344,6 +356,8 @@ async function poll(){
     $('bpa').textContent=st=='PAUSED'?'Продолжить':'Пауза';
     if(d.file&&d.file!==curFile&&st!='IDLE'){$('sel').value=d.file;await pick(d.file);}
     const ln=(st=='DONE')?1e9:d.line;
+    curStep=st=='DONE'?1e9:(d.step||0);
+    if(prog&&prog.plan&&curStep!==lastStep&&st!='IDLE'){lastStep=curStep;if(ln===lastLine)draw(ln);}
     if(prog&&ln!==lastLine){lastLine=ln;draw(st=='IDLE'?-1:ln);
       for(const el of $('code').children){const n=+el.dataset.n;
         el.className=!n?'cm':(n==ln?'cur':(n<ln?'done':''));
@@ -477,6 +491,17 @@ static void handle_file_get(WiFiClient& cl, const String& query) {
     f.close();
 }
 
+// Развёрнутая программа (G71/G70 → G0/G1/G2/G3) — для рисунка: «номер<TAB>кадр»; ошибка — «ERR<TAB>текст»
+static void handle_plan(WiFiClient& cl, const String& query) {
+    String name = get_param(query, "name");
+    if (!name.length()) { send_404(cl); return; }
+    String path = String(GCODE_DIR) + "/" + name, out, err;
+    if (!GCodeExec_Plan(path.c_str(), out, err)) out = "ERR\t" + err;
+    cl.printf("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n"
+              "Content-Length: %u\r\nConnection: close\r\n\r\n", (unsigned)out.length());
+    cl.print(out);
+}
+
 static void handle_file_delete(WiFiClient& cl, const String& query) {
     String name = get_param(query, "name");
     if (!name.length()) { send_404(cl); return; }
@@ -546,8 +571,8 @@ static void handle_exec_status(WiFiClient& cl) {
     const char* bn = basename_of(fn && fn[0] ? fn : "");
     char buf[512];
     snprintf(buf, sizeof(buf),
-        "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"pct\":%d,\"error\":\"%s\"}",
-        exec_state_str(st), bn, GCodeExec_GetLine(),
+        "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"step\":%d,\"pct\":%d,\"error\":\"%s\"}",
+        exec_state_str(st), bn, GCodeExec_GetLine(), GCodeExec_GetStep(),
         GCodeExec_GetProgress(), GCodeExec_GetError());
     send_ok_json(cl, buf);
 }
@@ -622,6 +647,8 @@ static void handle_client(WiFiClient& cl) {
         handle_files(cl);
     } else if (method == "GET" && path == "/api/file") {
         handle_file_get(cl, query);
+    } else if (method == "GET" && path == "/api/plan") {
+        handle_plan(cl, query);
     } else if (method == "DELETE" && path == "/api/file") {
         handle_file_delete(cl, query);
     } else if (method == "PUT" && path == "/api/file") {

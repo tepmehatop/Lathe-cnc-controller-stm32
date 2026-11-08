@@ -24,5 +24,10 @@ void        GCodeExec_Process();                         // вызывать и�
 GcExecSt    GCodeExec_GetState();
 int         GCodeExec_GetProgress();   // 0-100 %
 int         GCodeExec_GetLine();       // номер текущей строки (1-based)
+int         GCodeExec_GetStep();       // кадров прочитано (циклы G71/G70 — номер кадра развёрнутой программы)
 const char* GCodeExec_GetFilename();
 const char* GCodeExec_GetError();
+
+// Развёрнутая программа (циклы G71/G70 → G0/G1/G2/G3) для веб-страницы: строки «номер<TAB>кадр».
+// out пустой — циклов нет. false — ошибка в err («Строка N: …»)
+bool        GCodeExec_Plan(const char* filepath, String& out, String& err);

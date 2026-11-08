@@ -38,6 +38,7 @@ def main():
     ap.add_argument('--rpm', type=int, default=600, help='0 — шпиндель стоит (проверка ошибки G99)')
     ap.add_argument('--shot', default=None, help='снимок экрана дисплея в конце: «Готово» или ошибка (jpg)')
     ap.add_argument('--web', default=None, help='снимок веб-страницы в конце (png)')
+    ap.add_argument('--mid', default=None, help='снимки на середине программы: <префикс>_d.jpg и <префикс>_w.png')
     a = ap.parse_args()
     base = f'http://{a.ip}'
     name = os.path.basename(a.file)
@@ -59,13 +60,16 @@ def main():
         esp.s.reset_input_buffer()
         print('запуск:', http('POST', f'{base}/api/run?name={name}')[:80])
         t0, last, seen_run = time.time(), None, False
-        while time.time() - t0 < 600:
+        mid_done = not a.mid
+        while time.time() - t0 < 1800:
             time.sleep(1.0)
             ex = json.loads(http('GET', f'{base}/api/exec'))
             st = (ex.get('state'), ex.get('line'), ex.get('progress'), ex.get('error'))
             if st != last:
                 print('  ', st, 'каретка', mega.pos()); last = st
             S = str(ex.get('state')).upper()
+            if not mid_done and S in ('RUNNING', 'WAITING_ACK') and ex.get('pct', 0) >= 50:
+                hc.esp_shot(esp, a.mid + '_d.jpg'); web_shot(base, a.mid + '_w.png'); mid_done = True
             if S in ('RUNNING', 'WAITING_ACK', 'DWELL', 'PAUSED'):
                 seen_run = True
             # конец — только после запуска: «Готово» прошлой программы держится до старта новой

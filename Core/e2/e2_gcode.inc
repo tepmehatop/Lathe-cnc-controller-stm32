@@ -7,7 +7,9 @@
 // Координаты — те же, что на экране (нули оператора). X по умолчанию — диаметр (G7), G8 — радиус.
 // G90/G91 — абсолютные/приращения, G21/G20 — мм/дюймы, G94 — подача F в мм/мин (G95 — не поддерживается).
 // G0 — ускоренно (GCODE_RAPID_MM_MIN), G1 — подача F, G2/G3 — дуга (центр I K от начала или R), разбивается на
-// отрезки не длиннее 0.1 мм; G28 — в ноль (сначала X, потом Z). M3/M4/M5/M8/M9, T, S, N — принимаются без действия.
+// отрезки не длиннее 0.1 мм; G28 — в ноль (сначала X, потом Z), G28 U0 W0 — на месте (референтной точки нет);
+// U / W — приращения по X / Z. M3/M4/M5/M8/M9, T, S, N — принимаются без действия.
+// Циклы G71/G70 дисплей разворачивает в G0/G1/G2/G3 (ELS_Display/src/gcode_cycles.cpp).
 //
 // Движение: X и Z одновременно (Брезенхэм), разгон/торможение; счётчики ядра (Motor_*_Pos, Z_pos, X_pos, MX_pos)
 // обновляются как в прерываниях автора, компенсация люфта работает; поставленные упоры не пересекаются.
@@ -141,6 +143,8 @@ static const char* e2_gc_exec(const char* line)
          }
          case 96: case 97: break;                                     // скорость резания / обороты — шпиндель вручную
          case 28: {
+            float t;                                                  // Fanuc G28 U0 W0 — в референтную точку
+            if (e2_gc_word(line, 'U', &t) || e2_gc_word(line, 'W', &t)) return nullptr;   // станка: её нет — на месте
             const char* err = e2_gc_goto(e2_gc.z, 0, GCODE_RAPID_MM_MIN);
             return err ? err : e2_gc_goto(0, 0, GCODE_RAPID_MM_MIN);
          }
@@ -151,9 +155,13 @@ static const char* e2_gc_exec(const char* line)
    if (e2_gc_word(line, 'F', &v)) { if (v <= 0) return "F <= 0"; e2_gc.feed = v * e2_gc.unit; }
    bool hz = e2_gc_word(line, 'Z', &v); float z = hz ? v * e2_gc.unit : 0;
    float xv; bool hx = e2_gc_word(line, 'X', &xv); float x = hx ? xv * e2_gc.unit / (e2_gc.diam ? 2 : 1) : 0;
-   if (!hz && !hx) return nullptr;                              // нет перемещения
+   float uv, wv;                                                // Fanuc U / W — приращения по X / Z
+   bool hu = e2_gc_word(line, 'U', &uv), hw = e2_gc_word(line, 'W', &wv);
+   if (!hz && !hx && !hu && !hw) return nullptr;                // нет перемещения
    float tz = hz ? (e2_gc.abs ? z : e2_gc.z + z) : e2_gc.z;
    float tx = hx ? (e2_gc.abs ? x : e2_gc.x + x) : e2_gc.x;
+   if (hw) tz += wv * e2_gc.unit;
+   if (hu) tx += uv * e2_gc.unit / (e2_gc.diam ? 2 : 1);
    if (e2_gc.motion == 0) return e2_gc_goto(tz, tx, GCODE_RAPID_MM_MIN);
    // подача на оборот: мм/мин = F × обороты (обороты меряются раз в 250 мс; синхронизации со шпинделем нет)
    float feed = e2_gc.feed;

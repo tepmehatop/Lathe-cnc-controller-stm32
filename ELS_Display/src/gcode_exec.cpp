@@ -6,8 +6,13 @@
  */
 
 #include "gcode_exec.h"
+#include "gcode_cycles.h"
 #include <LittleFS.h>
 #include <Arduino.h>
+
+// Программа с циклами G71/G70 — развёрнутая копия: строки «номер исходной строки<TAB>кадр»
+#define RUN_FILE      "/.run.nc"
+#define CYCLES_MAX_B  65536
 
 // Строка — одно движение на STM32: длинный проход идёт минутами. Без ответа 10 мин — продолжить (без STM32)
 #define ACK_TIMEOUT_MS 600000
@@ -23,6 +28,8 @@ static uint32_t  s_dwell_t   = 0;
 static uint32_t  s_dwell_ms  = 0;
 static char      s_filename[64] = {};
 static char      s_error[200]   = {};   // кириллица — 2 байта на букву: 80 обрезали сообщение STM32
+static bool      s_expanded  = false;    // исполняется развёрнутая копия RUN_FILE
+static int       s_step      = 0;        // кадров прочитано (у развёрнутой — номер её кадра; веб-рисунок)
 
 // ─── Утилиты ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +92,34 @@ static int classify(const char* line, uint32_t* dwell_out) {
     return 0;
 }
 
+// Строки программы для разворота циклов (как их считает исполнитель: без комментариев, пустые — выброшены)
+static bool load_lines(const char* path, std::vector<std::string>& v) {
+    File f = LittleFS.open(path, "r");
+    if (!f) return false;
+    if (f.size() > CYCLES_MAX_B) { f.close(); return false; }
+    char proc[128];
+    while (f.available()) {
+        String raw = f.readStringUntil('\n');
+        if (preprocess(proc, sizeof(proc), raw.c_str())) v.push_back(proc);
+    }
+    f.close();
+    return true;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+bool GCodeExec_Plan(const char* filepath, String& out, String& err) {
+    std::vector<std::string> lines;
+    out = ""; err = "";
+    if (!load_lines(filepath, lines)) { err = "Файл не прочитан (или больше 64 КБ)"; return false; }
+    if (!GCodeCycles_Needed(lines)) return true;
+    std::vector<GcLine> exp;
+    std::string e; int en = 0;
+    if (!GCodeCycles_Expand(lines, exp, e, en)) { err = String("Строка ") + en + ": " + e.c_str(); return false; }
+    out.reserve(exp.size() * 24);
+    for (const GcLine& l : exp) { out += l.n; out += '\t'; out += l.g.c_str(); out += '\n'; }
+    return true;
+}
 
 void GCodeExec_Init(GcSendFn fn) {
     s_send_fn = fn;
@@ -96,12 +130,37 @@ bool GCodeExec_Run(const char* filepath) {
     close_file();
     s_state    = GCE_IDLE;
     s_line_nr  = 0;
+    s_step     = 0;
     s_error[0] = '\0';
 
     strncpy(s_filename, filepath, sizeof(s_filename) - 1);
     s_filename[sizeof(s_filename) - 1] = '\0';
 
-    s_file = new File(LittleFS.open(filepath, "r"));
+    // циклы G71/G70 — развернуть заранее (контур P…Q нужен целиком) в RUN_FILE
+    s_expanded = false;
+    {
+        String plan, perr;
+        if (!GCodeExec_Plan(filepath, plan, perr)) {
+            strncpy(s_error, perr.c_str(), sizeof(s_error) - 1);
+            s_error[sizeof(s_error) - 1] = '\0';
+            s_state = GCE_ERROR;
+            Serial.printf("[gce] ERROR: %s\n", s_error);
+            return false;
+        }
+        if (plan.length()) {
+            File o = LittleFS.open(RUN_FILE, "w");
+            bool ok = o && o.print(plan) == plan.length();
+            if (o) o.close();
+            if (!ok) {
+                snprintf(s_error, sizeof(s_error), "Нет места для развёрнутой программы (G71/G70)");
+                s_state = GCE_ERROR;
+                return false;
+            }
+            s_expanded = true;
+            Serial.printf("[gce] G71/G70 развёрнуты: %u B\n", (unsigned)plan.length());
+        }
+    }
+    s_file = new File(LittleFS.open(s_expanded ? RUN_FILE : filepath, "r"));
     if (!s_file || !(*s_file)) {
         delete s_file;
         s_file = nullptr;
@@ -167,9 +226,17 @@ void GCodeExec_Process() {
 
             String raw = s_file->readStringUntil('\n');
             char proc[128];
-            if (!preprocess(proc, sizeof(proc), raw.c_str())) return;
+            const char* src = raw.c_str();
+            int orig = 0;
+            if (s_expanded) {                    // «номер<TAB>кадр»
+                orig = atoi(src);
+                const char* t = strchr(src, '\t');
+                src = t ? t + 1 : src;
+            }
+            if (!preprocess(proc, sizeof(proc), src)) return;
 
-            s_line_nr++;
+            s_step++;
+            if (s_expanded) s_line_nr = orig; else s_line_nr++;
             uint32_t dwell_ms = 0;
             int cls = classify(proc, &dwell_ms);
 
@@ -220,5 +287,6 @@ int GCodeExec_GetProgress() {
 }
 
 int         GCodeExec_GetLine()     { return s_line_nr; }
+int         GCodeExec_GetStep()     { return s_step; }
 const char* GCodeExec_GetFilename() { return s_filename; }
 const char* GCodeExec_GetError()    { return s_error; }
