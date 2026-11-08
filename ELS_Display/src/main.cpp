@@ -4610,9 +4610,14 @@ static void show_alert(const char* message)
     lv_label_set_text(g_ui.alert_msg, message);
     // Длинное сообщение (ошибка G-кода) — окно выше и шрифт мельче, текст не наезжает на OK
     bool longmsg = strlen(message) > 160;
-    lv_obj_set_style_text_font(g_ui.alert_msg, longmsg ? &font_tahoma_bold_16 : &font_tahoma_bold_22, 0);
-    lv_obj_update_layout(g_ui.alert_msg);
-    lv_coord_t h = UY(12) + lv_obj_get_height(g_ui.alert_msg) + UY(6) + UY(28) + UY(10);
+    const lv_font_t* afont = longmsg ? &font_tahoma_bold_16 : &font_tahoma_bold_22;
+    lv_obj_set_style_text_font(g_ui.alert_msg, afont, 0);
+    // высота текста — по ширине и шрифту сразу (lv_obj_update_layout ещё не знает о переносе строк:
+    // третья строка уходила под кнопку OK)
+    lv_point_t tsz;
+    lv_txt_get_size(&tsz, message, afont, 0, lv_obj_get_style_text_line_space(g_ui.alert_msg, 0),
+                    lv_obj_get_width(g_ui.alert_msg), LV_TEXT_FLAG_NONE);
+    lv_coord_t h = UY(12) + tsz.y + UY(20) + UY(28) + UY(10);   // запас: строки шрифта выше расчётных
     if (h < UY(110)) h = UY(110);
     if (h > UY(250)) h = UY(250);
     lv_obj_set_height(g_ui.alert_box, h);
