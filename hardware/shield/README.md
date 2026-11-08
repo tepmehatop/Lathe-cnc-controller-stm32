@@ -15,30 +15,34 @@
 |---|---|
 | Схема KiCad (`els_shield.kicad_sch`, PDF — `els_shield_schematic.pdf`) | да, ERC — 0 ошибок |
 | Список деталей (`bom.md`, `bom.csv`) | да |
-| Плата: 96×126 мм, размещение, земля с двух сторон, подписи | да, DRC — 0 нарушений, кроме неразведённых связей |
-| **Дорожки** | **нет** — трассировка через KiCad MCP (`autoroute`, нужен Freerouting) |
-| Gerber-файлы для заказа | после трассировки |
+| Плата: 96×126 мм, размещение, земля с двух сторон, подписи | да |
+| Дорожки | да — KiCad MCP (`autoroute`, Freerouting 2.1.0), земля — полигоны + переходы (`fix_zones.py`) |
+| Проверка | DRC — **0 нарушений, 0 неразведённых**; сверка со схемой — цепи совпадают 1:1 |
+| Gerber-файлы для заказа | `els_shield_gerbers.zip` (медь, маска, шелкография с двух сторон, контур, сверловка) |
 
 Перед заказом обязательно:
-1. Провести дорожки и проверить DRC (0 ошибок, 0 непроведённых соединений).
-2. Сверить расстояние между гнёздами J1/J2 с вашей платой Discovery (по чертежу UM1472 — 53.34 мм между
+1. Сверить расстояние между гнёздами J1/J2 с вашей платой Discovery (по чертежу UM1472 — 53.34 мм между
    крайними рядами), лучше всего — распечатать слой F.Cu в масштабе 1:1 и приложить плату.
-3. Проверить снизу Discovery: под ней на шилде — SMD-детали высотой до 1.5 мм (C8 1206 — до 1.8 мм).
+2. Проверить снизу Discovery: под ней на шилде — SMD-детали высотой до 1.5 мм (C8 1206 — до 1.8 мм).
 
 ## Как собрать и развести
 
 Всё генерируется из `design.py` — единого описания деталей и цепей. Цепи выводов STM32 берутся из
 `Core/e2/e2_pins.h`, поэтому шилд всегда совпадает с прошивкой.
 
-```bash
-bash hardware/shield/build.sh                     # схема, BOM, размещение, проверки
-FREEROUTING_JAR=/путь/freerouting.jar \
-  bash hardware/shield/build.sh route             # + автотрассировка и Gerber
-```
+1. Схема, BOM, размещение (KiCad 10, macOS: `/Applications/KiCad`):
+   ```bash
+   bash hardware/shield/build.sh
+   ```
+2. Трассировка — через KiCad MCP: `open_project` (els_shield.kicad_pcb) → `autoroute` (Freerouting 2.1.0 под
+   Java 21, 3 попытки, берётся лучшая) → `add_gnd_stitching_vias` (сетка 6 мм) → `save_board`.
+3. Земля: `$KPY hardware/shield/fix_zones.py` — сплошное подключение площадок, убрать переходы с малым зазором,
+   по переходу в каждый оторванный кусок верхней земли, залить полигоны (`$KPY` — Python KiCad:
+   `/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3`).
+4. Проверка и файлы: MCP `run_drc` (0 нарушений), `run_drc` со сверкой схемы, `export_gerbers` + `export_drill`
+   в `gerbers/`, архив — `els_shield_gerbers.zip`.
 
-Нужны KiCad 8 (macOS: `/Applications/KiCad`), для трассировки — Java 17+ и
-[Freerouting](https://github.com/freerouting/freerouting/releases). Либо развести вручную: открыть
-`els_shield.kicad_pro` в KiCad → редактор плат → «Трассировать».
+Размещение генерируется заново из `design.py` — после него трассировку нужно повторить.
 
 ## Что на плате
 

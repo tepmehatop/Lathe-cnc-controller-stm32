@@ -53,3 +53,4 @@ dist/
 .tools/
 # отчёт DRC от KiCad MCP
 hardware/shield/els_shield_drc_violations.json
+hardware/shield/gerbers/
