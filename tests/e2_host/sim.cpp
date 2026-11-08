@@ -662,8 +662,14 @@ static void test_gcode() {
     std::string r = gcode("G0 Z-1");
     CHECK(r.find("M8") != std::string::npos, "вне M8 принято: %s", r.c_str());
     select_mode(8); run_ms(200);
-    touch("AXIS:Z:0"); touch("AXIS:X:0"); run_ms(50);
+    // X программы — от плитки «⌀ ДИАМЕТР», «ПОЗИЦИЯ X» на программу не влияет
+    touch("AXIS:Z:0"); touch("AXIS:X:7000"); touch("AXIS:D:20000"); run_ms(50);
     CHECK(gcode("G21 G90 G7") == "OK", "модальные не приняты");
+    r = gcode("G0 X20", 3000);
+    CHECK(r == "OK" && shown_x() == 7000, "G0 X20 при ⌀20: %s, X=%ld (ожидалось на месте, 7000)", r.c_str(), shown_x());
+    r = gcode("G0 X30", 3000);
+    CHECK(r == "OK" && shown_x() == 12000, "G0 X30 при ⌀20: %s, X=%ld (ожидалось 12000: +5 по радиусу)", r.c_str(), shown_x());
+    touch("AXIS:X:0"); touch("AXIS:D:0"); run_ms(50);
     r = gcode("G0 Z-5 X4", 3000);
     CHECK(r == "OK" && shown_z() == -5000 && shown_x() == 2000, "G0 Z-5 X4(⌀): %s, Z=%ld X=%ld", r.c_str(), shown_z(), shown_x());
     r = gcode("G1 Z-10 F300", 4000);
@@ -1407,7 +1413,7 @@ int main() {
     // на дисплее). Шпиндель 600 об/мин (подача на оборот). Печать: каждая строка — ответ и положение.
     if (const char* gf = getenv("SIM_GCFILE")) {
         controls_neutral(); select_mode(8); run_ms(200);
-        touch("AXIS:Z:0"); touch("AXIS:X:0"); spindle(600); run_ms(500);
+        touch("AXIS:Z:0"); touch("AXIS:X:0"); touch("AXIS:D:0"); spindle(600); run_ms(500);
         FILE* f = fopen(gf, "r"); if (!f) { printf("нет файла %s\n", gf); return 1; }
         char raw[256]; int n = 0, bad = 0;
         while (fgets(raw, sizeof raw, f)) {

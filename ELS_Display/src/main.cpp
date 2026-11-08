@@ -1282,11 +1282,6 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
 
 static void axis_kb_show(char axis)
 {
-    if (axis == 'X' && s_last_mode == MODE_RESERVE) {      // M8: вводится диаметр (как X в программе)
-        numpad_show(DIAM_SIGN " \xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0 " AXIS_X, "\xD0\xBC\xD0\xBC", 3, 4, true, nullptr,
-                    [](int32_t um, intptr_t) { axis_send('X', um / 2); }, 'X');
-        return;
-    }
     numpad_show(axis == 'D' ? TITLE_DIAM
               : axis == 'Z' ? "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z
                             : "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X,
@@ -3466,7 +3461,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_label_set_text(g_ui.secondary_unit, "");
             lv_label_set_text(g_ui.row1_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);   // ПОЗИЦИЯ Y
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
-            lv_label_set_text(g_ui.row2_title, DIAM_SIGN " \xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0 " AXIS_X);   // ⌀ ДИАМЕТР X — как X в программе
+            lv_label_set_text(g_ui.row2_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);   // ПОЗИЦИЯ X — как везде
             lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
             lv_label_set_text(g_ui.row3_title, "\xD0\x92\xD0\xAB\xD0\x9F\xD0\x9E\xD0\x9B\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E");   // ВЫПОЛНЕНО
             lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x6a9fb5), 0);
@@ -4687,7 +4682,7 @@ static void update_sm_row6(LatheMode mode, uint8_t sm)
         // G-код: как поставить ноль (подробно — окно «Перед стартом» на веб-странице)
         lv_label_set_text(g_ui.sm_row6,
             "\xD0\x9D\xD0\x9E\xD0\x9B\xD0\xAC Z: \xD0\xA2\xD0\x9E\xD0\xA0\xD0\x95\xD0\xA6\n"          // НОЛЬ Z: ТОРЕЦ
-            DIAM_SIGN " X: \xD0\x9A\xD0\x90\xD0\xA1\xD0\x90\xD0\x9D\xD0\x98\xD0\x95\n"                    // ⌀ X: КАСАНИЕ
+            DIAM_SIGN ": \xD0\x9A\xD0\x90\xD0\xA1\xD0\x90\xD0\x9D\xD0\x98\xD0\x95\n"                      // ⌀: КАСАНИЕ
             "\xD0\x98 \xD0\x92\xD0\x92\xD0\x9E\xD0\x94 " DIAM_SIGN);                                        // И ВВОД ⌀
         lv_obj_set_style_text_color(g_ui.sm_row6, lv_color_hex(0x6a9fb5), 0);
     } else if (mode == MODE_DIVIDER) {
@@ -4804,12 +4799,6 @@ static void gcode_status_update()
         else snprintf(e, sizeof(e), "%d:%02d", eta / 60, eta % 60);
         lv_label_set_text(g_ui.row4_val, e);
         lv_obj_set_style_text_color(g_ui.row4_val, lv_color_hex(0xe0e0e0), 0);
-    }
-    {   // X в программе — диаметр: ячейка X в M8 тоже диаметр (ноль X — ось шпинделя)
-        char d[24];
-        int32_t px = uart_protocol.getData().pos_x;
-        DisplayFormatter::formatPosition(d, 2 * px);
-        lv_label_set_text(g_ui.row2_val, d);
     }
     lv_label_set_long_mode(g_ui.row3_val, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(st == GCE_ERROR ? 0xff5555 : 0xe0e0e0), 0);
@@ -4998,9 +4987,9 @@ static void update_ui_values(const LatheData& data)
     // ── RPM bar ──────────────────────────────────────────────────────────────
     lv_bar_set_value(g_ui.rpm_bar, data.rpm, LV_ANIM_OFF);
 
-    // ── Диаметр (как Ø на LCD2004): все режимы, кроме делилки и резерва ─────
+    // ── Диаметр (как Ø на LCD2004): все режимы, кроме делилки; в G-КОД от него — X программы ─────
     if (g_ui.diam_val) {
-        bool show = data.mode != MODE_DIVIDER && data.mode != MODE_RESERVE;
+        bool show = data.mode != MODE_DIVIDER;
         if (show) {
             if (g_ui.diam_box) lv_obj_clear_flag(g_ui.diam_box, LV_OBJ_FLAG_HIDDEN);
             DisplayFormatter::formatPosition(buf, data.diam_x);

@@ -48,3 +48,6 @@ hardware/shield/*.kicad_prl
 
 # Файлы релиза (tools/make_release.sh)
 dist/
+
+# сторонние инструменты (KiCad MCP-сервер и т. п.) — не в репозитории
+.tools/
