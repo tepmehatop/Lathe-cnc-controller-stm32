@@ -58,8 +58,10 @@ def main():
         if a.rpm:
             sp.on(a.rpm); time.sleep(1.0)
         esp.s.reset_input_buffer()
+        est = json.loads(http('GET', f'{base}/api/info?name={name}'))
+        print('расчёт до запуска:', est)
         print('запуск:', http('POST', f'{base}/api/run?name={name}')[:80])
-        t0, last, seen_run = time.time(), None, False
+        t0, last, seen_run, t_run, etas = time.time(), None, False, None, []
         mid_done = not a.mid
         while time.time() - t0 < 1800:
             time.sleep(1.0)
@@ -71,10 +73,20 @@ def main():
             if not mid_done and S in ('RUNNING', 'WAITING_ACK') and ex.get('pct', 0) >= 50:
                 hc.esp_shot(esp, a.mid + '_d.jpg'); web_shot(base, a.mid + '_w.png'); mid_done = True
             if S in ('RUNNING', 'WAITING_ACK', 'DWELL', 'PAUSED'):
+                if not seen_run:
+                    t_run = time.time()
                 seen_run = True
+                etas.append((time.time() - t_run, ex.get('eta', -1), ex.get('pct', 0)))
             # конец — только после запуска: «Готово» прошлой программы держится до старта новой
             if seen_run and S in ('DONE', 'ERROR', 'IDLE'):
                 break
+        if t_run:                                                        # оценка времени против факта
+            act = time.time() - t_run
+            print(f'время: факт {act:.0f} с, расчёт до запуска {est.get("sec")} с')
+            for k in (0.25, 0.5, 0.75):
+                e = [x for x in etas if x[0] >= act * k]
+                if e:
+                    print(f'  на {k:.0%} факта: осталось по прогнозу {e[0][1]} с (на деле {act - e[0][0]:.0f} с), {e[0][2]}%')
         time.sleep(1.5)                                                  # экран и страница догоняют
         if a.shot:
             hc.esp_shot(esp, a.shot)

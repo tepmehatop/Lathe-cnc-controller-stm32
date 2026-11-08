@@ -20,6 +20,7 @@
 #endif
 #define E2_GC_MAX_SPS        8000    // шагов/с на ось — потолок
 #define E2_GC_RAMP           400     // шагов разгона/торможения
+#define E2_GC_START_SPS      1000    // с этой скорости мотор трогается сразу; быстрее — разгон за E2_GC_RAMP шагов
 
 struct E2Gc {
    bool  abs = true, diam = true;     // G90 / G7
@@ -90,8 +91,10 @@ static bool e2_gc_segment(long tz, long tx, float mm_min)
             if (e2_cal_abort) return false;
             e2_gc_report();
          }
-         long edge = i < n - i ? i : n - i;                         // разгон и торможение: с 4× периода
-         uint32_t p = edge >= E2_GC_RAMP ? period : period + 3 * period * (E2_GC_RAMP - edge) / E2_GC_RAMP;
+         // разгон и торможение — только выше стартовой скорости: подача и короткие отрезки дуг идут без замедления
+         long edge = i < n - i ? i : n - i;
+         const uint32_t p0 = 1000000 / E2_GC_START_SPS;
+         uint32_t p = period >= p0 || edge >= E2_GC_RAMP ? period : p0 - (p0 - period) * edge / E2_GC_RAMP;
          uint32_t el = micros() - t;
          if (el < p) delayMicroseconds(p - el);
          t += p;

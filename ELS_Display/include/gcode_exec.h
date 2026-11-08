@@ -31,3 +31,10 @@ const char* GCodeExec_GetError();
 // Развёрнутая программа (циклы G71/G70 → G0/G1/G2/G3) для веб-страницы: строки «номер<TAB>кадр».
 // out пустой — циклов нет. false — ошибка в err («Строка N: …»)
 bool        GCodeExec_Plan(const char* filepath, String& out, String& err);
+
+// Время: расчёт по модели станка (gcode_cycles.h) с поправкой по факту во время работы
+int         GCodeExec_GetEta();        // осталось, с (-1 — не известно)
+int         GCodeExec_GetTotal();      // расчётное время программы, с (-1 — нет)
+bool        GCodeExec_Estimate(const char* filepath, float& sec, int& rpm, String& err);  // до запуска
+void        GCodeExec_SetMachine(double spz, double spx);   // шагов на мм Z / X (механика STM32)
+void        GCodeExec_SetRpm(int rpm);                      // обороты шпинделя (подача на оборот)

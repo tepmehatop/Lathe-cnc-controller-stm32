@@ -135,6 +135,13 @@ button:disabled{opacity:.4;cursor:default}
 #files small{color:var(--dim)}
 #files button{padding:6px 12px;font-size:14px}
 #upmsg{color:var(--dim);font-size:13px;margin-top:8px}
+dialog{margin:auto;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:640px;width:calc(100% - 24px)}
+dialog::backdrop{background:#000a}
+dialog h3{font-size:18px;margin-bottom:10px}
+dialog svg{width:100%;height:auto;border-radius:8px;margin-bottom:10px}
+dialog ol{padding-left:22px}dialog li{margin:6px 0}
+dialog b{color:#ffd54a}
+.hint{color:var(--dim);font-size:13px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -152,6 +159,53 @@ button:disabled{opacity:.4;cursor:default}
 <div class="bar"><div id="pf"></div></div>
 <div id="err"></div>
 </div>
+
+<dialog id="dlg">
+<h3>Перед стартом</h3>
+<svg viewBox="0 0 560 250" font-family="-apple-system,Segoe UI,Arial,sans-serif" font-size="13">
+<rect width="560" height="250" fill="#0b1019" rx="8"/>
+<!-- патрон -->
+<rect x="14" y="38" width="46" height="154" rx="4" fill="#2a3550"/>
+<rect x="44" y="62" width="22" height="20" fill="#3b4a6b"/><rect x="44" y="148" width="22" height="20" fill="#3b4a6b"/>
+<text x="16" y="210" fill="#8a97ab">патрон</text>
+<!-- заготовка -->
+<rect x="60" y="80" width="300" height="70" fill="#5d6b80"/>
+<rect x="60" y="80" width="300" height="8" fill="#7b8aa1"/>
+<text x="150" y="122" fill="#e6ebf3">заготовка</text>
+<!-- ось шпинделя -->
+<line x1="8" y1="115" x2="545" y2="115" stroke="#3a4a66" stroke-dasharray="10 4 2 4"/>
+<text x="474" y="128" fill="#5b6b82">X = 0</text>
+<!-- ноль -->
+<circle cx="360" cy="115" r="5" fill="#43c463"/>
+<text x="368" y="150" fill="#43c463">ноль: торец на оси</text>
+<!-- диаметр -->
+<line x1="90" y1="80" x2="90" y2="150" stroke="#e070ff" stroke-width="1.5"/>
+<path d="M90 80 l-4 8 h8z M90 150 l-4 -8 h8z" fill="#e070ff"/>
+<text x="96" y="146" fill="#e070ff">⌀</text>
+<!-- резец 1: торец -->
+<polygon points="362,96 400,84 400,108" fill="#ffd54a"/>
+<rect x="400" y="88" width="60" height="16" fill="#9a8a50"/>
+<text x="370" y="72" fill="#ffd54a">① коснуться торца → Z = 0</text>
+<!-- резец 2: диаметр -->
+<polygon points="250,78 238,40 262,40" fill="#3fb6f0"/>
+<rect x="242" y="14" width="16" height="26" fill="#3a6f8f"/>
+<text x="268" y="34" fill="#3fb6f0">② коснуться диаметра →</text>
+<text x="268" y="50" fill="#3fb6f0">ввести ⌀ заготовки</text>
+<!-- оси -->
+<line x1="330" y1="222" x2="420" y2="222" stroke="#4da6ff" stroke-width="2"/>
+<path d="M428 222 l-10 -5 v10z" fill="#4da6ff"/>
+<text x="434" y="226" fill="#4da6ff">Z+ продольная</text>
+<line x1="330" y1="222" x2="330" y2="172" stroke="#e070ff" stroke-width="2"/>
+<path d="M330 164 l-5 10 h10z" fill="#e070ff"/>
+<text x="338" y="180" fill="#e070ff">X+ поперечная</text>
+</svg>
+<ol id="steps"></ol>
+<div class="hint">Первый раз — прогон «в воздухе»: поставьте ноль Z на 50 мм правее торца, резец пройдёт всю программу, не касаясь детали.</div>
+<div class="row" style="margin-top:12px;justify-content:flex-end">
+<button class="ghost" onclick="$('dlg').close()">Отмена</button>
+<button class="go" onclick="$('dlg').close();go()">Всё сделано — Старт</button>
+</div>
+</dialog>
 
 <div class="card">
 <h2>Траектория резца</h2>
@@ -183,6 +237,10 @@ button:disabled{opacity:.4;cursor:default}
 <script>
 const $=id=>document.getElementById(id);
 let prog=null, curFile='', lastLine=-1, planErr='', curStep=0, lastStep=-1;
+// время: 75 → «1 мин 15 с», 4000 → «1 ч 07 мин»
+function dur(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),c=s%60;
+  return h?h+' ч '+String(m).padStart(2,'0')+' мин':(m?m+' мин '+String(c).padStart(2,'0')+' с':c+' с');}
+let estTxt='';
 const STATE={IDLE:'Нет программы',RUNNING:'Выполняется',WAITING_ACK:'Выполняется',DWELL:'Пауза G4',PAUSED:'Пауза',DONE:'Готово',ERROR:'Ошибка'};
 const COLOR={RUNNING:'#43c463',WAITING_ACK:'#43c463',DWELL:'#3fb6f0',PAUSED:'#f0a330',DONE:'#3fb6f0',ERROR:'#ef5350'};
 
@@ -224,11 +282,26 @@ async function up(){
     if(d.ok){$('fi').value='';await files();$('sel').value=d.name;pick(d.name);}
   }catch(e){$('upmsg').textContent='Ошибка сети';}
 }
+// «Старт» — сначала окно: как поставить ноль и что подготовить (по числам выбранной программы)
 async function run(){
   const n=$('sel').value; if(!n){alert('Выберите файл');return;}
   if(curFile!==n) await pick(n);
-  await post('/api/run?name='+encodeURIComponent(n));
+  const f=v=>+v.toFixed(2);
+  let st=null,zmin=0;
+  for(const s of prog?prog.segs:[]){if(!st&&s.r)st=s.b;if(!s.r)for(const p of [s.a,s.b])zmin=Math.min(zmin,p[0]);}
+  const tools=[];
+  for(const l of prog?prog.src:[]){const m=l.t.match(/\bT(\d{2,4})\b/i);if(m){const c=(l.t.match(/\(([^)]*)\)/)||[])[1];tools.push('T'+m[1]+(c?' — '+c:''));}}
+  const li=[];
+  li.push('<b>Заготовка</b>: круглая, ⌀ меньше '+(st?f(2*st[1]):'?')+' мм — с этого ⌀ резец подходит к ней ускоренно; торчит из патрона больше чем на '+f(Math.abs(zmin)+5)+' мм (программа режет до Z '+f(zmin)+').');
+  li.push('<b>Ноль Z — торец</b> ①: подведите резец к торцу до лёгкого касания (или подрежьте торец), на дисплее — двойной тап по «ПОЗИЦИЯ Z»: станет 0.');
+  li.push('<b>Ноль X — ось</b> ②: коснитесь резцом наружного диаметра (или проточите пояском и измерьте штангенциркулем), на дисплее в режиме G-КОД — долгое нажатие на «⌀ ДИАМЕТР X» и введите этот диаметр.');
+  li.push('<b>Отведите резец</b> правее торца и выше заготовки. Первым ходом станок сам поедет в точку старта'+(st?' Z '+f(st[0])+', ⌀ '+f(2*st[1]):'')+'.');
+  li.push('<b>Резец</b>: '+(tools.length?[...new Set(tools)].join('; '):'в программе не указан — проходной')+'. Смены резца станок не делает.');
+  li.push('<b>Шпиндель</b>: включите вручную'+(/G\s*9[59]/i.test(prog?prog.src.map(l=>l.t).join('\n'):'')?' — подача на оборот, ≈600 об/мин':'')+'. На станке — режим M8 (G-КОД).');
+  $('steps').innerHTML=li.map(x=>'<li>'+x+'</li>').join('');
+  $('dlg').showModal();
 }
+async function go(){ await post('/api/run?name='+encodeURIComponent($('sel').value)); }
 
 // ── Разбор программы — как исполнитель станка: строки без комментариев, пустые не считаются ──
 // plan — развёрнутая станком программа (циклы G71/G70): [[номер строки, кадр], …]; рисуется она
@@ -288,6 +361,9 @@ async function pick(n){
       else plan=p.split('\n').filter(l=>l).map(l=>{const i=l.indexOf('\t');return [+l.slice(0,i),l.slice(i+1)];});
     }
     prog=parse(t,plan); curFile=n; lastLine=-1; $('sel').value=n;
+    estTxt='';
+    try{const e=await j('/api/info?name='+encodeURIComponent(n));
+      if(e.sec>=0) estTxt='Время ≈ '+dur(e.sec)+(/G\s*9[59]/i.test(t)?' (подача на оборот — при '+e.rpm+' об/мин)':'');}catch(e){}
     const c=$('code'); c.innerHTML='';
     prog.src.forEach(l=>{const d=document.createElement('div');d.dataset.n=l.n;if(!l.n)d.className='cm';
       d.innerHTML='<span>'+(l.n||'')+'</span>'+l.t.replace(/&/g,'&amp;').replace(/</g,'&lt;');c.appendChild(d);});
@@ -340,7 +416,7 @@ function draw(line){
   if(line>0){let p=null;for(const s of prog.segs)if(P?s.k<=curStep:s.n<=line)p=s.b;
     if(p){g.fillStyle='#ffd54a';g.beginPath();g.moveTo(tx(p[0]),ty(p[1]));g.lineTo(tx(p[0])+9,ty(p[1])-14);g.lineTo(tx(p[0])-9,ty(p[1])-14);g.fill();}}
   let az=0,bz=0,mx=0;for(const s of base)for(const p of [s.a,s.b]){az=Math.min(az,p[0]);bz=Math.max(bz,p[0]);mx=Math.max(mx,Math.abs(p[1]));}
-  $('info').textContent=(planErr?'Ошибка цикла: '+planErr+' · ':'')+'Резание: Z от '+az.toFixed(2)+' до '+bz.toFixed(2)+' мм · наибольший ⌀ '+(2*mx).toFixed(2)+' мм · строк '+prog.lines+' · X в программе — диаметр (G7), если не указано G8';
+  $('info').textContent=(planErr?'Ошибка цикла: '+planErr+' · ':'')+(estTxt?estTxt+' · ':'')+'Резание: Z от '+az.toFixed(2)+' до '+bz.toFixed(2)+' мм · наибольший ⌀ '+(2*mx).toFixed(2)+' мм · строк '+prog.lines+' · X в программе — диаметр (G7), если не указано G8';
 }
 
 async function poll(){
@@ -349,7 +425,8 @@ async function poll(){
     let t=STATE[st]||st;
     if(d.file&&st!='IDLE') t+=' · '+d.file;
     if(d.line&&st!='IDLE'&&st!='DONE') t+=' · строка '+d.line+(prog&&curFile==d.file?' из '+prog.lines:'');
-    if(st=='RUNNING'||st=='WAITING_ACK'||st=='PAUSED') t+=' · '+d.pct+'%';
+    if(st=='RUNNING'||st=='WAITING_ACK'||st=='PAUSED'){t+=' · '+d.pct+'%';if(d.eta>=0)t+=' · осталось ≈ '+dur(d.eta);}
+    if(st=='DONE'&&d.total>0) t+=' · расчёт был ≈ '+dur(d.total);
     $('state').textContent=t;$('state').style.color=COLOR[st]||'#e6ebf3';
     $('pf').style.width=(st=='DONE'?100:(d.pct||0))+'%';
     $('err').style.display=d.error?'block':'none';$('err').textContent=d.error||'';
@@ -366,6 +443,8 @@ async function poll(){
 }
 window.onresize=()=>draw(lastLine);
 net();files();poll();setInterval(net,10000);setInterval(poll,700);
+// ссылка …/#start=файл — сразу окно «Перед стартом» для этого файла
+if(location.hash.startsWith('#start='))pick(decodeURIComponent(location.hash.slice(7))).then(run);
 </script>
 </body>
 </html>)rawhtml";
@@ -502,6 +581,18 @@ static void handle_plan(WiFiClient& cl, const String& query) {
     cl.print(out);
 }
 
+// Расчётное время программы до запуска: {"sec":…,"rpm":…} (подача на оборот — при этих оборотах)
+static void handle_info(WiFiClient& cl, const String& query) {
+    String name = get_param(query, "name");
+    if (!name.length()) { send_404(cl); return; }
+    String path = String(GCODE_DIR) + "/" + name, err;
+    float sec = 0; int rpm = 0;
+    char buf[64];
+    if (GCodeExec_Estimate(path.c_str(), sec, rpm, err)) snprintf(buf, sizeof(buf), "{\"sec\":%d,\"rpm\":%d}", (int)(sec + 0.5f), rpm);
+    else snprintf(buf, sizeof(buf), "{\"sec\":-1}");
+    send_ok_json(cl, buf);
+}
+
 static void handle_file_delete(WiFiClient& cl, const String& query) {
     String name = get_param(query, "name");
     if (!name.length()) { send_404(cl); return; }
@@ -571,9 +662,9 @@ static void handle_exec_status(WiFiClient& cl) {
     const char* bn = basename_of(fn && fn[0] ? fn : "");
     char buf[512];
     snprintf(buf, sizeof(buf),
-        "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"step\":%d,\"pct\":%d,\"error\":\"%s\"}",
+        "{\"state\":\"%s\",\"file\":\"%s\",\"line\":%d,\"step\":%d,\"pct\":%d,\"eta\":%d,\"total\":%d,\"error\":\"%s\"}",
         exec_state_str(st), bn, GCodeExec_GetLine(), GCodeExec_GetStep(),
-        GCodeExec_GetProgress(), GCodeExec_GetError());
+        GCodeExec_GetProgress(), GCodeExec_GetEta(), GCodeExec_GetTotal(), GCodeExec_GetError());
     send_ok_json(cl, buf);
 }
 
@@ -647,6 +738,8 @@ static void handle_client(WiFiClient& cl) {
         handle_files(cl);
     } else if (method == "GET" && path == "/api/file") {
         handle_file_get(cl, query);
+    } else if (method == "GET" && path == "/api/info") {
+        handle_info(cl, query);
     } else if (method == "GET" && path == "/api/plan") {
         handle_plan(cl, query);
     } else if (method == "DELETE" && path == "/api/file") {

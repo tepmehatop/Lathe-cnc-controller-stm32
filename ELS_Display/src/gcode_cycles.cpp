@@ -336,3 +336,91 @@ bool GCodeCycles_Expand(const std::vector<std::string>& lines, std::vector<GcLin
     err.clear(); err_n = 0;
     return Expander(lines, out).run(err, err_n);
 }
+
+// ─── Оценка времени ─────────────────────────────────────────────────────────────────────────────────────────
+
+namespace {
+
+const double T_RAPID = 600, T_MAX_SPS = 8000, T_START_SPS = 1000, T_RAMP = 400;
+const double T_LINE_S = 0.03;            // обмен строкой и ответ (дисплей ↔ STM32), с — по стенду
+
+// отрезок (dz, dr) мм на скорости mm_min, с — как e2_gc_segment()
+double seg_time(double dz, double dr, double mm_min, double spz, double spx)
+{
+    double az = fabs(dz) * spz, ax = fabs(dr) * spx, n = round(fmax(az, ax));
+    if (n < 1) return 0;
+    double len = hypot(dz, dr), period = len / (mm_min / 60) * 1e6 / n, p0 = 1e6 / T_START_SPS;
+    if (period < 1e6 / T_MAX_SPS) period = 1e6 / T_MAX_SPS;
+    double t = n * period;
+    if (period < p0) t += fmin(T_RAMP, n / 2) * (p0 - period);     // разгон и торможение
+    return t / 1e6;
+}
+
+}  // namespace
+
+void GCodeTime_Lines(const std::vector<std::string>& lines, double spz, double spx, double rpm,
+                     std::vector<float>& sec)
+{
+    sec.assign(lines.size(), 0);
+    bool abs_ = true, diam = true, per_rev = false;
+    double unit = 1, feed = 100, z = 0, r = 0;
+    int motion = 0;
+    if (rpm < 1) rpm = 600;
+    for (size_t i = 0; i < lines.size(); i++) {
+        const std::string& s = lines[i];
+        double t = T_LINE_S, v;
+        if (s.empty() || s[0] == '%' || s[0] == 'O') { sec[i] = (float)t; continue; }
+        bool g28 = false, dwell = false;
+        for (size_t k = 0; k < s.size(); k++) {
+            if (s[k] != 'G' || (k && isalpha((unsigned char)s[k - 1]))) continue;
+            int g = atoi(s.c_str() + k + 1);
+            if (g <= 3) motion = g;
+            else if (g == 4) dwell = true;
+            else if (g == 7) diam = true;   else if (g == 8) diam = false;
+            else if (g == 20) unit = 25.4;  else if (g == 21) unit = 1;
+            else if (g == 90) abs_ = true;  else if (g == 91) abs_ = false;
+            else if (g == 94 || g == 98) per_rev = false; else if (g == 95 || g == 99) per_rev = true;
+            else if (g == 28) g28 = true;
+        }
+        if (dwell) { if (word(s, 'P', &v)) t += v; sec[i] = (float)t; continue; }
+        if (g28) {
+            if (!word(s, 'U', &v) && !word(s, 'W', &v)) {
+                t += seg_time(0, -r, T_RAPID, spz, spx) + seg_time(-z, 0, T_RAPID, spz, spx);
+                z = r = 0;
+            }
+            sec[i] = (float)t; continue;
+        }
+        if (word(s, 'F', &v) && v > 0) feed = v * unit;
+        double tz = z, tr = r;
+        bool hz = word(s, 'Z', &v); if (hz) tz = abs_ ? v * unit : z + v * unit;
+        bool hx = word(s, 'X', &v); if (hx) { v = v * unit / (diam ? 2 : 1); tr = abs_ ? v : r + v; }
+        if (word(s, 'W', &v)) { tz += v * unit; hz = true; }
+        if (word(s, 'U', &v)) { tr += v * unit / (diam ? 2 : 1); hx = true; }
+        if (!hz && !hx) { sec[i] = (float)t; continue; }
+        double f = motion == 0 ? T_RAPID : (per_rev ? feed * rpm : feed);
+        if (motion <= 1) t += seg_time(tz - z, tr - r, f, spz, spx);
+        else {
+            double ci, ck, R, cz, cr;
+            bool cw = motion == 2, hi = word(s, 'I', &ci), hk = word(s, 'K', &ck);
+            if (hi || hk) { cz = z + (hk ? ck * unit : 0); cr = r + (hi ? ci * unit : 0); }
+            else if (word(s, 'R', &R)) {
+                R *= unit;
+                double mz = (z + tz) / 2, mr = (r + tr) / 2, dz = tz - z, dr = tr - r, d = hypot(dz, dr);
+                if (d < 1e-9) { z = tz; r = tr; sec[i] = (float)t; continue; }
+                double h = sqrt(fmax(R * R - d * d / 4, 0)), sg = (cw ? -1 : 1) * (R > 0 ? 1 : -1);
+                cz = mz - sg * h * dr / d; cr = mr + sg * h * dz / d;
+            } else { z = tz; r = tr; sec[i] = (float)t; continue; }
+            double a0 = atan2(r - cr, z - cz), a1 = atan2(tr - cr, tz - cz), da = a1 - a0, rad = hypot(z - cz, r - cr);
+            if (cw) { while (da >= 0) da -= 2 * M_PI; } else { while (da <= 0) da += 2 * M_PI; }
+            int segs = (int)ceil(fabs(da) * rad / 0.1); if (segs < 1) segs = 1;
+            double pz = z, pr = r;
+            for (int k = 1; k <= segs; k++) {
+                double a = a0 + da * k / segs, qz = k == segs ? tz : cz + rad * cos(a), qr = k == segs ? tr : cr + rad * sin(a);
+                t += seg_time(qz - pz, qr - pr, f, spz, spx);
+                pz = qz; pr = qr;
+            }
+        }
+        z = tz; r = tr;
+        sec[i] = (float)t;
+    }
+}

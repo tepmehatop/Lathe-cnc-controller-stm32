@@ -31,6 +31,14 @@ static char      s_error[200]   = {};   // кириллица — 2 байта �
 static bool      s_expanded  = false;    // исполняется развёрнутая копия RUN_FILE
 static int       s_step      = 0;        // кадров прочитано (у развёрнутой — номер её кадра; веб-рисунок)
 
+// Оценка времени: s_cum[k] — расчётное время первых k кадров, с (GCodeTime_Lines). Пусто — файл больше 64 КБ
+static std::vector<float> s_cum;
+static double    s_spz = 400, s_spx = 800;   // шагов на мм Z / X — из настроек механики STM32 (CFG)
+static int       s_rpm = 0;                  // текущие обороты (подача на оборот); 0 — стоит, расчёт при 600
+static uint32_t  s_step_ms   = 0;        // начало текущего кадра
+static uint32_t  s_act_ms    = 0;        // фактическое время выполненных кадров (без пауз)
+static float     s_est_done  = 0;        // их расчётное время — поправка оценки по факту
+
 // ─── Утилиты ──────────────────────────────────────────────────────────────────
 
 static void close_file() {
@@ -108,18 +116,50 @@ static bool load_lines(const char* path, std::vector<std::string>& v) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-bool GCodeExec_Plan(const char* filepath, String& out, String& err) {
-    std::vector<std::string> lines;
-    out = ""; err = "";
-    if (!load_lines(filepath, lines)) { err = "Файл не прочитан (или больше 64 КБ)"; return false; }
-    if (!GCodeCycles_Needed(lines)) return true;
-    std::vector<GcLine> exp;
+// Строки, которые получит STM32 (циклы развёрнуты; exp — с номерами исходных строк, пусто — циклов нет)
+static bool prepare(const char* path, std::vector<std::string>& run, std::vector<GcLine>& exp, String& err) {
+    run.clear(); exp.clear();
+    if (!load_lines(path, run)) { err = "Файл не прочитан (или больше 64 КБ)"; return false; }
+    if (!GCodeCycles_Needed(run)) return true;
     std::string e; int en = 0;
-    if (!GCodeCycles_Expand(lines, exp, e, en)) { err = String("Строка ") + en + ": " + e.c_str(); return false; }
+    if (!GCodeCycles_Expand(run, exp, e, en)) { err = String("Строка ") + en + ": " + e.c_str(); return false; }
+    run.clear();
+    for (const GcLine& l : exp) run.push_back(l.g);
+    return true;
+}
+
+static int est_rpm() { return s_rpm > 0 ? s_rpm : 600; }
+
+static float total_time(const std::vector<std::string>& run, std::vector<float>* cum) {
+    std::vector<float> sec;
+    GCodeTime_Lines(run, s_spz, s_spx, est_rpm(), sec);
+    float t = 0;
+    if (cum) { cum->assign(1, 0); cum->reserve(sec.size() + 1); }
+    for (float v : sec) { t += v; if (cum) cum->push_back(t); }
+    return t;
+}
+
+bool GCodeExec_Plan(const char* filepath, String& out, String& err) {
+    std::vector<std::string> run;
+    std::vector<GcLine> exp;
+    out = ""; err = "";
+    if (!prepare(filepath, run, exp, err)) return false;
     out.reserve(exp.size() * 24);
     for (const GcLine& l : exp) { out += l.n; out += '\t'; out += l.g.c_str(); out += '\n'; }
     return true;
 }
+
+bool GCodeExec_Estimate(const char* filepath, float& sec, int& rpm, String& err) {
+    std::vector<std::string> run;
+    std::vector<GcLine> exp;
+    sec = 0; rpm = est_rpm(); err = "";
+    if (!prepare(filepath, run, exp, err)) return false;
+    sec = total_time(run, nullptr);
+    return true;
+}
+
+void GCodeExec_SetMachine(double spz, double spx) { if (spz > 0) s_spz = spz; if (spx > 0) s_spx = spx; }
+void GCodeExec_SetRpm(int rpm) { s_rpm = rpm > 0 ? rpm : 0; }   // не «последние»: при остановке бывает выброс
 
 void GCodeExec_Init(GcSendFn fn) {
     s_send_fn = fn;
@@ -136,18 +176,30 @@ bool GCodeExec_Run(const char* filepath) {
     strncpy(s_filename, filepath, sizeof(s_filename) - 1);
     s_filename[sizeof(s_filename) - 1] = '\0';
 
-    // циклы G71/G70 — развернуть заранее (контур P…Q нужен целиком) в RUN_FILE
+    // циклы G71/G70 — развернуть заранее (контур P…Q нужен целиком) в RUN_FILE; расчётное время кадров
     s_expanded = false;
+    s_cum.clear(); s_act_ms = 0; s_est_done = 0;
     {
-        String plan, perr;
-        if (!GCodeExec_Plan(filepath, plan, perr)) {
-            strncpy(s_error, perr.c_str(), sizeof(s_error) - 1);
-            s_error[sizeof(s_error) - 1] = '\0';
-            s_state = GCE_ERROR;
-            Serial.printf("[gce] ERROR: %s\n", s_error);
-            return false;
+        std::vector<std::string> run;
+        std::vector<GcLine> exp;
+        String perr;
+        if (!prepare(filepath, run, exp, perr)) {
+            if (LittleFS.exists(filepath) && perr.startsWith("Файл")) run.clear();   // большой файл — без оценки
+            else {
+                strncpy(s_error, perr.c_str(), sizeof(s_error) - 1);
+                s_error[sizeof(s_error) - 1] = '\0';
+                s_state = GCE_ERROR;
+                Serial.printf("[gce] ERROR: %s\n", s_error);
+                return false;
+            }
+        } else {
+            float t = total_time(run, &s_cum);
+            Serial.printf("[gce] расчётное время %.0f с (%d об/мин)\n", t, est_rpm());
         }
-        if (plan.length()) {
+        if (!exp.empty()) {
+            String plan;
+            plan.reserve(exp.size() * 24);
+            for (const GcLine& l : exp) { plan += l.n; plan += '\t'; plan += l.g.c_str(); plan += '\n'; }
             File o = LittleFS.open(RUN_FILE, "w");
             bool ok = o && o.print(plan) == plan.length();
             if (o) o.close();
@@ -194,9 +246,17 @@ void GCodeExec_TogglePause() {
     }
 }
 
+// кадр выполнен — его фактическое и расчётное время в поправку оценки
+static void step_done() {
+    if (s_step <= 0 || s_step >= (int)s_cum.size()) return;
+    s_act_ms   += millis() - s_step_ms;
+    s_est_done += s_cum[s_step] - s_cum[s_step - 1];
+}
+
 void GCodeExec_OnAck(bool ok, const char* err) {
     if (s_state != GCE_WAITING_ACK) return;
     if (ok) {
+        step_done();
         s_state = GCE_RUNNING;
     } else {
         snprintf(s_error, sizeof(s_error), "Строка %d: %s", s_line_nr, err ? err : "?");
@@ -236,6 +296,7 @@ void GCodeExec_Process() {
             if (!preprocess(proc, sizeof(proc), src)) return;
 
             s_step++;
+            s_step_ms = millis();
             if (s_expanded) s_line_nr = orig; else s_line_nr++;
             uint32_t dwell_ms = 0;
             int cls = classify(proc, &dwell_ms);
@@ -270,7 +331,7 @@ void GCodeExec_Process() {
         }
 
         case GCE_DWELL: {
-            if (millis() - s_dwell_t >= s_dwell_ms) s_state = GCE_RUNNING;
+            if (millis() - s_dwell_t >= s_dwell_ms) { step_done(); s_state = GCE_RUNNING; }
             break;
         }
 
@@ -280,11 +341,37 @@ void GCodeExec_Process() {
 
 GcExecSt GCodeExec_GetState() { return s_state; }
 
+// Осталось по расчёту (без поправки), с: кадры после текущего + недоделанная часть текущего
+static float remain_raw() {
+    int n = (int)s_cum.size() - 1, k = s_step < n ? s_step : n;
+    if (k < 0) k = 0;
+    float rem = s_cum[n] - s_cum[k];
+    if (k > 0 && (s_state == GCE_WAITING_ACK || s_state == GCE_DWELL)) {
+        float cur = s_cum[k] - s_cum[k - 1], in = (millis() - s_step_ms) / 1000.0f;
+        rem += cur > in ? cur - in : 0;
+    }
+    return rem;
+}
+
 int GCodeExec_GetProgress() {
     if (s_state == GCE_DONE) return 100;
+    if (s_cum.size() > 1 && s_cum.back() > 0) {
+        if (s_state == GCE_IDLE || s_state == GCE_ERROR) return 0;
+        return (int)(100 * (1 - remain_raw() / s_cum.back()));
+    }
     if (!s_file || s_file_size == 0) return 0;
     return (int)((long)s_file->position() * 100L / s_file_size);
 }
+
+int GCodeExec_GetEta() {
+    if (s_state == GCE_DONE) return 0;
+    if (s_cum.size() < 2 || s_state == GCE_IDLE || s_state == GCE_ERROR) return -1;
+    float k = 1;                                         // поправка по факту: станок идёт медленнее/быстрее расчёта
+    if (s_est_done > 20) { k = s_act_ms / 1000.0f / s_est_done; k = k < 0.5f ? 0.5f : (k > 3 ? 3 : k); }
+    return (int)(remain_raw() * k + 0.5f);
+}
+
+int GCodeExec_GetTotal() { return s_cum.size() > 1 ? (int)(s_cum.back() + 0.5f) : -1; }
 
 int         GCodeExec_GetLine()     { return s_line_nr; }
 int         GCodeExec_GetStep()     { return s_step; }

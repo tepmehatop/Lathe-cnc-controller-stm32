@@ -492,7 +492,7 @@ struct LayoutWidgets {
 };
 // Цвета осей в заголовках (recolor LVGL): Y — каретка (по ГОСТ это Z, синий), X — поперечная.
 // Красный/зелёный не берём — ими показан знак значения.
-#define AXIS_Y      "#4da6ff Y#"
+#define AXIS_Z      "#4da6ff Z#"   // продольная (вдоль оси шпинделя) — Z, как в G-коде и ISO; на LCD2004 автора и блоке DRO — Y
 #define AXIS_X      "#e070ff X#"
 #define DIAM_SIGN   "\xE2\x8C\x80"   // ⌀ (U+2300, есть в шрифтах подписей: tools/gen_p4_fonts.sh, gen_43_fonts.sh)
 #define TITLE_DIAM  "#e070ff " DIAM_SIGN " \xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0#"   // ⌀ ДИАМЕТР — цветом оси X
@@ -1085,7 +1085,7 @@ static CellRefs make_param_cell(lv_obj_t* parent, int x, int y, int w, int h,
     lv_obj_set_pos(title, 0, 0);
     lv_obj_set_style_text_font(title, &font_dejavu_14, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(editable ? 0xffaa44 : 0x6a9fb5), 0);
-    lv_label_set_recolor(title, true);   // цвет букв осей (AXIS_X / AXIS_Y)
+    lv_label_set_recolor(title, true);   // цвет букв осей (AXIS_X / AXIS_Z)
     lv_label_set_text(title, title_text);
 
     // val: vertically centered in remaining space below title
@@ -1282,8 +1282,13 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
 
 static void axis_kb_show(char axis)
 {
+    if (axis == 'X' && s_last_mode == MODE_RESERVE) {      // M8: вводится диаметр (как X в программе)
+        numpad_show(DIAM_SIGN " \xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0 " AXIS_X, "\xD0\xBC\xD0\xBC", 3, 4, true, nullptr,
+                    [](int32_t um, intptr_t) { axis_send('X', um / 2); }, 'X');
+        return;
+    }
     numpad_show(axis == 'D' ? TITLE_DIAM
-              : axis == 'Z' ? "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y
+              : axis == 'Z' ? "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z
                             : "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X,
                 "\xD0\xBC\xD0\xBC", 3, 4, true, nullptr,                     // мм
                 [](int32_t um, intptr_t a) { axis_send((char)a, um); }, axis);
@@ -1423,7 +1428,7 @@ static void create_k_content(lv_obj_t* screen)
     // Row 1: ПОЗИЦИЯ Z
     {
         auto r = make_param_cell(panel, col_x[0], GRID_Y, COL_W0, ROW_H,
-                                  "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                                  "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
         g_wk.row1_box = r.box; g_wk.row1_title = r.title; g_wk.row1_val = r.val;
         lv_label_set_text(r.val, "+125.45");
         lv_obj_set_style_text_color(r.val, lv_color_hex(0x00ff88), 0);
@@ -1862,7 +1867,7 @@ static void cal_show()
     lv_obj_set_style_text_color(g_cal.help, lv_color_hex(0x9ab8c8), 0);
     lv_label_set_long_mode(g_cal.help, LV_LABEL_LONG_WRAP);
 
-    const char* names[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y,   // ПРОДОЛЬНАЯ Y
+    const char* names[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Z,   // ПРОДОЛЬНАЯ Y
                              "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X }; // ПОПЕРЕЧНАЯ X
     for (int i = 0; i < 2; i++) {
         int y = UY(104) + i * UY(36);
@@ -2255,7 +2260,7 @@ static void scales_show()
     }
     // Линейки по осям
     const int X_Z = UX(200), X_X = UX(336), COL_W = UX(128), Y0 = UY(88), DY = UY(26), RH = UY(24);
-    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y, "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X };
+    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Z, "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X };
     for (int c = 0; c < 2; c++) {
         lv_obj_t* h = lv_label_create(back);
         lv_obj_set_style_text_font(h, &font_dejavu_14, 0);
@@ -2416,7 +2421,7 @@ static void create_settings_menu(lv_obj_t* screen)
 
     const int X_NAME = UX(16), X_Z = UX(200), X_X = UX(336), COL_W = UX(128), ROW_Y0 = UY(58), ROW_DY = UY(32), ROW_H = UY(29);
     // заголовки колонок: продольная — Y на экране (как ПОЗИЦИЯ Y), поперечная — X
-    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Y,   // ПРОДОЛЬНАЯ Y
+    const char* heads[2] = { "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x90\xD0\xAF " AXIS_Z,   // ПРОДОЛЬНАЯ Y
                              "\xD0\x9F\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x95\xD0\xA7\xD0\x9D\xD0\x90\xD0\xAF " AXIS_X }; // ПОПЕРЕЧНАЯ X
     for (int c = 0; c < 2; c++) {
         lv_obj_t* h = lv_label_create(ov);
@@ -2449,7 +2454,7 @@ static void create_settings_menu(lv_obj_t* screen)
                 for (auto& x : CFG_FIELDS) if (x.idx_z == idx || x.idx_x == idx) f = &x;
                 static char title[64];
                 snprintf(title, sizeof(title), "%s%s", f->name,
-                         f->idx_x < 0 ? "" : idx == f->idx_z ? " (" AXIS_Y ")" : " (" AXIS_X ")");
+                         f->idx_x < 0 ? "" : idx == f->idx_z ? " (" AXIS_Z ")" : " (" AXIS_X ")");
                 char init[16];
                 cfg_fmt(init, sizeof(init), idx, g_cfg.edit[idx]);
                 numpad_show(title, f->unit, f->dec, f->digits, false, init, [](int32_t v, intptr_t i) {
@@ -3168,7 +3173,7 @@ static void apply_feed_sm2_layout()
 {
     if (g_edit_param.active) exit_edit_mode();
     lv_label_set_text(g_ui.row1_title,
-        "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_Y);   // ОСЬ Y (ДИАМЕТР — постоянная плитка рядом)
+        "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_Z);   // ОСЬ Y (ДИАМЕТР — постоянная плитка рядом)
     lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row2_title,
         "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_X);                                   // ОСЬ X
@@ -3183,10 +3188,10 @@ static void apply_feed_sm3_layout()
 {
     if (g_edit_param.active) exit_edit_mode();
     lv_label_set_text(g_ui.row1_title,
-        "\xD0\x9E\xD0\xA2\xD0\xA1\xD0\x9A\xD0\x9E\xD0\x9A " AXIS_Y);         // ОТСКОК Z
+        "\xD0\x9E\xD0\xA2\xD0\xA1\xD0\x9A\xD0\x9E\xD0\x9A " AXIS_Z);         // ОТСКОК Z
     lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row2_title,
-        "\xD0\x9E\xD0\xA1\xD0\x9B\xD0\x90\xD0\x91\xD0\x9B. \xD0\x9D\xD0\x90\xD0\xA2\xD0\xAF\xD0\x93\xD0\x90 " AXIS_Y);  // ОСЛАБЛ. НАТЯГА Y (LCD «Ослабление натяга Y»)
+        "\xD0\x9E\xD0\xA1\xD0\x9B\xD0\x90\xD0\x91\xD0\x9B. \xD0\x9D\xD0\x90\xD0\xA2\xD0\xAF\xD0\x93\xD0\x90 " AXIS_Z);  // ОСЛАБЛ. НАТЯГА Y (LCD «Ослабление натяга Y»)
     lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row3_title, "---");
     lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x555555), 0);
@@ -3235,7 +3240,7 @@ static void apply_sphere_sm2_layout()
         "\xD0\xA8\xD0\x98\xD0\xA0\xD0\x98\xD0\x9D\xD0\x90 \xD0\xA0\xD0\x95\xD0\x97\xD0\xA6\xD0\x90");  // ШИРИНА РЕЗЦА
     lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row2_title,
-        "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x9E\xD0\xA1\xD0\x98 " AXIS_Y);             // ШАГ ОСИ Z
+        "\xD0\xA8\xD0\x90\xD0\x93 \xD0\x9E\xD0\xA1\xD0\x98 " AXIS_Z);             // ШАГ ОСИ Z
     lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row3_title,
         "\xD0\x9D\xD0\x9E\xD0\x96\xD0\x9A\xD0\x90 " DIAM_SIGN);       // НОЖКА ⌀ (LCD «Ножка:Ø», диаметр)
@@ -3249,7 +3254,7 @@ static void apply_common_sm3_layout()
 {
     if (g_edit_param.active) exit_edit_mode();
     lv_label_set_text(g_ui.row1_title,
-        "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_Y);   // ОСЬ Y (ДИАМЕТР — постоянная плитка рядом)
+        "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_Z);   // ОСЬ Y (ДИАМЕТР — постоянная плитка рядом)
     lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_text(g_ui.row2_title,
         "\xD0\x9E\xD0\xA1\xD0\xAC " AXIS_X);                                        // ОСЬ X
@@ -3263,6 +3268,9 @@ static void apply_common_sm3_layout()
 // ============================================================================
 static void apply_mode_layout(LatheMode mode)
 {
+    // M8: имя файла — в узкой колонке слева (по центру подсказка о нуле); в остальных режимах — по тексту
+    lv_obj_set_width(g_ui.primary_unit, mode == MODE_RESERVE ? UX(165) : LV_SIZE_CONTENT);
+    lv_label_set_long_mode(g_ui.primary_unit, mode == MODE_RESERVE ? LV_LABEL_LONG_DOT : LV_LABEL_LONG_WRAP);
     // M8 (G-код) — в основном поле слова (ГОТОВ, ПАУЗА…): tahoma 40 содержит только цифры и пару букв
     lv_obj_set_style_text_font(g_ui.primary_val, mode == MODE_RESERVE ? &font_tahoma_bold_28 : &font_tahoma_bold_40, 0);
     // Выходим из редактирования если активно (скрывает стрелки и восстанавливает цвет)
@@ -3325,7 +3333,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_label_set_text(g_ui.secondary_unit, "RPM");
             lv_obj_set_style_text_color(g_ui.secondary_unit, lv_color_hex(0x3a7a5a), 0);
             lv_label_set_text(g_ui.row1_title,
-                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);  // read-only: dim blue
             lv_label_set_text(g_ui.row2_title,
                 "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);  // ПОЗИЦИЯ X
@@ -3347,7 +3355,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_obj_set_style_text_color(g_ui.secondary_unit, lv_color_hex(0x3a7a5a), 0);
             // row1 = ПОЗИЦИЯ Z (всегда; дабл-тап — ноль оси, категория резьбы — плиткой ТИП)
             lv_label_set_text(g_ui.row1_title,
-                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
             lv_label_set_text(g_ui.row2_title,
                 "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);  // ПОЗИЦИЯ X
@@ -3379,7 +3387,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_obj_set_style_text_color(g_ui.secondary_unit, lv_color_hex(0x3a7a5a), 0);
             // row1: ПОЗИЦИЯ Z (всегда — синий, read-only)
             lv_label_set_text(g_ui.row1_title,
-                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
             // row2: ПОЗИЦИЯ X (всегда — синий, read-only)
             lv_label_set_text(g_ui.row2_title,
@@ -3410,7 +3418,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_obj_set_style_text_color(g_ui.secondary_unit, lv_color_hex(0x3a7a5a), 0);
             // row1: ПОЗИЦИЯ Z (всегда — синий, read-only)
             lv_label_set_text(g_ui.row1_title,
-                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
             // row2: ПОЗИЦИЯ X (всегда — синий, read-only)
             lv_label_set_text(g_ui.row2_title,
@@ -3456,18 +3464,20 @@ static void apply_mode_layout(LatheMode mode)
 
         case MODE_RESERVE:                                         // M8 — G-код: позиции и строка программы
             lv_label_set_text(g_ui.secondary_unit, "");
-            lv_label_set_text(g_ui.row1_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);   // ПОЗИЦИЯ Y
+            lv_label_set_text(g_ui.row1_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);   // ПОЗИЦИЯ Y
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
-            lv_label_set_text(g_ui.row2_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);   // ПОЗИЦИЯ X
+            lv_label_set_text(g_ui.row2_title, DIAM_SIGN " \xD0\x94\xD0\x98\xD0\x90\xD0\x9C\xD0\x95\xD0\xA2\xD0\xA0 " AXIS_X);   // ⌀ ДИАМЕТР X — как X в программе
             lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
             lv_label_set_text(g_ui.row3_title, "\xD0\x92\xD0\xAB\xD0\x9F\xD0\x9E\xD0\x9B\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E");   // ВЫПОЛНЕНО
             lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x6a9fb5), 0);
-            if (g_ui.row4_box) lv_obj_add_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_ui.row4_title, "\xD0\x9E\xD0\xA1\xD0\xA2\xD0\x90\xD0\x9B\xD0\x9E\xD0\xA1\xD0\xAC");   // ОСТАЛОСЬ
+            lv_obj_set_style_text_color(g_ui.row4_title, lv_color_hex(0x6a9fb5), 0);
+            if (g_ui.row4_box) lv_obj_clear_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             break;
         default:
             lv_label_set_text(g_ui.secondary_unit, "RPM");
             lv_label_set_text(g_ui.row1_title,
-                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Y);  // ПОЗИЦИЯ Z
+                "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_Z);  // ПОЗИЦИЯ Z
             lv_label_set_text(g_ui.row2_title,
                 "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);  // ПОЗИЦИЯ X
             lv_label_set_text(g_ui.row3_title, "---");
@@ -4673,7 +4683,14 @@ static void update_sm_row6(LatheMode mode, uint8_t sm)
     bool is_vvod = (mode == MODE_FEED) ? (sm == 2) : (sm == 3);
     bool is_param = (mode == MODE_FEED) ? (sm == 3) : (sm == 2);
 
-    if (mode == MODE_DIVIDER) {
+    if (mode == MODE_RESERVE) {
+        // G-код: как поставить ноль (подробно — окно «Перед стартом» на веб-странице)
+        lv_label_set_text(g_ui.sm_row6,
+            "\xD0\x9D\xD0\x9E\xD0\x9B\xD0\xAC Z: \xD0\xA2\xD0\x9E\xD0\xA0\xD0\x95\xD0\xA6\n"          // НОЛЬ Z: ТОРЕЦ
+            DIAM_SIGN " X: \xD0\x9A\xD0\x90\xD0\xA1\xD0\x90\xD0\x9D\xD0\x98\xD0\x95\n"                    // ⌀ X: КАСАНИЕ
+            "\xD0\x98 \xD0\x92\xD0\x92\xD0\x9E\xD0\x94 " DIAM_SIGN);                                        // И ВВОД ⌀
+        lv_obj_set_style_text_color(g_ui.sm_row6, lv_color_hex(0x6a9fb5), 0);
+    } else if (mode == MODE_DIVIDER) {
         // Делилка: подсказка LCD2004 «Сброс кнопкой Селект» (сброс угла)
         lv_label_set_text(g_ui.sm_row6,
             "\xD0\xA1\xD0\x91\xD0\xA0\xD0\x9E\xD0\xA1\n"
@@ -4779,10 +4796,26 @@ static void gcode_status_update()
     s_prev = st;
     if (st == GCE_ERROR) snprintf(l, sizeof(l), "N%d", GCodeExec_GetLine());   // «ОШИБКА» — крупно выше
     lv_label_set_text(g_ui.row3_val, l);
+    {   // осталось времени (расчёт по модели станка с поправкой по факту): м:сс или ч:мм:сс
+        int eta = GCodeExec_GetEta();
+        char e[16];
+        if (eta < 0) snprintf(e, sizeof(e), "--");
+        else if (eta >= 3600) snprintf(e, sizeof(e), "%d:%02d:%02d", eta / 3600, eta % 3600 / 60, eta % 60);
+        else snprintf(e, sizeof(e), "%d:%02d", eta / 60, eta % 60);
+        lv_label_set_text(g_ui.row4_val, e);
+        lv_obj_set_style_text_color(g_ui.row4_val, lv_color_hex(0xe0e0e0), 0);
+    }
+    {   // X в программе — диаметр: ячейка X в M8 тоже диаметр (ноль X — ось шпинделя)
+        char d[24];
+        int32_t px = uart_protocol.getData().pos_x;
+        DisplayFormatter::formatPosition(d, 2 * px);
+        lv_label_set_text(g_ui.row2_val, d);
+    }
     lv_label_set_long_mode(g_ui.row3_val, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(st == GCE_ERROR ? 0xff5555 : 0xe0e0e0), 0);
     const char* f = GCodeExec_GetFilename();
-    snprintf(b, sizeof(b), "G-\xD0\x9A\xD0\x9E\xD0\x94%s%s", f && *f ? ": " : "", f && *f ? (strrchr(f, '/') ? strrchr(f, '/') + 1 : f) : "");
+    // имя файла (режим «G-КОД» — в шапке); длинное — с многоточием по ширине колонки
+    snprintf(b, sizeof(b), "%s", f && *f ? (strrchr(f, '/') ? strrchr(f, '/') + 1 : f) : "\xD0\xA4\xD0\x90\xD0\x99\xD0\x9B \xD0\x9D\xD0\x95 \xD0\x92\xD0\xAB\xD0\x91\xD0\xA0\xD0\x90\xD0\x9D");   // ФАЙЛ НЕ ВЫБРАН
     lv_label_set_text(g_ui.primary_unit, b);
 }
 
@@ -5861,6 +5894,10 @@ static void test_stop()
 
 void onDataUpdate(const LatheData& data)
 {
+    // оценка времени G-кода: обороты (подача на оборот) и шагов на мм из механики STM32
+    GCodeExec_SetRpm(data.rpm);
+    if (data.cfg_valid && data.cfg[3] > 0 && data.cfg[6] > 0)
+        GCodeExec_SetMachine(data.cfg[1] * data.cfg[2] * 100.0 / data.cfg[3], data.cfg[4] * data.cfg[5] * 100.0 / data.cfg[6]);
     update_ui_values(data);
 }
 

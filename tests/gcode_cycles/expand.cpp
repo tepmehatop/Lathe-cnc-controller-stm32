@@ -96,7 +96,15 @@ int main(int argc, char** argv)
         if (in[i][0] == 'N' && atoi(in[i].c_str() + 1) == p) ip = (int)i + 1;
         if (in[i][0] == 'N' && atoi(in[i].c_str() + 1) == q) iq = (int)i + 1;
     }
-    printf("строк программы %zu, развёрнуто %zu\n", in.size(), out.size());
+    std::vector<std::string> run;
+    for (const GcLine& l : out) run.push_back(l.g);
+    std::vector<float> sec;
+    GCodeTime_Lines(run, 400, 800, 600, sec);             // механика по умолчанию, 600 об/мин
+    double tsum = 0;
+    for (float v : sec) tsum += v;
+    long ts = lround(tsum);
+    printf("строк программы %zu, развёрнуто %zu, расчётное время %ld с (%ld:%02ld)\n", in.size(), out.size(),
+           ts, ts / 60, ts % 60);
     std::vector<P> path = trace(out, 0, 0);
     // поверхность детали — путь чистового прохода по контуру (точки строк P…Q), берём только участки до выхода
     // на наибольший X контура (дальше — отвод)
