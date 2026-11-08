@@ -749,6 +749,7 @@ struct AlertState {
     bool     sticky;   // флаг ошибки ядра: без авто-скрытия, закрывает ALERT:0 от STM32
 };
 static AlertState g_alert = {false, 0, false};
+static bool s_gcode_alert = false;   // ошибка G-кода: закрывает только OK, не ALERT:0 и не таймер
 
 // ============================================================================
 // Состояние джойстик-оверлея (US-013)
@@ -1271,7 +1272,7 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
     lv_obj_set_style_pad_gap(m, US(4), 0);
     lv_obj_set_style_bg_color(m, lv_color_hex(0x1a2a3a), LV_PART_ITEMS);
     lv_obj_set_style_text_color(m, lv_color_hex(0xe0e0e0), LV_PART_ITEMS);
-    lv_obj_set_style_text_color(m, lv_color_hex(0x3a4a5a), LV_PART_ITEMS | LV_STATE_DISABLED);
+    lv_obj_set_style_text_color(m, lv_color_hex(0x3a4a5a), (lv_style_selector_t)LV_PART_ITEMS | LV_STATE_DISABLED);
     lv_obj_add_event_cb(m, [](lv_event_t* e) {
         lv_obj_t* o = lv_event_get_target(e);
         const char* k = lv_btnmatrix_get_btn_text(o, lv_btnmatrix_get_selected_btn(o));
@@ -2659,7 +2660,8 @@ lv_obj_t* create_dark_pro_ui()
         // Текст алерта (2 строки, кириллица)
         lv_obj_t* amsg = lv_label_create(abox);
         lv_obj_set_pos(amsg, UX(50), UY(12));
-        lv_obj_set_size(amsg, UX(340), UY(60));   // 2 строки даже для "в нейтральное положение"
+        lv_obj_set_width(amsg, UX(340));           // высота — по тексту, окно подстраивается в show_alert
+        lv_obj_set_height(amsg, LV_SIZE_CONTENT);
         lv_obj_set_style_text_font(amsg, &font_tahoma_bold_22, 0);
         lv_obj_set_style_text_color(amsg, lv_color_hex(0xffcc44), 0);
         lv_label_set_long_mode(amsg, LV_LABEL_LONG_WRAP);
@@ -3458,7 +3460,7 @@ static void apply_mode_layout(LatheMode mode)
             lv_obj_set_style_text_color(g_ui.row1_title, lv_color_hex(0x6a9fb5), 0);
             lv_label_set_text(g_ui.row2_title, "\xD0\x9F\xD0\x9E\xD0\x97\xD0\x98\xD0\xA6\xD0\x98\xD0\xAF " AXIS_X);   // ПОЗИЦИЯ X
             lv_obj_set_style_text_color(g_ui.row2_title, lv_color_hex(0x6a9fb5), 0);
-            lv_label_set_text(g_ui.row3_title, "\xD0\xA1\xD0\xA2\xD0\xA0\xD0\x9E\xD0\x9A\xD0\x90");
+            lv_label_set_text(g_ui.row3_title, "\xD0\x92\xD0\xAB\xD0\x9F\xD0\x9E\xD0\x9B\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E");   // ВЫПОЛНЕНО
             lv_obj_set_style_text_color(g_ui.row3_title, lv_color_hex(0x6a9fb5), 0);
             if (g_ui.row4_box) lv_obj_add_flag(g_ui.row4_box, LV_OBJ_FLAG_HIDDEN);
             break;
@@ -4601,6 +4603,14 @@ static void show_alert(const char* message)
 {
     if (!g_ui.alert_box || !g_ui.alert_msg) return;
     lv_label_set_text(g_ui.alert_msg, message);
+    // Длинное сообщение (ошибка G-кода) — окно выше и шрифт мельче, текст не наезжает на OK
+    bool longmsg = strlen(message) > 160;
+    lv_obj_set_style_text_font(g_ui.alert_msg, longmsg ? &font_tahoma_bold_16 : &font_tahoma_bold_22, 0);
+    lv_obj_update_layout(g_ui.alert_msg);
+    lv_coord_t h = UY(12) + lv_obj_get_height(g_ui.alert_msg) + UY(6) + UY(28) + UY(10);
+    if (h < UY(110)) h = UY(110);
+    if (h > UY(250)) h = UY(250);
+    lv_obj_set_height(g_ui.alert_box, h);
     lv_obj_clear_flag(g_ui.alert_box, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(g_ui.alert_box);
     g_alert.active  = true;
@@ -4620,6 +4630,7 @@ static void dismiss_alert()
     if (!g_ui.alert_box) return;
     g_alert.active = false;
     g_alert.sticky = false;
+    s_gcode_alert  = false;
     lv_obj_add_flag(g_ui.alert_box, LV_OBJ_FLAG_HIDDEN);
     // Кружок ⚠ → серый
     if (g_ui.warn_bg) {
@@ -4757,12 +4768,17 @@ static void gcode_status_update()
     if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, t);
     lv_obj_set_style_text_color(g_ui.primary_val, lv_color_hex(col), 0);
     if (st == GCE_IDLE) snprintf(l, sizeof(l), "--");
-    else snprintf(l, sizeof(l), "%d  %d%%", GCodeExec_GetLine(), GCodeExec_GetProgress());
+    else snprintf(l, sizeof(l), "%d%%", GCodeExec_GetProgress());   // номер строки — крупно выше («N7»)
     // ячейка узкая — причина ошибки целиком в сообщении (один раз при переходе в ошибку)
     static GcExecSt s_prev = GCE_IDLE;
-    if (st == GCE_ERROR && s_prev != GCE_ERROR) show_alert(GCodeExec_GetError());
+    if (st == GCE_ERROR && s_prev != GCE_ERROR) {
+        show_alert(GCodeExec_GetError());
+        g_alert.sticky = true;                 // висит до OK — причину надо успеть прочитать
+        s_gcode_alert = true;
+    }
     s_prev = st;
-    lv_label_set_text(g_ui.row3_val, st == GCE_ERROR ? "\xD0\x9E\xD0\xA8\xD0\x98\xD0\x91\xD0\x9A\xD0\x90" : l);
+    if (st == GCE_ERROR) snprintf(l, sizeof(l), "N%d", GCodeExec_GetLine());   // «ОШИБКА» — крупно выше
+    lv_label_set_text(g_ui.row3_val, l);
     lv_label_set_long_mode(g_ui.row3_val, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(g_ui.row3_val, lv_color_hex(st == GCE_ERROR ? 0xff5555 : 0xe0e0e0), 0);
     const char* f = GCodeExec_GetFilename();
@@ -4780,7 +4796,7 @@ static void update_ui_values(const LatheData& data)
     if (data.mode != s_last_mode) {
         s_last_mode = data.mode;
         s_last_select_menu = data.select_menu;
-        if (g_alert.active && !g_alert.sticky) dismiss_alert();  // флаги ядра переживают смену режима, как на LCD2004
+        if (g_alert.active && (!g_alert.sticky || s_gcode_alert)) dismiss_alert();  // флаги ядра переживают смену режима, как на LCD2004
         apply_sm_layout(data.mode, data.select_menu);
     } else if (data.select_menu != s_last_select_menu) {
         s_last_select_menu = data.select_menu;
@@ -6086,6 +6102,7 @@ void setup()
     uart_protocol.setAlertDismissCallback([]() {
         const LatheData& d = uart_protocol.getData();
         if (s_sphere_alert && d.mode == MODE_SPHERE && d.submode == SUBMODE_INTERNAL) return;
+        if (s_gcode_alert) return;
         dismiss_alert();
     });
 

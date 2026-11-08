@@ -158,7 +158,7 @@ static const char* e2_gc_exec(const char* line)
    // подача на оборот: мм/мин = F × обороты (обороты меряются раз в 250 мс; синхронизации со шпинделем нет)
    float feed = e2_gc.feed;
    if (e2_gc.per_rev && e2_gc.motion) {
-      if (e2_rpm == 0) return "ШПИНДЕЛЬ СТОИТ: G99/G95 - ПОДАЧА НА ОБОРОТ, ВКЛЮЧИТЕ ШПИНДЕЛЬ";
+      if (e2_rpm == 0) return "ВКЛЮЧИТЕ ШПИНДЕЛЬ (G99 - ПОДАЧА НА ОБОРОТ)";
       feed = e2_gc.feed * e2_rpm;
    }
    if (e2_gc.motion == 1) return e2_gc_goto(tz, tx, feed);
