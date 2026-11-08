@@ -202,6 +202,28 @@ def s_cal_error(b):
     b.mode(1, 1); b.tap('gear'); b.tap('set_cal'); b.tap((262, 23)); b.tap((400, 129)); b.shot('cal_error')
     b.tap(CAL_CLOSE); b.tap(HUB_CLOSE)
 
+def cal_prepare(b):
+    """Калибровка: шпиндель стоит, Mega следует за моторами как блок DRO (люфт Z 80 мкм — для наглядного итога)."""
+    b.sp.off(); time.sleep(1.0)
+    if b.mega:
+        for c in ('w0', 'kz2500', 'kx1250', 'lz80', 'lx0', 'f1', 'o'):
+            b.mega.cmd(c)
+    b.mode(1, 1); b.tap('gear'); b.tap('set_cal')
+
+CAL_GO_Z, CAL_NEXT, NUMPAD_CANCEL = (389, 120), (86, 237), (210, 234)
+
+def s_cal_run(b):
+    """По линейкам: ПУСК по Z — снимок хода и итога («ПРИМЕНИТЬ» не нажимается: настройки стенда не меняются)."""
+    cal_prepare(b); b.tap((262, 23)); b.tap(CAL_GO_Z); time.sleep(2.5); b.shot('cal_run')
+    time.sleep(55.0)                              # 3 хода туда-обратно по 21 мм — около 40 с
+    b.shot('cal_result'); b.tap(CAL_CLOSE); b.tap(HUB_CLOSE); b.sp.on(500)
+
+def s_cal_ind(b):
+    """По индикатору: выбран люфт → «ДАЛЕЕ» → ход → окно ввода показания (отмена — без расчёта)."""
+    cal_prepare(b); b.tap((402, 23)); b.tap(CAL_GO_Z); time.sleep(4.0); b.shot('cal_ind_zero')
+    b.tap(CAL_NEXT); time.sleep(12.0); b.shot('cal_ind_input')
+    b.tap(NUMPAD_CANCEL); b.tap(CAL_CLOSE); b.tap(HUB_CLOSE); b.sp.on(500)
+
 def make_alert(name, cmd):
     def f(b):
         b.mode(1, 1); b.inject(cmd, 1.0); b.shot(name); b.tap('alert_ok'); b.clear()

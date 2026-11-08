@@ -6,7 +6,8 @@
   python3 tools/docs_gen/annotate.py            — все рисунки из MARKS
   python3 tools/docs_gen/annotate.py main_feed  — один
 
-Исходные снимки (1280×800, поворот уже сделан) — docs/manual/raw/<имя>.jpg, результат — docs/manual/img/<имя>.png.
+Исходные снимки — docs/manual/raw/<имя>.jpg (экран 1280×800, поворот уже сделан) или <имя>.png (веб-страница,
+любой размер), результат — docs/manual/img/<имя>.jpg шириной до 960.
 Метка: (номер, x, y, dx, dy) — стрелка от кружка в (x+dx, y+dy) к точке (x, y), координаты снимка в пикселях.
 """
 import os, subprocess, sys, tempfile
@@ -15,7 +16,6 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 RAW = os.path.join(ROOT, 'docs', 'manual', 'raw')
 OUT = os.path.join(ROOT, 'docs', 'manual', 'img')
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-W, H = 1280, 800
 
 # Координаты — по снимку 1280×800 дисплея 10.1" (шапка: режим слева, подрежим, упоры, S1/S2/S3, ⚡, ⚠)
 HEAD = [(1, 190, 60, 60, 110), (2, 645, 60, 0, 120), (3, 940, 55, -30, 120), (4, 1093, 55, -40, 120),
@@ -51,20 +51,41 @@ MARKS = {
     'set_cal': [(1, 700, 68, 0, 70), (2, 1075, 68, 0, 70), (3, 672, 371, 0, 0), (4, 1057, 371, 0, 0),
                 (5, 659, 715, 0, -70), (6, 1070, 715, 0, -70)],
     'numpad': [(1, 640, 160, -360, 0), (2, 945, 282, 120, 0), (3, 560, 687, 0, 90), (4, 885, 687, 0, 90)],
+    'cal_run': [(1, 699, 67, 0, 75), (2, 560, 365, -40, -60), (3, 1100, 345, 80, -45), (4, 570, 560, 80, 0),
+                (5, 560, 715, -150, 0)],
+    'cal_result': [(1, 800, 575, 0, 60), (2, 245, 700, 0, -75)],
+    'cal_ind_zero': [(1, 1100, 345, 80, -45), (2, 845, 557, 70, 0), (3, 248, 705, 0, -80)],
+    'cal_ind_input': [(1, 960, 168, 190, 0), (2, 885, 688, 230, 0), (3, 560, 688, -350, 0)],
+    'gcode_run': [at(1, 160, 255, (270, -70)), at(2, 120, 710), at(3, 470, 710)],
+    # веб-страница (снимок 1100 px шириной)
+    'web_page': [(1, 420, 118, 180, -45), (2, 874, 112, -20, -55), (3, 957, 112, 0, -55), (4, 1037, 112, 20, -55),
+                 (5, 455, 148, 200, 0), (6, 560, 430, 200, 60), (7, 105, 662, 130, 32), (8, 700, 820, 300, -20),
+                 (9, 915, 1130, -60, -55), (10, 1029, 1130, 0, -55), (11, 200, 1365, 360, -35), (12, 400, 1380, 200, 20)],
+    'web_prestart': [(1, 250, 560, -110, 0), (2, 610, 860, -80, 40), (3, 757, 860, 100, 40)],
+    'web_run': [(1, 400, 162, 120, -60), (2, 300, 184, 0, 60), (3, 640, 375, 60, 90), (4, 512, 303, -60, -30),
+                (5, 300, 905, 300, 0), (6, 957, 120, 0, 70), (7, 1037, 120, 20, 70)],
 }
 
 # Маски: (x, y, w, h, текст) — закрыть имя сети Wi-Fi владельца и найденные сети
+NET = (280, 14, 330, 30, 'Wi-Fi: МОЯ_СЕТЬ · 192.168.1.57 · свободно 856 КБ')    # шапка веб-страницы
 MASKS = {
+    'web_page': [NET], 'web_prestart': [NET], 'web_run': [NET], 'web_done': [NET],
     'settings': [(40, 500, 900, 50, 'Роутер: МОЯ_СЕТЬ')],
     'set_wifi': [(40, 105, 900, 46, 'Подключено к МОЯ_СЕТЬ: http://192.168.1.57'), (262, 182, 618, 76, 'МОЯ_СЕТЬ'),
                  (46, 445, 1186, 232, '')],
 }
 
 
+def size(path):
+    out = subprocess.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', path], capture_output=True, text=True).stdout
+    return [int(l.split()[-1]) for l in out.splitlines() if 'pixel' in l]
+
+
 def render(name, marks, masks=()):
-    src = os.path.join(RAW, name + '.jpg')
-    if not os.path.exists(src):
-        print('нет снимка', src); return False
+    src = next((os.path.join(RAW, name + e) for e in ('.jpg', '.png') if os.path.exists(os.path.join(RAW, name + e))), None)
+    if not src:
+        print('нет снимка', name); return False
+    W, H = size(src)
     svg = []
     for x, y, w, h, t in masks:
         svg.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="#0e1822"/>')
@@ -97,7 +118,8 @@ markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#
         except subprocess.TimeoutExpired:
             subprocess.run(['pkill', '-f', 'Chrome --headless=new'], capture_output=True)
     os.unlink(page)
-    subprocess.run(['sips', '-Z', '960', '-s', 'format', 'jpeg', '-s', 'formatOptions', '82', png, '--out', jpg],
+    subprocess.run(['sips', '--resampleWidth', str(min(W, 960)), '-s', 'format', 'jpeg', '-s', 'formatOptions', '82',
+                    png, '--out', jpg],
                    capture_output=True)                                 # компактнее для репозитория
     os.unlink(png)
     print('рисунок', jpg)
@@ -105,7 +127,7 @@ markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#
 
 
 def main():
-    names = sys.argv[1:] or sorted(f[:-4] for f in os.listdir(RAW) if f.endswith('.jpg'))
+    names = sys.argv[1:] or sorted(f[:-4] for f in os.listdir(RAW) if f.endswith(('.jpg', '.png')))
     for n in names:
         render(n, MARKS.get(n, []), MASKS.get(n, ()))
 

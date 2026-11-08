@@ -1780,8 +1780,8 @@ static void cal_tick(lv_timer_t*)
     }
     if (d.cal_state != 4 && g_cal.ist && d.cal_state == 3) g_cal.ist = 0;
     if (d.cal_state == 1) {
-        snprintf(t, sizeof(t), "\xD0\x98\xD0\x94\xD0\x81\xD0\xA2 \xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90 %s: %s",   // ИДЁТ КАЛИБРОВКА Y: 1/3
-                 d.cal_ax == 'Z' ? "Y" : "X", strchr(d.cal_text, ':') ? strchr(d.cal_text, ':') + 1 : "");
+        snprintf(t, sizeof(t), "\xD0\x98\xD0\x94\xD0\x81\xD0\xA2 \xD0\x9A\xD0\x90\xD0\x9B\xD0\x98\xD0\x91\xD0\xA0\xD0\x9E\xD0\x92\xD0\x9A\xD0\x90 %s: %s",   // ИДЁТ КАЛИБРОВКА Z: 1/3
+                 d.cal_ax == 'Z' ? "Z" : "X", strchr(d.cal_text, ':') ? strchr(d.cal_text, ':') + 1 : "");
         cal_status(t, 0x6a9fb5);
         lv_obj_add_flag(g_cal.apply, LV_OBJ_FLAG_HIDDEN);
     } else if (d.cal_state == 3) {
@@ -1794,7 +1794,7 @@ static void cal_tick(lv_timer_t*)
         snprintf(t, sizeof(t),
                  "%s: \xD0\xB2\xD0\xB8\xD0\xBD\xD1\x82 %ld.%03ld \xD0\xBC\xD0\xBC (\xD0\xB1\xD1\x8B\xD0\xBB\xD0\xBE %ld.%02ld, \xD0\xB1\xD1\x83\xD0\xB4\xD0\xB5\xD1\x82 %ld.%02ld), "
                  "\xD0\xBB\xD1\x8E\xD1\x84\xD1\x82 %ld \xD0\xBC\xD0\xBA\xD0\xBC%s",
-                 zi ? "Y" : "X", (long)(d.cal_screw_um / 1000), (long)(d.cal_screw_um % 1000),
+                 zi ? "Z" : "X", (long)(d.cal_screw_um / 1000), (long)(d.cal_screw_um % 1000),
                  (long)(cfg_screw / 100), (long)(cfg_screw % 100), (long)(new_screw / 100), (long)(new_screw % 100),
                  (long)d.cal_bl_um,
                  dev > 200 ? "\n\xD0\x9E\xD0\xA2\xD0\x9B\xD0\x98\xD0\xA7\xD0\x90\xD0\x95\xD0\xA2\xD0\xA1\xD0\xAF \xD0\x91\xD0\x9E\xD0\x9B\xD0\x95\xD0\x95 20%: "

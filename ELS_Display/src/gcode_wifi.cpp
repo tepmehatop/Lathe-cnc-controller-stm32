@@ -443,8 +443,9 @@ async function poll(){
 }
 window.onresize=()=>draw(lastLine);
 net();files();poll();setInterval(net,10000);setInterval(poll,700);
-// ссылка …/#start=файл — сразу окно «Перед стартом» для этого файла
+// ссылка …/#start=файл — сразу окно «Перед стартом» для этого файла; …/#file=файл — только выбрать файл
 if(location.hash.startsWith('#start='))pick(decodeURIComponent(location.hash.slice(7))).then(run);
+else if(location.hash.startsWith('#file='))pick(decodeURIComponent(location.hash.slice(6)));
 </script>
 </body>
 </html>)rawhtml";
