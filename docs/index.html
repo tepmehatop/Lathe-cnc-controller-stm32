@@ -98,6 +98,7 @@ ol.steps > li { margin-bottom: 10px; }
 <div class="box">Физические кнопки пульта и кнопки на экране работают одинаково — можно пользоваться и тем, и другим.</div>
 
 <h2 id="buy">2. Что купить</h2>
+<p>Ниже — для сборки на макетке. Со шилдом — полный список покупок (шилд, разъёмы, станок, пульт, инструмент): <a href="assembly/README.md#2-список-покупок">docs/assembly</a>.</p>
 <h3>Обязательно</h3>
 <table>
 <tr><th>Что</th><th>Сколько</th><th>Зачем</th></tr>
@@ -155,68 +156,68 @@ ol.steps > li { margin-bottom: 10px; }
 <div class="fig"><img src="wiring/discovery_pinout.svg" alt="Карта разъёмов P1 и P2"></div>
 <p class="cap">Серые — свободные или служебные штырьки. Цвета — группы, как в легенде внизу картинки.</p>
 <div class="tbl"><table>
-<tr><th>Что подключить</th><th>Вывод STM32</th><th>Штырёк на плате</th><th>Mega (7e2)</th><th>Как</th></tr>
-<tr><td>Энкодер шпинделя, канал A</td><td><b>PA1</b></td><td>P1-11</td><td>21, INT0 + T5/47</td><td>подтяжка 1k к 3V; см. схему энкодера</td></tr>
-<tr><td>Энкодер шпинделя, канал B</td><td><b>PA8</b></td><td>P2-43</td><td>20</td><td>подтяжка 1k к 3V; см. схему энкодера</td></tr>
-<tr><td>Драйвер Z (каретка): STEP</td><td><b>PE9</b></td><td>P1-27</td><td>49</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>Драйвер Z: DIR</td><td><b>PE10</b></td><td>P1-28</td><td>43</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>Драйвер Z: ENA</td><td><b>PE11</b></td><td>P1-29</td><td>45</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>Драйвер X (суппорт): STEP</td><td><b>PE13</b></td><td>P1-31</td><td>48</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>Драйвер X: DIR</td><td><b>PE14</b></td><td>P1-32</td><td>44</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>Драйвер X: ENA</td><td><b>PE15</b></td><td>P1-33</td><td>46</td><td>через NPN-ключ, см. схему драйверов</td></tr>
-<tr><td>РГИ, канал A</td><td><b>PE7</b></td><td>P1-25</td><td>19, INT2</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>РГИ, канал B</td><td><b>PC13</b></td><td>P2-12</td><td>18</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>РГИ: переключатель оси — Z</td><td><b>PC10</b></td><td>P2-37</td><td>2</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>РГИ: переключатель оси — X</td><td><b>PC12</b></td><td>P2-35</td><td>3</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>РГИ: масштаб ×1</td><td><b>PA4</b></td><td>P1-16</td><td>14</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>РГИ: масштаб ×10</td><td><b>PD8</b></td><td>P1-40</td><td>15</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
-<tr><td>Режим: Синхронная подача</td><td><b>PD0</b></td><td>P2-36</td><td>30</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Асинхронная подача</td><td><b>PD1</b></td><td>P2-33</td><td>31</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Конус &lt;</td><td><b>PD2</b></td><td>P2-34</td><td>32</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Конус &gt;</td><td><b>PD3</b></td><td>P2-31</td><td>33</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Резьба</td><td><b>PD6</b></td><td>P2-30</td><td>34</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Шар</td><td><b>PD7</b></td><td>P2-27</td><td>35</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Делилка</td><td><b>PD10</b></td><td>P1-42</td><td>36</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Режим: Резерв</td><td><b>PD11</b></td><td>P1-43</td><td>37</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Подрежим: Внутренний</td><td><b>PC8</b></td><td>P2-45</td><td>A13</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Подрежим: Ручной</td><td><b>PC9</b></td><td>P2-46</td><td>A14</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Подрежим: Наружный</td><td><b>PC11</b></td><td>P2-38</td><td>A15</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка меню Влево</td><td><b>PB13</b></td><td>P1-37</td><td>A0</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка меню Вправо</td><td><b>PB14</b></td><td>P1-38</td><td>A1</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка меню Вверх</td><td><b>PB12</b></td><td>P1-36</td><td>A2</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка меню Вниз</td><td><b>PD9</b></td><td>P1-41</td><td>A3</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка меню Выбор</td><td><b>PB15</b></td><td>P1-39</td><td>A4</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Джойстик Влево</td><td><b>PB0</b></td><td>P1-22</td><td>A8</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Джойстик Вправо</td><td><b>PB1</b></td><td>P1-21</td><td>A9</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Джойстик Вверх (на себя)</td><td><b>PE3</b></td><td>P2-16</td><td>A10</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Джойстик Вниз (от себя)</td><td><b>PB9</b></td><td>P2-20</td><td>A11</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка ускоренного хода</td><td><b>PB8</b></td><td>P2-19</td><td>A12</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
-<tr><td>Кнопка упора Левый</td><td><b>PC5</b></td><td>P1-19</td><td>28</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Кнопка упора Правый</td><td><b>PC4</b></td><td>P1-20</td><td>26</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Кнопка упора Передний</td><td><b>PC2</b></td><td>P1-10</td><td>24</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Кнопка упора Задний</td><td><b>PA0</b></td><td>P1-12</td><td>22</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Светодиод упора Левый</td><td><b>PE6</b></td><td>P2-11</td><td>29</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Светодиод упора Правый</td><td><b>PE5</b></td><td>P2-14</td><td>27</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Светодиод упора Передний</td><td><b>PE4</b></td><td>P2-13</td><td>25</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Светодиод упора Задний</td><td><b>PE2</b></td><td>P2-15</td><td>23</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
-<tr><td>Тахометр (выход: импульс на оборот)</td><td><b>PE8</b></td><td>P1-26</td><td>42</td><td>см. схему</td></tr>
-<tr><td>Зуммер</td><td><b>PE12</b></td><td>P1-30</td><td>16</td><td>см. схему</td></tr>
-<tr><td>Переменный резистор подачи (средний вывод)</td><td><b>PC1</b></td><td>P1-7</td><td>A7</td><td>см. схему</td></tr>
-<tr><td>LCD2004 (I2C): SCL</td><td><b>PB6</b></td><td>P2-23</td><td></td><td>см. схему связи</td></tr>
-<tr><td>LCD2004 (I2C): SDA</td><td><b>PB7</b></td><td>P2-24</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Дисплей ESP32: TX STM32 → RX дисплея</td><td><b>PB10</b></td><td>P1-34</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Дисплей ESP32: RX STM32 ← TX дисплея</td><td><b>PB11</b></td><td>P1-35</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Блок DRO HS800-2: его TX → сюда</td><td><b>PA3</b></td><td>P1-13</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Блок DRO: не подключается</td><td><b>PA2</b></td><td>P1-14</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Отладочный порт (USB-UART): TX</td><td><b>PA9</b></td><td>P2-44</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Отладочный порт (USB-UART): RX</td><td><b>PA10</b></td><td>P2-41</td><td></td><td>см. схему связи</td></tr>
-<tr><td>— (служебный: держит аудиочип платы выключенным)</td><td><b>PD4</b></td><td>P2-32</td><td></td><td>см. схему связи</td></tr>
-<tr><td>Линейка Z: A / такт</td><td><b>PA15</b></td><td>P2-40</td><td></td><td>см. docs/scales</td></tr>
-<tr><td>Линейка Z: B / данные</td><td><b>PB3</b></td><td>P2-28</td><td></td><td>см. docs/scales</td></tr>
-<tr><td>Линейка Z: REQ (Digimatic)</td><td><b>PC6</b></td><td>P2-47</td><td></td><td>см. docs/scales</td></tr>
-<tr><td>Линейка X: A / такт</td><td><b>PB4</b></td><td>P2-25</td><td></td><td>см. docs/scales</td></tr>
-<tr><td>Линейка X: B / данные</td><td><b>PB5</b></td><td>P2-26</td><td></td><td>см. docs/scales</td></tr>
-<tr><td>Линейка X: REQ (Digimatic)</td><td><b>PC7</b></td><td>P2-48</td><td></td><td>см. docs/scales</td></tr>
+<tr><th>Что подключить</th><th>Вывод STM32</th><th>Штырёк на плате</th><th>Шилд</th><th>Mega (7e2)</th><th>Как</th></tr>
+<tr><td>Энкодер шпинделя, канал A</td><td><b>PA1</b></td><td>P1-11</td><td>J4-3 A</td><td>21, INT0 + T5/47</td><td>подтяжка 1k к 3V; см. схему энкодера</td></tr>
+<tr><td>Энкодер шпинделя, канал B</td><td><b>PA8</b></td><td>P2-43</td><td>J4-4 B</td><td>20</td><td>подтяжка 1k к 3V; см. схему энкодера</td></tr>
+<tr><td>Драйвер Z (каретка): STEP</td><td><b>PE9</b></td><td>P1-27</td><td>J5-2 PUL-</td><td>49</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>Драйвер Z: DIR</td><td><b>PE10</b></td><td>P1-28</td><td>J5-4 DIR-</td><td>43</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>Драйвер Z: ENA</td><td><b>PE11</b></td><td>P1-29</td><td>J5-6 ENA-</td><td>45</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>Драйвер X (суппорт): STEP</td><td><b>PE13</b></td><td>P1-31</td><td>J6-2 PUL-</td><td>48</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>Драйвер X: DIR</td><td><b>PE14</b></td><td>P1-32</td><td>J6-4 DIR-</td><td>44</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>Драйвер X: ENA</td><td><b>PE15</b></td><td>P1-33</td><td>J6-6 ENA-</td><td>46</td><td>через NPN-ключ, см. схему драйверов</td></tr>
+<tr><td>РГИ, канал A</td><td><b>PE7</b></td><td>P1-25</td><td>J13-3 A</td><td>19, INT2</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>РГИ, канал B</td><td><b>PC13</b></td><td>P2-12</td><td>J13-4 B</td><td>18</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>РГИ: переключатель оси — Z</td><td><b>PC10</b></td><td>P2-37</td><td>J14-1 Z</td><td>2</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>РГИ: переключатель оси — X</td><td><b>PC12</b></td><td>P2-35</td><td>J14-2 X</td><td>3</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>РГИ: масштаб ×1</td><td><b>PA4</b></td><td>P1-16</td><td>J14-3 x1</td><td>14</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>РГИ: масштаб ×10</td><td><b>PD8</b></td><td>P1-40</td><td>J14-4 x10</td><td>15</td><td>подтяжка 1k к 3V (+10 нФ на A и B)</td></tr>
+<tr><td>Режим: Синхронная подача</td><td><b>PD0</b></td><td>P2-36</td><td>J7-1 M1</td><td>30</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Асинхронная подача</td><td><b>PD1</b></td><td>P2-33</td><td>J7-2 M2</td><td>31</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Конус &lt;</td><td><b>PD2</b></td><td>P2-34</td><td>J7-4 M4</td><td>32</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Конус &gt;</td><td><b>PD3</b></td><td>P2-31</td><td>J7-5 M5</td><td>33</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Резьба</td><td><b>PD6</b></td><td>P2-30</td><td>J7-3 M3</td><td>34</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Шар</td><td><b>PD7</b></td><td>P2-27</td><td>J7-6 M6</td><td>35</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Делилка</td><td><b>PD10</b></td><td>P1-42</td><td>J7-7 M7</td><td>36</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Режим: Резерв</td><td><b>PD11</b></td><td>P1-43</td><td>J7-8 M8</td><td>37</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Подрежим: Внутренний</td><td><b>PC8</b></td><td>P2-45</td><td>J8-1 ВНУТ</td><td>A13</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Подрежим: Ручной</td><td><b>PC9</b></td><td>P2-46</td><td>J8-2 РУЧ</td><td>A14</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Подрежим: Наружный</td><td><b>PC11</b></td><td>P2-38</td><td>J8-3 НАР</td><td>A15</td><td>контакт переключателя на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка меню Влево</td><td><b>PB13</b></td><td>P1-37</td><td>J9-1 ЛЕВ</td><td>A0</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка меню Вправо</td><td><b>PB14</b></td><td>P1-38</td><td>J9-2 ПРАВ</td><td>A1</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка меню Вверх</td><td><b>PB12</b></td><td>P1-36</td><td>J9-3 ВВЕРХ</td><td>A2</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка меню Вниз</td><td><b>PD9</b></td><td>P1-41</td><td>J9-4 ВНИЗ</td><td>A3</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка меню Выбор</td><td><b>PB15</b></td><td>P1-39</td><td>J9-5 ВЫБ</td><td>A4</td><td>кнопка на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Джойстик Влево</td><td><b>PB0</b></td><td>P1-22</td><td>J10-1 ЛЕВ</td><td>A8</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Джойстик Вправо</td><td><b>PB1</b></td><td>P1-21</td><td>J10-2 ПРАВ</td><td>A9</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Джойстик Вверх (на себя)</td><td><b>PE3</b></td><td>P2-16</td><td>J10-3 ВВЕРХ</td><td>A10</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Джойстик Вниз (от себя)</td><td><b>PB9</b></td><td>P2-20</td><td>J10-4 ВНИЗ</td><td>A11</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка ускоренного хода</td><td><b>PB8</b></td><td>P2-19</td><td>J10-5 БЫСТР</td><td>A12</td><td>контакт на GND, подтяжка 1k к 3V</td></tr>
+<tr><td>Кнопка упора Левый</td><td><b>PC5</b></td><td>P1-19</td><td>J11-1 ЛЕВ</td><td>28</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Кнопка упора Правый</td><td><b>PC4</b></td><td>P1-20</td><td>J11-2 ПРАВ</td><td>26</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Кнопка упора Передний</td><td><b>PC2</b></td><td>P1-10</td><td>J11-3 ПЕРЕД</td><td>24</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Кнопка упора Задний</td><td><b>PA0</b></td><td>P1-12</td><td>J11-4 ЗАД</td><td>22</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Светодиод упора Левый</td><td><b>PE6</b></td><td>P2-11</td><td>J12-2 ЛЕВ</td><td>29</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Светодиод упора Правый</td><td><b>PE5</b></td><td>P2-14</td><td>J12-3 ПРАВ</td><td>27</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Светодиод упора Передний</td><td><b>PE4</b></td><td>P2-13</td><td>J12-4 ПЕРЕД</td><td>25</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Светодиод упора Задний</td><td><b>PE2</b></td><td>P2-15</td><td>J12-5 ЗАД</td><td>23</td><td>кнопка на GND / светодиод от 3V через 220 Ом</td></tr>
+<tr><td>Тахометр (выход: импульс на оборот)</td><td><b>PE8</b></td><td>P1-26</td><td>J16-3 ИМП</td><td>42</td><td>см. схему</td></tr>
+<tr><td>Зуммер</td><td><b>PE12</b></td><td>P1-30</td><td>J15-2 -</td><td>16</td><td>см. схему</td></tr>
+<tr><td>Переменный резистор подачи (средний вывод)</td><td><b>PC1</b></td><td>P1-7</td><td>J17-2 СР</td><td>A7</td><td>см. схему</td></tr>
+<tr><td>LCD2004 (I2C): SCL</td><td><b>PB6</b></td><td>P2-23</td><td>J18-4 SCL</td><td></td><td>см. схему связи</td></tr>
+<tr><td>LCD2004 (I2C): SDA</td><td><b>PB7</b></td><td>P2-24</td><td>J18-3 SDA</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Дисплей ESP32: TX STM32 → RX дисплея</td><td><b>PB10</b></td><td>P1-34</td><td>J19-3 TX</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Дисплей ESP32: RX STM32 ← TX дисплея</td><td><b>PB11</b></td><td>P1-35</td><td>J19-4 RX</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Блок DRO HS800-2: его TX → сюда</td><td><b>PA3</b></td><td>P1-13</td><td>J20-2 RX</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Блок DRO: не подключается</td><td><b>PA2</b></td><td>P1-14</td><td>—</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Отладочный порт (USB-UART): TX</td><td><b>PA9</b></td><td>P2-44</td><td>J21-2 TX</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Отладочный порт (USB-UART): RX</td><td><b>PA10</b></td><td>P2-41</td><td>J21-3 RX</td><td></td><td>см. схему связи</td></tr>
+<tr><td>— (служебный: держит аудиочип платы выключенным)</td><td><b>PD4</b></td><td>P2-32</td><td>—</td><td></td><td>см. схему связи</td></tr>
+<tr><td>Линейка Z: A / такт</td><td><b>PA15</b></td><td>P2-40</td><td>J22-3 A</td><td></td><td>см. docs/scales</td></tr>
+<tr><td>Линейка Z: B / данные</td><td><b>PB3</b></td><td>P2-28</td><td>J22-4 B</td><td></td><td>см. docs/scales</td></tr>
+<tr><td>Линейка Z: REQ (Digimatic)</td><td><b>PC6</b></td><td>P2-47</td><td>J22-5 REQ</td><td></td><td>см. docs/scales</td></tr>
+<tr><td>Линейка X: A / такт</td><td><b>PB4</b></td><td>P2-25</td><td>J23-3 A</td><td></td><td>см. docs/scales</td></tr>
+<tr><td>Линейка X: B / данные</td><td><b>PB5</b></td><td>P2-26</td><td>J23-4 B</td><td></td><td>см. docs/scales</td></tr>
+<tr><td>Линейка X: REQ (Digimatic)</td><td><b>PC7</b></td><td>P2-48</td><td>J23-5 REQ</td><td></td><td>см. docs/scales</td></tr>
 </table></div>
 <div class="box">Синяя кнопка USER на самой плате соединена с PA0 — это вход «Упор Задний». Нажатие на неё работает как нажатие кнопки заднего упора.</div>
 <div class="box"><b>Питание.</b> <b>3V</b> (P2-5, P2-6) — для подтяжек и светодиодов, не больше 100 мА. <b>5V</b> (P2-3, P2-4) — сюда можно подать 5 В от блока питания, когда плата не подключена к компьютеру по USB. <b>GND</b> — любой из помеченных. Драйверы моторов, LCD2004 и дисплей от платы не питать.</div>
@@ -286,9 +287,9 @@ ol.steps > li { margin-bottom: 10px; }
 <p>Оба дисплея работают одинаково, разница — только размер. 7" — в планах. Подробности — <a href="../DISPLAYS.md">DISPLAYS.md</a>.</p>
 
 <h2 id="shield">11. Шилд — плата под Discovery</h2>
-<p>Шилд — это плата, на которую сверху вставляется Discovery, а все провода пульта, драйверов, энкодеров и дисплея подключаются к винтовым клеммникам. На ней те же резисторы, транзисторы и конденсаторы, что на схемах выше.</p>
-<div class="fig"><img src="../hardware/shield/preview_top.svg" alt="Шилд, вид сверху"></div>
-<p>Готовы схема в KiCad, список деталей и размещение на плате 180×146 мм. Дорожки ещё не проведены — после трассировки появятся файлы для заказа. Подробности и порядок сборки — <a href="../hardware/shield/README.md">hardware/shield</a>.</p>
+<p>Шилд — плата 96×126 мм, на которую сверху вставляется Discovery. Все провода пульта, драйверов, энкодеров и дисплея подключаются к разъёмам с защёлкой (KF2510, шаг 2.54 мм), режимы — шлейфом IDC-10. На ней те же резисторы, транзисторы и конденсаторы, что на схемах выше (SMD 0805).</p>
+<div class="fig"><img src="assembly/shield_map.svg" alt="Шилд: где какой разъём"></div>
+<p>Плата разведена и проверена (DRC — 0 нарушений, каждый контакт сверен с прошивкой), Gerber-файлы для заказа готовы. Что купить, как заказать и спаять, какой провод куда и как проверить каждый блок — <a href="assembly/README.md">docs/assembly</a>. Схема и плата в KiCad — <a href="../hardware/shield/README.md">hardware/shield</a>.</p>
 
 <h2 id="trouble">12. Если не работает</h2>
 <table>

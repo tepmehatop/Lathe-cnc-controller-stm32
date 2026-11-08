@@ -389,17 +389,34 @@ def overview_svg():
 
 
 # ── Таблица выводов ──────────────────────────────────────────────────────────
+def shield_pin(name):
+    """Вывод разъёма шилда (hardware/shield/design.py) для сигнала: J4-3 и т. п.; через ключ/резистор — по цепи за ним."""
+    sys.path.insert(0, os.path.join(ROOT, 'hardware', 'shield'))
+    import design
+    alias = dict(design.KEYS)
+    alias.update({'TACHO': 'TACHO_OUT'})
+    name = name.replace('_PIN', '')                  # SCALE_Z_PIN_A → SCALE_Z_A
+    for net in (name, alias.get(name), name + '_K', name + '_T'):
+        for ref, _, nets, labels in design.TERMINALS:
+            if net in nets:
+                i = nets.index(net)
+                return f'{ref}-{i + 1} {labels[i]}'
+    return '—'
+
+
 def pins_md(pins):
     lines = ['# Выводы STM32F4DISCOVERY — что куда подключать', '',
              'Сгенерировано из `Core/e2/e2_pins.h` и `Core/els_config.h` скриптом `tools/docs_gen/wiring_svg.py`.',
              'Карта разъёмов — [discovery_pinout.svg](discovery_pinout.svg). «Mega» — вывод в оригинальной схеме 7e2.', '',
-             '| Что подключить | Вывод STM32 | Штырёк на плате | Mega (7e2) | Как |', '|---|---|---|---|---|']
+             'Колонка «Шилд» — разъём и вывод на шилде ([docs/assembly](../assembly/README.md)); PA2 и PD4 на шилде',
+             'наружу не выводятся.', '',
+             '| Что подключить | Вывод STM32 | Штырёк на плате | Шилд | Mega (7e2) | Как |', '|---|---|---|---|---|---|']
     for g, _, gname in GROUPS:
         for p in pins:
             if p['group'] != g:
                 continue
             title = TITLES.get(p['name'], p.get('title', p['name']))
-            lines.append(f"| {title} | **{p['pin']}** | {HEADER.get(p['pin'], '—')} | {p['mega']} | {HOW[g]} |")
+            lines.append(f"| {title} | **{p['pin']}** | {HEADER.get(p['pin'], '—')} | {shield_pin(p['name'])} | {p['mega']} | {HOW[g]} |")
     lines += ['', 'Питание: **3V** (P2-5, P2-6) — для подтяжек и светодиодов (до 100 мА); **5V** (P2-3, P2-4) — вход 5 В',
               'для платы, когда она не питается по USB; **GND** — P1-1, P1-2, P1-5, P1-23, P1-49, P1-50, P2-1, P2-2, P2-49, P2-50.']
     with open(os.path.join(OUT, 'pins.md'), 'w', encoding='utf-8') as f:

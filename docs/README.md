@@ -137,7 +137,8 @@ GPIO37 (TX). TX платы STM32 (PB10) → RX дисплея, RX платы (PB
 
 ## 11. Шилд
 
-[hardware/shield](../hardware/shield/README.md) — схема в KiCad, список деталей, плата.
+Сборка на шилде — что купить, заказ и пайка платы, какой провод куда, первое включение по блокам:
+[assembly/README.md](assembly/README.md). Схема и плата в KiCad — [hardware/shield](../hardware/shield/README.md).
 
 ## 12. Для разработчиков
 
