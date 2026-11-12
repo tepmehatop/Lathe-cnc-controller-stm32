@@ -4,7 +4,8 @@
 
 Для каждого «### TC-NNN»:
   - из **Input** берутся все команды `<...>` по порядку:
-      `<TOUCH:X>` → `<BTN:X>` (уходит в STM32 как нажатие), остальные — инъекция как от STM32;
+      `<TOUCH:X>` → `<BTN:X>` (уходит в STM32 как нажатие), `<TAP:x,y>` — касание экрана (база 480×272),
+      `<WAIT:мс>` — пауза раннера, остальные — инъекция как от STM32;
   - если в кейсе нет TOUCH — данные от STM32 на время кейса глушатся (<RXMUTE:1>),
     чтобы живые POS_Z/RPM от симулятора DRO не перетирали инжектированное состояние;
   - из **Expected** берутся пары  поле = "значение"  и сверяются с <UIDUMP> дисплея;
@@ -12,7 +13,7 @@
 Кейсы без пар поле="значение" помечаются VISUAL — проверка по скриншоту/логу вручную.
 
 Запуск:
-  python3 tools/run_test_cases.py --port /dev/cu.usbmodem14801 --out <папка> [--only TC-031]
+  python3 tools/run_test_cases.py --port /dev/cu.usbmodem14801 --out <папка> [--only TC-031,TC-032]
 """
 
 import argparse, io, os, re, struct, time
@@ -123,18 +124,22 @@ def main():
     d = Display(a.port, os.path.join(a.out, 'device.log'))
     results = []
     for c in parse_cases(a.cases):
-        if a.only and c['id'] != a.only:
+        if a.only and c['id'] not in a.only.split(','):
             continue
         d.raw.write(f"\n===== {c['id']} {c['title']}\n")
         d.send('<RXMUTE:%d>' % (0 if c['live'] else 1), 0.1)
+        d.send('<UIRESET>', 0.2)                             # закрыть барабан/правку от прошлого кейса
         if not c['live']:
             for cmd in BASELINE:
                 d.send(cmd)
         d.drain(0.3)
         log_start = len(d.buf)
         for cmd in c['cmds']:
+            if cmd.startswith('<WAIT:'):                     # пауза раннера, мс (дисплею не шлётся)
+                d.drain(int(cmd[6:-1]) / 1000.0)
+                continue
             d.send('<BTN:' + cmd[7:] if cmd.startswith('<TOUCH:') else cmd,
-                   0.35 if cmd.startswith('<TOUCH:') else 0.08)
+                   0.35 if cmd.startswith('<TOUCH:') else 0.6 if cmd.startswith('<TAP:') else 0.08)
         d.drain(1.2 if c['live'] else 0.5)
         log = d.buf[log_start:]
         ui = d.ui()

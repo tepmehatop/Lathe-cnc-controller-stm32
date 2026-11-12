@@ -20,7 +20,7 @@
 
 ### TC-003: M1/S3 external submode feed 0.30
 **Input**: `<MODE:1>` `<SUBMODE:3>` `<FEED:30>` `<PASS:3,8>` `<AP:15>`
-**Expected**: primary_val = "0.30"; pass = "8/3" (green/yellow); row3_val = "0.15"
+**Expected**: primary_val = "0.30"; row4_val = "6/8" (осталось/всего); row3_val = "0.15"
 **Field**: primary_val, row4_val, row3_val
 
 ### TC-004: M1/S1 feed 0.50 with high pass count
@@ -45,7 +45,7 @@
 
 ### TC-008: M1/S2 no passes (Manual submode)
 **Input**: `<MODE:1>` `<SUBMODE:2>` `<PASS:0,0>`
-**Expected**: row4_val = "--/--"
+**Expected**: row4_val = "--"
 **Field**: row4_val
 
 ### TC-009: M1 SM=2 diameter display
@@ -89,17 +89,17 @@
 
 ### TC-016: M2/S1 afeed basic display
 **Input**: `<MODE:2>` `<SUBMODE:1>` `<AFEED:10>` `<POS_Z:23400>` `<POS_X:-7200>` `<PASS:2,8>` `<AP:10>`
-**Expected**: primary_val = "10"; row4_val = "8/2"; row3_val = "0.10"
+**Expected**: primary_val = "10"; row4_val = "7/8"; row3_val = "0.10"
 **Field**: primary_val, row4_val, row3_val
 
 ### TC-017: M2/S2 manual no passes
 **Input**: `<MODE:2>` `<SUBMODE:2>` `<AFEED:30>` `<PASS:0,0>`
-**Expected**: primary_val = "30"; row4_val = "--/--"
+**Expected**: primary_val = "30"; row4_val = "--"
 **Field**: primary_val, row4_val
 
 ### TC-018: M2/S3 afeed=50
 **Input**: `<MODE:2>` `<SUBMODE:3>` `<AFEED:50>` `<PASS:7,8>` `<AP:25>`
-**Expected**: primary_val = "50"; row4_val = "8/7"; row3_val = "0.25"
+**Expected**: primary_val = "50"; row4_val = "2/8"; row3_val = "0.25"
 **Field**: primary_val, row4_val, row3_val
 
 ### TC-019: M2/S1 afeed=20 with positions
@@ -150,7 +150,7 @@
 
 ### TC-028: M2 SM=3 Z axis display
 **Input**: `<MODE:2>` `<SELECTMENU:3>` `<POS_Z:45000>`
-**Expected**: row3_val = "+45.00"
+**Expected**: row1_title = "ОСЬ Z"; row1_val = "+45.00"
 **Field**: row3_val
 
 ### TC-029: M2 SM=1→SM=2 layout change
@@ -169,32 +169,32 @@
 
 ### TC-031: M3/S1 thread 1.00mm Ph=1
 **Input**: `<MODE:3>` `<SUBMODE:1>` `<THREAD_NAME:1.00mm>` `<THREAD:100>` `<RPM_LIM:800>` `<PH:1>` `<THREAD_CYCL:8>` `<PASS:5,10>` `<POS_Z:45000>`
-**Expected**: primary_val = "1.00"; primary_unit = "ШАГ ММ"; row3_title = "ОБ/МИН"; row3_val = "800"; row4_val = "8/5"
+**Expected**: primary_val = "1.00"; primary_unit = "ШАГ ММ"; row3_title = "ОБ/МИН"; row3_val = "800"; row4_val = "4/8"
 **Field**: primary_val, primary_unit, row3_val, row4_val
 
 ### TC-032: M3/S2 thread 1.50mm Ph=2 manual
-**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD_NAME:1.50mm>` `<THREAD:150>` `<PH:2>` `<THREAD_CYCL:16>` `<THREAD_TRAVEL:300>`
-**Expected**: primary_val = "1.50"; row3_title = "ХОД ММ"; row3_val = "3.00"; row4_val = "16"
+**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD_NAME:1.50mm>` `<THREAD:150>` `<PH:2>` `<THREAD_CYCL:16>` `<THREAD_TRAVEL:300>` `<PASS:1,0>`
+**Expected**: primary_val = "1.50"; row3_title = "ХОД ММ"; row3_val = "3.00"; row4_val = "16/16"
 **Field**: primary_val, row3_title, row3_val, row4_val
 
 ### TC-033: M3/S3 thread 2.00mm
 **Input**: `<MODE:3>` `<SUBMODE:3>` `<THREAD_NAME:2.00mm>` `<THREAD:200>` `<RPM_LIM:400>` `<PH:1>` `<THREAD_CYCL:13>` `<PASS:8,10>`
-**Expected**: primary_val = "2.00"; row4_val = "13/8"
+**Expected**: primary_val = "2.00"; row4_val = "6/13"
 **Field**: primary_val, row4_val
 
 ### TC-034: M3/S2 8tpi imperial thread Ph=3
-**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD_NAME: 8tpi >` `<THREAD:318>` `<PH:3>` `<THREAD_CYCL:29>`
-**Expected**: primary_val = "8" (filtered: only digits); primary_unit = "ДЮЙМ"; row4_val = "29"
+**Input**: `<PASS:1,0>` `<MODE:3>` `<SUBMODE:2>` `<THREAD_NAME: 8tpi >` `<THREAD:318>` `<PH:3>` `<THREAD_CYCL:29>`
+**Expected**: primary_val = "8" (filtered: only digits); primary_unit = "ДЮЙМ"; row4_val = "29/29"
 **Field**: primary_val, primary_unit, row4_val
 
 ### TC-035: M3/S1 G1/8 pipe thread
 **Input**: `<MODE:3>` `<SUBMODE:1>` `<THREAD_NAME:G  1/8>` `<THREAD:91>` `<RPM_LIM:200>` `<THREAD_CYCL:9>` `<PASS:3,6>`
-**Expected**: primary_val = "1/8" (filtered); primary_unit = "G-ТРУБ"; row4_val = "9/3"
+**Expected**: primary_val = "1/8" (filtered); primary_unit = "G-ТРУБ"; row4_val = "7/9"
 **Field**: primary_val, primary_unit, row4_val
 
 ### TC-036: M3/S3 2.50mm Ph=4
 **Input**: `<MODE:3>` `<SUBMODE:3>` `<THREAD_NAME:2.50mm>` `<THREAD:250>` `<PH:4>` `<THREAD_TRAVEL:1000>` `<THREAD_CYCL:8>`
-**Expected**: primary_val = "2.50"; row3_title = "ХОД ММ"; row3_val = "10.00"; row4_val = "8/?"
+**Expected**: primary_val = "2.50"; row3_title = "ХОД ММ"; row3_val = "10.00"; row4_val = "9/8"
 **Field**: primary_val, row3_val
 
 ### TC-037: M3 G-ТРУБ category indicator
@@ -204,7 +204,7 @@
 
 ### TC-038: M3 K-ТРУБ category indicator
 **Input**: `<MODE:3>` `<THREAD_NAME:K 1/8>`
-**Expected**: primary_unit = "К-ТРУБ"
+**Expected**: primary_unit = "K-ТРУБ"
 **Field**: primary_unit
 
 ### TC-039: M3 ДЮЙМ category indicator (tpi)
@@ -244,7 +244,7 @@
 
 ### TC-046: M3 SM=3 Z axis display
 **Input**: `<MODE:3>` `<SELECTMENU:3>` `<POS_Z:32000>`
-**Expected**: row3_val = "+32.00"
+**Expected**: row1_title = "ОСЬ Z"; row1_val = "+32.00"
 **Field**: row3_val
 
 ### TC-047: M3 THR_CAT double-tap → metric to imperial
@@ -268,27 +268,27 @@
 **Field**: primary_unit
 
 ### TC-051: M3 cycles display with manual submode (no pass_nr)
-**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD_CYCL:16>` `<PASS:0,0>`
-**Expected**: row4_val = "16" (no slash, just total cycles for manual)
+**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD_CYCL:16>` `<PASS:1,0>`
+**Expected**: row4_val = "16/16" (в «Ручном» ядро держит Pass_Nr = 1)
 **Field**: row4_val
 
 ### TC-052: M3/S1 cycles display with pass_nr
 **Input**: `<MODE:3>` `<SUBMODE:1>` `<THREAD_CYCL:8>` `<PASS:5,10>`
-**Expected**: row4_val = "8/5" (cycles green, pass_nr yellow)
+**Expected**: row4_val = "4/8" (cycles green, pass_nr yellow)
 **Field**: row4_val
 
 ### TC-053: M3 BUG-04 edit mode sync by thread_name (64tpi)
-**Input**: ESP32 in test mode, scenario with thread_mm=40, thread_name="64tpi"; tap primary_val to enter edit mode
-**Expected**: local_step = 44 (64tpi index), not index for 0.40mm
-**Field**: edit mode local_step
+**Input**: `<MODE:3>` `<SUBMODE:2>` `<THREAD:40>` `<THREAD_NAME:64tpi >` `<TAP:100,80>` `<WAIT:600>` (тап по основному значению — правка шага)
+**Expected**: edit = "1"; primary_val = "64"; primary_unit = "ДЮЙМ" (шаг найден по имени, не 0.40 мм)
+**Field**: edit, primary_val, primary_unit
 
 ### TC-054: M3 BUG-06 cycles formula +1 check
 **Input**: `<MODE:3>` `<SUBMODE:1>` `<THREAD_CYCL:4>` `<PASS:3,6>`
-**Expected**: row4_val = "4/3"
+**Expected**: row4_val = "2/4"
 **Field**: row4_val
 
 ### TC-055: M3 thread_name empty → fallback to numeric
-**Input**: `<MODE:3>` `<THREAD:150>` and thread_name=""
+**Input**: `<MODE:3>` `<THREAD_NAME:>` `<THREAD:150>`
 **Expected**: primary_val = "1.50" (numeric fallback)
 **Field**: primary_val
 
@@ -298,22 +298,22 @@
 
 ### TC-056: M4/S1 basic cone display 45°
 **Input**: `<MODE:4>` `<SUBMODE:1>` `<FEED:15>` `<CONE:0>` `<PASS:2,4>` `<AP:15>` `<POS_Z:-18300>` `<POS_X:4200>`
-**Expected**: primary_val = "0.15"; row3_val = "45°"; row4_val = "4/2"; row1_val = "-18.30"
+**Expected**: primary_val = "0.15"; row3_val = "45°"; row4_val = "3/4"; row1_val = "-18.30"
 **Field**: primary_val, row3_val, row4_val, row1_val
 
 ### TC-057: M4/S2 manual cone 1°
 **Input**: `<MODE:4>` `<SUBMODE:2>` `<FEED:25>` `<CONE:2>` `<PASS:0,0>`
-**Expected**: primary_val = "0.25"; row3_val = "1°"; row4_val = "--/--"
+**Expected**: primary_val = "0.25"; row3_val = "1°"; row4_val = "--"
 **Field**: primary_val, row3_val, row4_val
 
 ### TC-058: M4/S3 cone 7°
 **Input**: `<MODE:4>` `<SUBMODE:3>` `<FEED:30>` `<CONE:8>` `<PASS:1,3>` `<AP:15>`
-**Expected**: primary_val = "0.30"; row3_val = "7°"; row4_val = "3/1"
+**Expected**: primary_val = "0.30"; row3_val = "7°"; row4_val = "3/3"
 **Field**: primary_val, row3_val, row4_val
 
 ### TC-059: M4/S1 cone 3°
 **Input**: `<MODE:4>` `<SUBMODE:1>` `<FEED:20>` `<CONE:4>` `<PASS:3,6>`
-**Expected**: primary_val = "0.20"; row3_val = "3°"; row4_val = "6/3"
+**Expected**: primary_val = "0.20"; row3_val = "3°"; row4_val = "4/6"
 **Field**: primary_val, row3_val, row4_val
 
 ### TC-060: M4/S3 KM0 Morse taper
@@ -343,7 +343,7 @@
 
 ### TC-065: M4 SM=3 Z axis
 **Input**: `<MODE:4>` `<SELECTMENU:3>` `<POS_Z:-12000>`
-**Expected**: row3_val = "-12.00"
+**Expected**: row1_title = "ОСЬ Z"; row1_val = "-12.00"
 **Field**: row3_val
 
 ---
@@ -357,7 +357,7 @@
 
 ### TC-067: M5/S2 2° manual
 **Input**: `<MODE:5>` `<SUBMODE:2>` `<FEED:20>` `<CONE:3>` `<PASS:0,0>`
-**Expected**: primary_val = "0.20"; row3_val = "2°"; row4_val = "--/--"
+**Expected**: primary_val = "0.20"; row3_val = "2°"; row4_val = "--"
 **Field**: primary_val, row3_val, row4_val
 
 ### TC-068: M5/S3 6° external
@@ -367,7 +367,7 @@
 
 ### TC-069: M5/S3 4° pass counting
 **Input**: `<MODE:5>` `<SUBMODE:3>` `<FEED:25>` `<CONE:5>` `<PASS:4,6>`
-**Expected**: row4_val = "6/4"
+**Expected**: row4_val = "3/6"
 **Field**: row4_val
 
 ### TC-070: M5/S1 KM3 Morse taper
@@ -391,12 +391,12 @@
 
 ### TC-073: M6/S2 sphere ø40mm
 **Input**: `<MODE:6>` `<SUBMODE:2>` `<SPHERE:2000>` `<PASS:3,8>` `<BAR:500>` `<PASS_SPHR:80>` `<POS_Z:-12500>` `<POS_X:8000>`
-**Expected**: primary_val = sphere diameter display; row3_val = "10.00" (bar_r*2/100); row4_val = "82/3" (80+2=82)
+**Expected**: primary_val = sphere diameter display; row3_val = "10.00" (bar_r*2/100); row4_val = "79/81" (80+2=82)
 **Field**: primary_val, row3_val, row4_val
 
 ### TC-074: M6/S3 sphere ø100mm
 **Input**: `<MODE:6>` `<SUBMODE:3>` `<SPHERE:5000>` `<PASS:0,15>` `<BAR:1000>` `<PASS_SPHR:200>`
-**Expected**: row3_val = "20.00"; row4_val = "202/0"
+**Expected**: row3_val = "20.00"; row4_val = "202/201"
 **Field**: row3_val, row4_val
 
 ### TC-075: M6/S1 INTERNAL → alert "Режим невозможен!"
@@ -421,12 +421,12 @@
 
 ### TC-079: M6 sphere ø10mm minimal
 **Input**: `<MODE:6>` `<SUBMODE:3>` `<SPHERE:500>` `<BAR:200>` `<PASS_SPHR:20>` `<PASS:2,5>`
-**Expected**: row3_val = "4.00"; row4_val = "22/2"
+**Expected**: row3_val = "4.00"; row4_val = "20/21"
 **Field**: row3_val, row4_val
 
 ### TC-080: M6 sphere ø200mm maximum
 **Input**: `<MODE:6>` `<SUBMODE:3>` `<SPHERE:10000>` `<BAR:1500>` `<PASS_SPHR:300>` `<PASS:0,20>`
-**Expected**: row3_val = "30.00"; row4_val = "302/0"
+**Expected**: row3_val = "30.00"; row4_val = "302/301"
 **Field**: row3_val, row4_val
 
 ### TC-081: M6 SM=2 cutter width + cutting step
@@ -436,7 +436,7 @@
 
 ### TC-082: M6 SM=3 Z axis display
 **Input**: `<MODE:6>` `<SELECTMENU:3>` `<POS_Z:-30000>`
-**Expected**: row3_val = "-30.00"
+**Expected**: row1_title = "ОСЬ Z"; row1_val = "-30.00"
 **Field**: row3_val
 
 ---
@@ -499,7 +499,7 @@
 
 ### TC-093: M8 zero positions
 **Input**: `<MODE:8>` `<POS_Z:0>` `<POS_X:0>`
-**Expected**: mode_lbl = "M8"; row1_val = "0.00"; row2_val = "0.00"; primary_val = "---"
+**Expected**: mode_lbl = "G-КОД"; row1_val = "0.00"; row2_val = "0.00"; primary_val = "ГОТОВ"
 **Field**: mode_lbl, row1_val, row2_val, primary_val
 
 ### TC-094: M8 with positions
@@ -805,7 +805,7 @@
 
 ### TC-151: SM-07 SELECTMENU:3 for M3
 **Input**: `<MODE:3>` `<SELECTMENU:3>` `<POS_Z:78500>`
-**Expected**: row3_val = "+78.50"
+**Expected**: row1_title = "ОСЬ Z"; row1_val = "+78.50"
 **Field**: row3_val
 
 ### TC-152: SM-08 SELECTMENU:2 for M4
@@ -895,9 +895,9 @@
 
 ## Edge Cases and Boundary Tests
 
-### TC-167: E-01 pass_total = 0 → "--/--"
+### TC-167: E-01 pass_total = 0 → "--"
 **Input**: `<MODE:1>` `<PASS:0,0>`
-**Expected**: row4_val = "--/--"
+**Expected**: row4_val = "--"
 **Field**: row4_val
 
 ### TC-168: E-02 pass_nr > pass_total (anomalous)
@@ -917,7 +917,7 @@
 
 ### TC-171: E-05 very large pass_total
 **Input**: `<MODE:1>` `<PASS:5,255>` (uint16_t max practical)
-**Expected**: row4_val = "255/5" — no overflow
+**Expected**: row4_val = "251/255" — no overflow
 **Field**: row4_val
 
 ### TC-172: E-06 cone_idx out of range (bounds check)
@@ -945,9 +945,9 @@
 **Expected**: BUG: primary_val shows -32768 (NOT expected); FIX: change afeed_mm to int32_t
 **Field**: primary_val
 
-### TC-177: E-11 AFEED=33024 shows -32512 (reported bug)
+### TC-177: E-11 AFEED=33024 (было −32512 — исправлено, int32)
 **Input**: `<MODE:2>` `<AFEED:33024>`
-**Expected**: BUG: primary_val = "-32512"; correct behavior = "33024"
+**Expected**: primary_val = "33024"
 **Field**: primary_val
 **Note**: Root cause — LatheData.afeed_mm is int16_t; 33024 stored as 0x8100 = -32512. Fix: change field type to int32_t.
 
@@ -968,7 +968,7 @@
 
 ### TC-181: E-15 sphere_radius=0 edge case
 **Input**: `<MODE:6>` `<SUBMODE:3>` `<SPHERE:0>`
-**Expected**: primary_val = "0.00" — no crash
+**Expected**: thr_type_val = "0.0" — no crash (в M6 основное поле — подача; диаметр шара — с одним знаком, шаг 0.5 мм)
 **Field**: primary_val
 
 ---
@@ -981,8 +981,8 @@
 **Field**: mode_lbl
 
 ### TC-183: FC-02 M3 thread UP → step increments
-**Input**: In M3 edit mode, ESP32 sends KEY:UP → STM32 increments Thread_Step → sends back THREAD_NAME/THREAD/RPM_LIM/THREAD_TRAVEL/THREAD_CYCL
-**Expected**: ESP32 primary_val updates to next thread step
+**Input**: `<TOUCH:M3>` `<TOUCH:THREAD_STEP:11>` `<TOUCH:KEY:UP>` (STM32: шаг 1.00 → ▲ → следующий по таблице)
+**Expected**: primary_val = "1.25"
 **Field**: primary_val, rpm_limit
 
 ### TC-184: FC-03 M1 Ap DOWN → decrements
@@ -1030,38 +1030,38 @@
 ## PT Preset Tests (ESP32 internal test mode: 5× fast DN)
 
 ### TC-192: PT-01 M1/S1 scenario
-**Input**: ESP32 test mode, select scenario "M1/S1 Подача 0.10 Пр1/6"
-**Expected**: primary_val="0.10"; row4_val="6/1"; row3_val="0.10"; row1_val="+56.78"; row2_val="-8.50"
+**Input**: `<MODE:1>` `<SUBMODE:1>` `<FEED:10>` `<PASS:1,6>` `<AP:10>` `<POS_Z:56780>` `<POS_X:-8500>`
+**Expected**: primary_val = "0.10"; row4_val = "6/6"; row3_val = "0.10"; row1_val = "+56.78"; row2_val = "-8.50"
 **Field**: all M1 fields
 
 ### TC-193: PT-02 M2/S2 Manual scenario
-**Input**: ESP32 test mode, select scenario "M2/S2 аПодача 0.30 Ручной"
-**Expected**: primary_val="30"; row4_val="--/--"; submode=S2
+**Input**: `<MODE:2>` `<SUBMODE:2>` `<AFEED:30>`
+**Expected**: primary_val = "30"; row4_val = "--"; s2_lbl = "S2"
 **Field**: primary_val, row4_val
 
 ### TC-194: PT-03 M3/S1 1.00mm scenario
-**Input**: ESP32 test mode, select M3 scenario
-**Expected**: primary_unit="ШАГ ММ"; primary_val="1.00"; row3_val="800" (ОБ/МИН)
+**Input**: `<MODE:3>` `<SUBMODE:1>` `<THREAD_NAME:1.00mm>` `<THREAD:100>` `<RPM_LIM:800>`
+**Expected**: primary_unit = "ШАГ ММ"; primary_val = "1.00"; row3_val = "800"
 **Field**: primary_unit, primary_val, row3_val
 
 ### TC-195: PT-04 M6/S1 alert scenario
-**Input**: ESP32 test mode, select M6 SUBMODE_INTERNAL scenario
-**Expected**: Alert "Режим невозможен!" shown
+**Input**: `<MODE:6>` `<SUBMODE:1>`
+**Expected**: alert = "1"; alert_msg = "Режим невозможен!"
 **Field**: alert panel
 
 ### TC-196: PT-05 M7 divider scenario
-**Input**: ESP32 test mode, select M7 scenario (6 divisions)
-**Expected**: row3_val="60.0°"; row1_val="6"; row2_val="1"
+**Input**: `<MODE:7>` `<DIVN:6>` `<DIVM:1>`
+**Expected**: row1_val = "6"; row2_val = "1"; row3_val = "60.0°"
 **Field**: all M7 fields
 
 ### TC-197: PT-06 M4 cone scenario KM0
-**Input**: ESP32 test mode, M4 with CONE:45
-**Expected**: row3_val="KM0"
+**Input**: `<MODE:4>` `<CONE:45>`
+**Expected**: row3_val = "KM0"
 **Field**: row3_val
 
 ### TC-198: PT-07 M5 cone scenario 1:20
-**Input**: ESP32 test mode, M5 with CONE:57
-**Expected**: row3_val="1:20"
+**Input**: `<MODE:5>` `<CONE:57>`
+**Expected**: row3_val = "1:20"
 **Field**: row3_val
 
 ---
@@ -1069,18 +1069,18 @@
 ## Screenshot Mechanism Tests
 
 ### TC-199: SCR-01 USB screenshot trigger
-**Input**: Run `python3 tools/screenshot_usb.py /dev/cu.usbmodem14801`
-**Expected**: Script sends byte 'S', receives magic 0xDEADBEEF + uint32 size + JPEG data; saves to screenshot_latest.jpg
+**Input**: `<MODE:1>` (раннер снимает скриншот каждого кейса: 'S' → 0xDEADBEEF + размер + JPEG)
+**Expected**: mode_lbl = "СИНХРОН"; скриншот сохранён
 **Field**: File created in tools/ directory
 
 ### TC-200: SCR-02 screenshot during M3 display
-**Input**: Set M3 mode with thread display active, then trigger screenshot
-**Expected**: JPEG captures M3 UI with thread name, ОБ/МИН, cycles visible
+**Input**: `<MODE:3>` `<THREAD_NAME:1.50mm>` `<THREAD:150>` `<RPM_LIM:380>` `<THREAD_CYCL:16>` `<PASS:1,0>`
+**Expected**: primary_val = "1.50"; row3_val = "380"; row4_val = "16/16"; на скриншоте — шаг, ОБ/МИН, проходы
 **Field**: screenshot content
 
 ### TC-201: SCR-03 screenshot during alert
-**Input**: Trigger ALERT:1, then take screenshot
-**Expected**: Alert overlay visible in JPEG
+**Input**: `<ALERT:1>`
+**Expected**: alert = "1"; на скриншоте — окно сообщения
 **Field**: screenshot content
 
 ---
@@ -1103,8 +1103,8 @@
 **Field**: primary_val
 
 ### TC-205: BUG-AFEED-04 setAfeedOptimistic with large value
-**Input**: ESP32 local optimistic update with afeed=33000 via setAfeedOptimistic
-**Expected**: afeed_mm stores 33000 without truncation (requires int32_t)
+**Input**: `<MODE:2>` `<AFEED:33000>`
+**Expected**: primary_val = "33000" (int32, без переполнения)
 **Field**: primary_val
 
 ---
@@ -1157,9 +1157,9 @@
 **Field**: row3 border
 
 ### TC-215: Sub-edit timeout (5 seconds auto-exit)
-**Input**: Enter sub-edit mode (SUBSEL:AP), wait 5 seconds without input
-**Expected**: Yellow border disappears; sub-edit exits automatically
-**Field**: row3 border disappears
+**Input**: `<MODE:1>` `<SUBMODE:1>` `<AP:20>` `<TAP:70,230>` `<WAIT:6000>` (тап по «Съём» — правка с барабаном, 6 с без касаний)
+**Expected**: sub_edit = "1"; roller = "1" (пока открыт барабан, правка по таймауту не выходит — иначе барабан оставался висеть)
+**Field**: sub_edit, roller
 
 ---
 

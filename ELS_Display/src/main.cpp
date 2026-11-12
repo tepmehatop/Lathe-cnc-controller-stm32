@@ -291,6 +291,7 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 // Имитация касания для автотестов (<TAP:x,y> или <TAP:x,y,мс> по USB): нажатие держится 120 мс
 // или заданное время (долгое нажатие — от 400 мс)
 static struct { bool active; lv_coord_t x, y; uint32_t until_ms; } g_sim_tap = {};
+static int g_touch_raw_x = -1, g_touch_raw_y = -1;   // последнее «сырое» касание драйвера (проверка тача)
 static void sim_tap(int x, int y, int ms = 120)
 {
     g_sim_tap.x = (lv_coord_t)x;
@@ -315,6 +316,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 #ifdef DISPLAY_JC4827W543
     if (touch.read()) {
         TP_Point p = touch.getPoint(0);
+        g_touch_raw_x = p.x; g_touch_raw_y = p.y;
         data->point.x = p.x;
         data->point.y = p.y;
         data->state = LV_INDEV_STATE_PR;
@@ -328,6 +330,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     uint16_t tx = 0, ty = 0;
     bool pressed = p4_touch.getTouch(&tx, &ty);
     if (pressed) {
+        g_touch_raw_x = tx; g_touch_raw_y = ty;
         data->state = LV_INDEV_STATE_PR;
         data->point.x = (lv_coord_t)(P4_LCD_V_RES - 1 - ty);
         data->point.y = (lv_coord_t)(P4_LCD_H_RES - 1 - tx);
@@ -337,6 +340,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 #elif defined(DISPLAY_JC1060P470)
     uint16_t tx = 0, ty = 0;
     if (p7_touch.getTouch(&tx, &ty)) {
+        g_touch_raw_x = tx; g_touch_raw_y = ty;
         data->state = LV_INDEV_STATE_PR;
 #if P7_ROT180
         data->point.x = (lv_coord_t)(P7_LCD_H_RES - 1 - tx);
@@ -883,6 +887,11 @@ static void dismiss_alert();
 static void show_joystick_overlay();
 static void hide_joystick_overlay();
 static void update_limit_indicators(const LimitStatus& lim);
+// Большие экраны (10.1", 7"): плитка «УПОРЫ» на свободном месте в M1/M2 — где стоят упоры и длина между ними
+#define BIG_SCREEN (SCREEN_WIDTH >= 1024)
+static lv_obj_t* s_lim_box = nullptr;
+static lv_obj_t* s_lim_val = nullptr;
+static void big_limits_update(const LatheData& data);
 static void enter_sub_edit(int row);
 static void exit_sub_edit();
 static void highlight_sub_edit_row(int row, bool on);
@@ -1546,6 +1555,18 @@ static void create_k_content(lv_obj_t* screen)
                                   "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\xA5\xD0\x9E\xD0\x94\xD0\xAB", false, true);  // ПРОХОДЫ
         g_wk.row4_box = r.box; g_wk.row4_title = r.title; g_wk.row4_val = r.val;
         lv_label_set_recolor(r.val, true);
+    }
+    // Большой экран: «УПОРЫ» — под плиткой ТИП/СЪЁМ/ШАР, видна, когда та скрыта (M1/M2, подэкран 1)
+    if (BIG_SCREEN) {
+        auto r = make_param_cell(panel, col_x[2], GRID_Y + ROW_H + GAP, COL_W2, ROW_H,
+                                  "\xD0\xA3\xD0\x9F\xD0\x9E\xD0\xA0\xD0\xAB");  // УПОРЫ
+        lv_obj_set_style_text_font(r.val, &font_dejavu_14, 0);
+        lv_obj_set_style_text_line_space(r.val, US(2), 0);
+        lv_obj_set_pos(r.val, 0, US(18));
+        lv_label_set_recolor(r.val, true);
+        lv_label_set_text(r.val, "");
+        lv_obj_add_flag(r.box, LV_OBJ_FLAG_HIDDEN);
+        s_lim_box = r.box; s_lim_val = r.val;
     }
     // Spare1 (col2 bottom): tracked thread-type cell — shown in M3 only
     {
@@ -3690,7 +3711,17 @@ static void enter_edit_mode()
             // when multiple entries share the same mm_x100, e.g. "0.40mm" vs "64tpi ")
             if (d.thread_name[0] != '\0') {
                 for (int i = 0; i < THREAD_TABLE_SIZE; i++) {
-                    if (strncmp(d.thread_name, s_thread_table[i].label, 6) == 0) {
+                    // без учёта пробелов: ядро дополняет имя до 6 знаков ("64tpi ", " 8tpi ")
+                    const char *a = d.thread_name, *b = s_thread_table[i].label;
+                    bool eq = true;
+                    while (eq) {
+                        while (*a == ' ') a++;
+                        while (*b == ' ') b++;
+                        if (*a != *b) eq = false;
+                        else if (!*a) break;
+                        else { a++; b++; }
+                    }
+                    if (eq) {
                         best = i;
                         found = true;
                         break;
@@ -4721,6 +4752,42 @@ static void dismiss_alert()
 // Обновление индикаторов лимитов в statusbar
 // ============================================================================
 
+// Упор ставится там, где сейчас суппорт: в момент, когда флаг упора встал, запоминаем показанную координату.
+// Упор, стоявший до включения дисплея, — «?» (координата неизвестна).
+static void big_limits_update(const LatheData& data)
+{
+    if (!s_lim_box) return;
+    static bool s_init = false, s_prev[4];
+    static bool s_known[4];
+    static int32_t s_pos[4];
+    const bool cur[4] = {(bool)data.limits.left, (bool)data.limits.right, (bool)data.limits.front, (bool)data.limits.rear};
+    for (int i = 0; i < 4; i++) {
+        if (!s_init) { s_prev[i] = cur[i]; s_known[i] = false; continue; }
+        if (cur[i] && !s_prev[i]) { s_pos[i] = i < 2 ? data.pos_z : data.pos_x; s_known[i] = true; }
+        if (!cur[i]) s_known[i] = false;
+        s_prev[i] = cur[i];
+    }
+    s_init = true;
+    bool show = (data.mode == MODE_FEED || data.mode == MODE_AFEED) && data.select_menu == 1 &&
+                g_ui.thr_type_box && lv_obj_has_flag(g_ui.thr_type_box, LV_OBJ_FLAG_HIDDEN);
+    if (!show) { lv_obj_add_flag(s_lim_box, LV_OBJ_FLAG_HIDDEN); return; }
+    lv_obj_clear_flag(s_lim_box, LV_OBJ_FLAG_HIDDEN);
+    char v[4][16];
+    for (int i = 0; i < 4; i++) {
+        if (!cur[i])           snprintf(v[i], sizeof(v[i]), "--");
+        else if (!s_known[i])  snprintf(v[i], sizeof(v[i]), "?");
+        else                   DisplayFormatter::formatPosition(v[i], s_pos[i]);
+    }
+    char len[48] = "";
+    if (cur[0] && cur[1] && s_known[0] && s_known[1]) {
+        char b[16]; DisplayFormatter::formatPosition(b, abs(s_pos[1] - s_pos[0]));
+        snprintf(len, sizeof(len), "\n#6a9fb5 \xD0\x94\xD0\xBB\xD0\xB8\xD0\xBD\xD0\xB0# %s", b[0] == '+' ? b + 1 : b);   // Длина
+    }
+    static char t[128];
+    snprintf(t, sizeof(t), AXIS_Z " %s .. %s\n" AXIS_X " %s .. %s%s", v[0], v[1], v[2], v[3], len);
+    if (strcmp(lv_label_get_text(s_lim_val), t) != 0) lv_label_set_text(s_lim_val, t);
+}
+
 static void update_limit_indicators(const LimitStatus& lim)
 {
     // Z-ось (L/R): SET → голубой #00d4ff, NOT SET → тёмный #1a3a4a
@@ -4973,6 +5040,7 @@ static void update_ui_values(const LatheData& data)
         }
 
         update_limit_indicators(data.limits);
+        big_limits_update(data);
         update_sm_row6(data.mode, data.select_menu);
     }
 
@@ -5986,13 +6054,100 @@ void onDataUpdate(const LatheData& data)
 }
 
 // ============================================================================
+// Проверка тача по всей площади (BACKLOG-011): <TOUCHTEST:1> по USB — 9 мишеней (углы, середины краёв,
+// центр). Каждое касание — точка на экране и строка в USB: ближайшая мишень, промах в пикселях и «сырые»
+// координаты драйвера (по ним считается поправка). <TOUCHTEST:0> или «ЗАКРЫТЬ» — выход.
+// ============================================================================
+static lv_obj_t* g_tt = nullptr;
+static lv_obj_t* g_tt_lbl = nullptr;
+static const int TT_N = 9;
+static lv_point_t g_tt_pt[TT_N];
+
+static void touchtest_close()
+{
+    if (g_tt) { lv_obj_del(g_tt); g_tt = nullptr; g_tt_lbl = nullptr; }
+    Serial.println("[TOUCHTEST] закрыт");
+}
+
+static void touchtest_open()
+{
+    if (g_tt) touchtest_close();
+    const int W = SCREEN_WIDTH, H = SCREEN_HEIGHT, mx = UX(14), my = UY(14);
+    const int xs[3] = {mx, W / 2, W - 1 - mx}, ys[3] = {my, H / 2, H - 1 - my};
+    g_tt = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(g_tt, W, H);
+    lv_obj_set_pos(g_tt, 0, 0);
+    lv_obj_set_style_bg_color(g_tt, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(g_tt, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(g_tt, 0, 0);
+    lv_obj_set_style_radius(g_tt, 0, 0);
+    lv_obj_set_style_pad_all(g_tt, 0, 0);
+    lv_obj_clear_flag(g_tt, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(g_tt, LV_OBJ_FLAG_CLICKABLE);
+    const int arm = US(10), th = (US(1) > 1 ? US(1) : 2);
+    for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) {
+        int i = r * 3 + c;
+        g_tt_pt[i].x = xs[c]; g_tt_pt[i].y = ys[r];
+        for (int k = 0; k < 2; k++) {
+            lv_obj_t* l = lv_obj_create(g_tt);
+            lv_obj_set_style_bg_color(l, lv_color_hex(0x00d4ff), 0);
+            lv_obj_set_style_border_width(l, 0, 0);
+            lv_obj_set_style_radius(l, 0, 0);
+            lv_obj_clear_flag(l, LV_OBJ_FLAG_CLICKABLE);
+            if (k == 0) { lv_obj_set_size(l, 2 * arm + 1, th); lv_obj_set_pos(l, xs[c] - arm, ys[r] - th / 2); }
+            else        { lv_obj_set_size(l, th, 2 * arm + 1); lv_obj_set_pos(l, xs[c] - th / 2, ys[r] - arm); }
+        }
+    }
+    g_tt_lbl = lv_label_create(g_tt);
+    lv_obj_set_style_text_font(g_tt_lbl, &font_dejavu_16, 0);
+    lv_obj_set_style_text_color(g_tt_lbl, lv_color_hex(0xe0e0e0), 0);
+    lv_obj_set_style_text_align(g_tt_lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(g_tt_lbl, "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x92\xD0\x95\xD0\xA0\xD0\x9A\xD0\x90 \xD0\xA2\xD0\x90\xD0\xA7\xD0\x90\n"   // ПРОВЕРКА ТАЧА
+                                "\xD0\xBA\xD0\xB0\xD1\x81\xD0\xB0\xD0\xB9\xD1\x82\xD0\xB5\xD1\x81\xD1\x8C "
+                                "\xD0\xBA\xD1\x80\xD0\xB5\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xBE\xD0\xB2");     // касайтесь крестиков
+    lv_obj_align(g_tt_lbl, LV_ALIGN_CENTER, 0, -UY(40));
+    lv_obj_t* cl = lv_btn_create(g_tt);
+    lv_obj_set_size(cl, UX(100), UY(30));
+    lv_obj_align(cl, LV_ALIGN_CENTER, 0, UY(50));
+    lv_obj_set_style_bg_color(cl, lv_color_hex(0x2a1a1a), 0);
+    lv_obj_t* cll = lv_label_create(cl);
+    lv_obj_set_style_text_font(cll, &font_dejavu_16, 0);
+    lv_label_set_text(cll, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC");   // ЗАКРЫТЬ
+    lv_obj_center(cll);
+    lv_obj_add_event_cb(cl, [](lv_event_t*) { touchtest_close(); }, LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_event_cb(g_tt, [](lv_event_t*) {
+        lv_point_t p;
+        lv_indev_get_point(lv_indev_get_act(), &p);
+        int best = 0; long bd = LONG_MAX;
+        for (int i = 0; i < TT_N; i++) {
+            long dx = p.x - g_tt_pt[i].x, dy = p.y - g_tt_pt[i].y, d = dx * dx + dy * dy;
+            if (d < bd) { bd = d; best = i; }
+        }
+        int dx = p.x - g_tt_pt[best].x, dy = p.y - g_tt_pt[best].y;
+        lv_obj_t* dot = lv_obj_create(g_tt);
+        lv_obj_set_size(dot, US(4), US(4));
+        lv_obj_set_pos(dot, p.x - US(2), p.y - US(2));
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_width(dot, 0, 0);
+        lv_obj_set_style_bg_color(dot, lv_color_hex(abs(dx) <= US(4) && abs(dy) <= US(4) ? 0x00ff88 : 0xff4444), 0);
+        lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+        static char t[96];
+        snprintf(t, sizeof(t), "%d: dx %+d  dy %+d", best + 1, dx, dy);
+        lv_label_set_text(g_tt_lbl, t);
+        Serial.printf("[TOUCHTEST] target=%d tx=%d ty=%d x=%d y=%d dx=%d dy=%d raw=%d,%d\n", best + 1,
+                      (int)g_tt_pt[best].x, (int)g_tt_pt[best].y, (int)p.x, (int)p.y, dx, dy, g_touch_raw_x, g_touch_raw_y);
+    }, LV_EVENT_PRESSED, nullptr);
+    Serial.printf("[TOUCHTEST] открыт %dx%d, мишени с отступом %d,%d\n", W, H, mx, my);
+}
+
+// ============================================================================
 // Автотесты: текущие тексты виджетов одной строкой (<UIDUMP> по USB)
 // Формат: [UI] key="text" ... (перевод строки в тексте → \n), цвета — RRGGBB
 // ============================================================================
 static void ui_dump()
 {
     const struct { const char* key; lv_obj_t* obj; } labels[] = {
-        {"mode_lbl", g_ui.mode_lbl},         {"submode_lbl", g_ui.submode_lbl}, {"sel_lbl", g_ui.sel_lbl},
+        {"mode_lbl", g_ui.mode_lbl},         {"submode_lbl", g_ui.submode_lbl}, {"sel_lbl", g_ui.sel_lbl}, {"lim_info", s_lim_val},
         {"primary_unit", g_ui.primary_unit}, {"primary_val", g_ui.primary_val},
         {"thread_tag", g_ui.thread_tag},
         {"secondary_unit", g_ui.secondary_unit}, {"secondary_val", g_ui.secondary_val},
@@ -6287,11 +6442,13 @@ void loop()
     GCodeExec_Process();
 
     // Авто-выход из режима редактирования через 5 секунд бездействия
-    if (g_edit_param.active && (millis() - g_edit_param.last_ms > 5000)) {
+    // Пока открыт барабан — не выходить: его закрывают только его кнопки (иначе барабан оставался висеть
+    // поверх экрана без режима правки)
+    if (g_edit_param.active && !g_roller.active && (millis() - g_edit_param.last_ms > 5000)) {
         exit_edit_mode();
     }
     // Авто-выход из sub-edit (редактирование строки правой панели) через 5 секунд
-    if (g_sub_edit.active && (millis() - g_sub_edit.last_ms > 5000)) {
+    if (g_sub_edit.active && !g_roller.active && (millis() - g_sub_edit.last_ms > 5000)) {
         exit_sub_edit();
     }
 
@@ -6357,6 +6514,8 @@ void loop()
             //   <TAP:x,y[,мс]> → имитация касания, x/y в координатах базы 480×272
             //   <UIDUMP>     → тексты виджетов в [UI]-строку (автотесты)
             //   <RXMUTE:0|1> → игнорировать данные от STM32 (автотесты)
+            //   <UIRESET>    → закрыть барабан, правку, проверку тача, сообщение (автотесты)
+            //   <TOUCHTEST:1|0> → экран проверки тача (9 мишеней, промахи — в USB)
             //   <CMD:val>    → обработать как команду от STM32
             static char    usb_inj_buf[128];
             static uint8_t usb_inj_len = 0;
@@ -6378,6 +6537,15 @@ void loop()
                             Serial.printf("[TAP] %d,%d %d мс\n", tx, ty, tms);
                         } else if (strcmp(usb_inj_buf, "<UIDUMP") == 0) {
                             ui_dump();
+                        } else if (strcmp(usb_inj_buf, "<UIRESET") == 0) {      // автотесты: закрыть всё временное
+                            close_roller(false);
+                            if (g_edit_param.active) exit_edit_mode();
+                            exit_sub_edit();
+                            if (g_tt) touchtest_close();
+                            if (g_alert.active) dismiss_alert();
+                            Serial.println("[UIRESET]");
+                        } else if (sscanf(usb_inj_buf, "<TOUCHTEST:%d", &tx) == 1) {
+                            if (tx) touchtest_open(); else touchtest_close();
                         } else if (sscanf(usb_inj_buf, "<RXMUTE:%d", &tx) == 1) {
                             uart_protocol.setRxMute(tx != 0);
                             Serial.printf("[RXMUTE] %d\n", tx);
