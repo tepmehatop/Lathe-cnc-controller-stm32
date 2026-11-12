@@ -2775,9 +2775,13 @@
         (size 1 1))
       (justify right bottom))
     (uuid "a47edfc1-890b-501a-8b47-27cefe085f0e"))
-  (no_connect
-    (at 60.96 43.18)
-    (uuid "db2dfdc2-c064-594e-9423-8659c95d0a98"))
+  (label "NRST"
+    (at 60.96 43.18 0)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "8b68b12d-f746-526a-ae6d-f314bc20ee7e"))
   (label "FEED_POT"
     (at 48.26 45.72 180)
     (effects
@@ -2819,12 +2823,20 @@
         (size 1 1))
       (justify right bottom))
     (uuid "96ae12db-784d-55a1-ab69-da74fc5117d8"))
-  (no_connect
-    (at 60.96 53.34)
-    (uuid "05f10a52-ce67-5a95-8da2-78de25aa5037"))
-  (no_connect
-    (at 48.26 55.88)
-    (uuid "25a3354f-5670-5249-a992-628dcfebd6e2"))
+  (label "PROBE"
+    (at 60.96 53.34 0)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "1fad61f3-199f-566a-9718-72b00bf75058"))
+  (label "RES_IO1"
+    (at 48.26 55.88 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "f3a50879-e77d-5b6e-92fd-47eac15ea64b"))
   (label "HAND_X1"
     (at 60.96 55.88 0)
     (effects
@@ -2832,9 +2844,13 @@
         (size 1 1))
       (justify left bottom))
     (uuid "6533245e-9bec-54f1-93c3-abe22dab2f1f"))
-  (no_connect
-    (at 48.26 58.42)
-    (uuid "ab578307-9546-5698-9744-421fabed27e2"))
+  (label "RES_IO2"
+    (at 48.26 58.42 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "c4e789a4-8650-52d5-a6e0-61f7184a8a9c"))
   (no_connect
     (at 60.96 58.42)
     (uuid "ff4287ad-e378-5bad-84ba-22be24e98eff"))
@@ -3012,15 +3028,23 @@
   (no_connect
     (at 60.96 91.44)
     (uuid "f8c7707c-9da7-5c6c-8364-637c71564a63"))
-  (no_connect
-    (at 48.26 93.98)
-    (uuid "21a79128-69e2-5a47-95e4-d010908c0823"))
+  (label "RES_OUT2"
+    (at 48.26 93.98 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "538f0809-c135-5f81-952e-a24f2c55d37b"))
   (no_connect
     (at 60.96 93.98)
     (uuid "e3a63ad7-90a9-5a2e-8029-c5b33a55d3b3"))
-  (no_connect
-    (at 48.26 96.52)
-    (uuid "00295ae3-62a0-5c85-b305-a035f6ad63ab"))
+  (label "RES_OUT4"
+    (at 48.26 96.52 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "4a0452a5-1e8b-5949-b6b1-f7a020c3b3da"))
   (no_connect
     (at 60.96 96.52)
     (uuid "600a3575-d97e-5725-a113-243176fa1687"))
@@ -5395,245 +5419,322 @@
       (justify left bottom))
     (uuid "e6c5d29e-601c-5d5e-a69a-4182d4165b4e"))
   (symbol
-    (lib_id "Device:R")
-    (at 91.44 152.4 0)
+    (lib_id "Connector_Generic:Conn_01x02")
+    (at 96.52 149.86 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "f9bf312e-ba3f-5e56-808c-edadb70bae96")
-    (property "Reference" "R2"
-      (at 91.44 149.86 0)
+    (uuid "12b782c5-2771-57e2-87aa-b664a4d3c89a")
+    (property "Reference" "J24"
+      (at 96.52 147.32 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
-      (at 91.44 154.94 0)
+    (property "Value" "СБРОС"
+      (at 96.52 152.4 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-      (at 91.44 152.4 0)
+    (property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-02A_1x02_P2.54mm_Vertical"
+      (at 96.52 149.86 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 91.44 152.4 0)
+      (at 96.52 149.86 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база Z_STEP"
-      (at 91.44 152.4 0)
+    (property "Description" "RST / GND"
+      (at 96.52 149.86 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "5b785fe5-cb13-5b05-ba4c-6b38f76a3c63"))
+      (uuid "694663b4-86c8-5388-a173-24be1b8760b2"))
     (pin "2"
-      (uuid "16254d0b-9c9d-5400-9f6e-776f81da2115"))
+      (uuid "9b9fb409-35f9-5a26-bc73-eb90f6cc82a1"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R2")
+          (reference "J24")
           (unit 1)))))
-  (label "Z_STEP"
-    (at 91.44 148.59 90)
-    (effects
-      (font
-        (size 1 1))
-      (justify left bottom))
-    (uuid "0061843f-39e8-56e1-9500-fcee93694616"))
-  (label "B_Z_STEP"
-    (at 91.44 156.21 270)
+  (label "NRST"
+    (at 91.44 149.86 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "d5f1c844-e507-57e2-9393-d9b1db8c803d"))
-  (symbol
-    (lib_id "Device:R")
-    (at 137.16 152.4 0)
-    (unit 1)
-    (exclude_from_sim no)
-    (in_bom yes)
-    (on_board yes)
-    (dnp no)
-    (uuid "7819bbc8-e032-5844-b627-1b6ea179c4c9")
-    (property "Reference" "R3"
-      (at 137.16 149.86 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Value" "10k"
-      (at 137.16 154.94 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-      (at 137.16 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (property "Datasheet" "~"
-      (at 137.16 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (property "Description" "закрывает ключ при старте"
-      (at 137.16 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (pin "1"
-      (uuid "cc683241-1e5e-501c-98c2-2d50c5584f77"))
-    (pin "2"
-      (uuid "c82a398c-bd45-53f5-ae01-d90322b0811f"))
-    (instances
-      (project "els_shield"
-        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R3")
-          (unit 1)))))
-  (label "B_Z_STEP"
-    (at 137.16 148.59 90)
-    (effects
-      (font
-        (size 1 1))
-      (justify left bottom))
-    (uuid "4483dd19-a6b5-5271-bceb-840fd750c6a4"))
+    (uuid "3d8dfad3-8309-5f62-a446-777b4cb9f495"))
   (label "GND"
-    (at 137.16 156.21 270)
+    (at 91.44 152.4 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "8cd46bfc-6b91-5f93-8ca7-7a6e1a120bd9"))
+    (uuid "7945e4bf-6db1-5e8a-a17c-b1fababa9e1b"))
+  (text "RST / GND"
+    (exclude_from_sim no)
+    (at 76.2 142.24 0)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left bottom))
+    (uuid "8f6fa1f5-ea0c-5be5-a902-2daf33a2dd32"))
   (symbol
-    (lib_id "Device:R")
-    (at 182.88 152.4 0)
+    (lib_id "Connector_Generic:Conn_01x03")
+    (at 142.24 152.4 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "6d8cee48-3c3b-5765-b016-89db334c2e25")
-    (property "Reference" "R4"
-      (at 182.88 149.86 0)
+    (uuid "bdf1c05c-c718-5000-a0da-2fafa279bf12")
+    (property "Reference" "J25"
+      (at 142.24 149.86 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
-      (at 182.88 154.94 0)
+    (property "Value" "ДАТЧИК (РЕЗЕРВ)"
+      (at 142.24 154.94 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-      (at 182.88 152.4 0)
+    (property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-03A_1x03_P2.54mm_Vertical"
+      (at 142.24 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 182.88 152.4 0)
+      (at 142.24 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база Z_DIR"
-      (at 182.88 152.4 0)
+    (property "Description" "+5V / GND / ВХ"
+      (at 142.24 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "3380475e-3429-5fc5-b957-09478bfb63e7"))
+      (uuid "9dbc03da-304b-58b1-ab92-bcb3cbb37072"))
     (pin "2"
-      (uuid "bc34740b-1f19-5a3d-b967-802e6c14f6ec"))
+      (uuid "acb285bb-5d85-5be9-b6ff-fa36c28942a2"))
+    (pin "3"
+      (uuid "8eda5ebf-338c-56cf-9bf1-2ac539eed04b"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R4")
+          (reference "J25")
           (unit 1)))))
-  (label "Z_DIR"
-    (at 182.88 148.59 90)
-    (effects
-      (font
-        (size 1 1))
-      (justify left bottom))
-    (uuid "ce5e1c4f-d24b-5b3c-a054-039f77a1ef56"))
-  (label "B_Z_DIR"
-    (at 182.88 156.21 270)
+  (label "+5V"
+    (at 137.16 149.86 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "1fbd47e3-71e4-5519-96ea-c756bbed6054"))
-  (symbol
-    (lib_id "Device:R")
-    (at 228.6 152.4 0)
-    (unit 1)
-    (exclude_from_sim no)
-    (in_bom yes)
-    (on_board yes)
-    (dnp no)
-    (uuid "2811e662-43c2-561b-8bff-6739d7cad948")
-    (property "Reference" "R5"
-      (at 228.6 149.86 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Value" "10k"
-      (at 228.6 154.94 0)
-      (effects
-        (font
-          (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
-      (at 228.6 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (property "Datasheet" "~"
-      (at 228.6 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (property "Description" "закрывает ключ при старте"
-      (at 228.6 152.4 0)
-      (effects
-        (font
-          (size 1.27 1.27))
-        (hide yes)))
-    (pin "1"
-      (uuid "2fa7a886-2c9d-5616-bed2-8abf0468930a"))
-    (pin "2"
-      (uuid "bbea2473-9699-5afd-a6af-53fa58577bb8"))
-    (instances
-      (project "els_shield"
-        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R5")
-          (unit 1)))))
-  (label "B_Z_DIR"
-    (at 228.6 148.59 90)
-    (effects
-      (font
-        (size 1 1))
-      (justify left bottom))
-    (uuid "24126c38-18a2-5d02-833e-1d44e8bda1f9"))
+    (uuid "33ac9fe4-fa80-547e-9c43-1db95f87dbb9"))
   (label "GND"
-    (at 228.6 156.21 270)
+    (at 137.16 152.4 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "4e25d792-aa3e-5f32-9c4c-5b5117fc9e83"))
+    (uuid "f8373658-ac1b-5846-86ff-2a177f6dce0b"))
+  (label "PROBE"
+    (at 137.16 154.94 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "a6399f52-57fc-5a3e-9cad-042325d798b6"))
+  (text "+5V / GND / ВХ"
+    (exclude_from_sim no)
+    (at 121.92 142.24 0)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left bottom))
+    (uuid "80569093-30cc-5852-8b2f-93926e210f58"))
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x04")
+    (at 187.96 152.4 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "d1b5044c-1f7e-54b9-95ef-a6069653e3f7")
+    (property "Reference" "J26"
+      (at 187.96 149.86 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "РЕЗЕРВ ВЫХОДЫ PD13 PD15"
+      (at 187.96 154.94 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-04A_1x04_P2.54mm_Vertical"
+      (at 187.96 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 187.96 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "+5V / GND / D13 / D15"
+      (at 187.96 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "81c43092-6863-5edc-a197-2217564c07bf"))
+    (pin "2"
+      (uuid "cbe5191a-53b7-5853-8a4b-7cfd92dbceca"))
+    (pin "3"
+      (uuid "54c37607-15ae-5e54-b4d1-24b5b7dc3124"))
+    (pin "4"
+      (uuid "382dad3d-ed61-5dc2-b387-67bdd38ad69d"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "J26")
+          (unit 1)))))
+  (label "+5V"
+    (at 182.88 149.86 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "f1a0d344-98ff-5a65-98ef-27427d213079"))
+  (label "GND"
+    (at 182.88 152.4 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "1d5cd28d-74ea-560a-9bda-97d0ad752257"))
+  (label "RES_OUT2_T"
+    (at 182.88 154.94 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "987d81d4-2650-5ae9-809b-6ed04e4d7b48"))
+  (label "RES_OUT4_T"
+    (at 182.88 157.48 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "200af201-b398-532a-bd41-6dbfe1ac06b7"))
+  (text "+5V / GND / D13 / D15"
+    (exclude_from_sim no)
+    (at 167.64 142.24 0)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left bottom))
+    (uuid "9bcc422d-a182-53f9-8dae-119720308aba"))
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x04")
+    (at 233.68 152.4 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "5de6b466-7845-5f4a-8099-b9d4b84fd0ad")
+    (property "Reference" "J27"
+      (at 233.68 149.86 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "РЕЗЕРВ PA5 PA7"
+      (at 233.68 154.94 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-04A_1x04_P2.54mm_Vertical"
+      (at 233.68 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 233.68 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "+3V / GND / A5 / A7"
+      (at 233.68 152.4 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "af29c39c-bf9b-5ad2-b00c-95cc5bb54355"))
+    (pin "2"
+      (uuid "db3c7b2d-01b0-5399-b5d3-89370ccf8564"))
+    (pin "3"
+      (uuid "f8201abb-e5c9-55d2-9833-a4ee826d8579"))
+    (pin "4"
+      (uuid "61c704ed-25fa-5fca-8082-639ae7665074"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "J27")
+          (unit 1)))))
+  (label "+3V"
+    (at 228.6 149.86 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "efeb72dd-29f2-5c59-bf39-83313bdb2c48"))
+  (label "GND"
+    (at 228.6 152.4 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "e9693b5c-a444-594f-9818-294bb2b95329"))
+  (label "RES_IO1_T"
+    (at 228.6 154.94 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "b6f2c531-d7b4-5950-9196-07a9ea259458"))
+  (label "RES_IO2_T"
+    (at 228.6 157.48 180)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "642b3ca9-91ea-5239-acdf-631d91b29280"))
+  (text "+3V / GND / A5 / A7"
+    (exclude_from_sim no)
+    (at 213.36 142.24 0)
+    (effects
+      (font
+        (size 1.27 1.27))
+      (justify left bottom))
+    (uuid "1c644660-b7a3-5d46-9d1f-2b23280c74c0"))
   (symbol
     (lib_id "Device:R")
     (at 271.78 152.4 0)
@@ -5642,8 +5743,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "930f79bf-6ac5-53a8-bd3c-d44f05048163")
-    (property "Reference" "R6"
+    (uuid "f9bf312e-ba3f-5e56-808c-edadb70bae96")
+    (property "Reference" "R2"
       (at 271.78 149.86 0)
       (effects
         (font
@@ -5665,35 +5766,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база Z_ENA"
+    (property "Description" "база Z_STEP"
       (at 271.78 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "64614ec4-9c15-5393-8c57-bf7dee91d70d"))
+      (uuid "5b785fe5-cb13-5b05-ba4c-6b38f76a3c63"))
     (pin "2"
-      (uuid "bb54e2a5-e4bf-58a4-b018-4fb6e964c149"))
+      (uuid "16254d0b-9c9d-5400-9f6e-776f81da2115"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R6")
+          (reference "R2")
           (unit 1)))))
-  (label "Z_ENA"
+  (label "Z_STEP"
     (at 271.78 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "3169dc6c-81ad-57ac-8ba5-eb527f8dbe87"))
-  (label "B_Z_ENA"
+    (uuid "0061843f-39e8-56e1-9500-fcee93694616"))
+  (label "B_Z_STEP"
     (at 271.78 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "7c5dc252-844d-5082-bfe8-de0cda2a6894"))
+    (uuid "d5f1c844-e507-57e2-9393-d9b1db8c803d"))
   (symbol
     (lib_id "Device:R")
     (at 317.5 152.4 0)
@@ -5702,8 +5803,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "10d12aa8-1106-5e25-91ca-beebe9575f9c")
-    (property "Reference" "R7"
+    (uuid "7819bbc8-e032-5844-b627-1b6ea179c4c9")
+    (property "Reference" "R3"
       (at 317.5 149.86 0)
       (effects
         (font
@@ -5732,28 +5833,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "73d84d1a-9594-5a26-a61d-f57599739126"))
+      (uuid "cc683241-1e5e-501c-98c2-2d50c5584f77"))
     (pin "2"
-      (uuid "85350346-b10d-57c0-914a-0a9963b43dc9"))
+      (uuid "c82a398c-bd45-53f5-ae01-d90322b0811f"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R7")
+          (reference "R3")
           (unit 1)))))
-  (label "B_Z_ENA"
+  (label "B_Z_STEP"
     (at 317.5 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "bdc538a8-03c1-59e3-9701-e421f7db128e"))
+    (uuid "4483dd19-a6b5-5271-bceb-840fd750c6a4"))
   (label "GND"
     (at 317.5 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "243a2496-e03f-5a06-b45d-5917b090c45b"))
+    (uuid "8cd46bfc-6b91-5f93-8ca7-7a6e1a120bd9"))
   (symbol
     (lib_id "Device:R")
     (at 363.22 152.4 0)
@@ -5762,8 +5863,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "5dc315a0-c73f-5a7e-b11e-1620297b02c0")
-    (property "Reference" "R8"
+    (uuid "6d8cee48-3c3b-5765-b016-89db334c2e25")
+    (property "Reference" "R4"
       (at 363.22 149.86 0)
       (effects
         (font
@@ -5785,35 +5886,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база X_STEP"
+    (property "Description" "база Z_DIR"
       (at 363.22 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "edfdee40-2a11-5dd5-8bb8-1e609ed4c234"))
+      (uuid "3380475e-3429-5fc5-b957-09478bfb63e7"))
     (pin "2"
-      (uuid "67719225-32ea-5ea4-b04a-b53d82c95f75"))
+      (uuid "bc34740b-1f19-5a3d-b967-802e6c14f6ec"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R8")
+          (reference "R4")
           (unit 1)))))
-  (label "X_STEP"
+  (label "Z_DIR"
     (at 363.22 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "792c659b-693c-548a-bebc-077751ec1c16"))
-  (label "B_X_STEP"
+    (uuid "ce5e1c4f-d24b-5b3c-a054-039f77a1ef56"))
+  (label "B_Z_DIR"
     (at 363.22 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "959ccaf0-66fe-5d79-88fd-b1612814d7fd"))
+    (uuid "1fbd47e3-71e4-5519-96ea-c756bbed6054"))
   (symbol
     (lib_id "Device:R")
     (at 406.4 152.4 0)
@@ -5822,8 +5923,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "8e2723b6-e0db-57dc-9118-4052cdf07c42")
-    (property "Reference" "R9"
+    (uuid "2811e662-43c2-561b-8bff-6739d7cad948")
+    (property "Reference" "R5"
       (at 406.4 149.86 0)
       (effects
         (font
@@ -5852,28 +5953,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "d3031e48-c11d-569e-84cb-7f167c4f833a"))
+      (uuid "2fa7a886-2c9d-5616-bed2-8abf0468930a"))
     (pin "2"
-      (uuid "e40e24bd-c0c3-563a-95c6-a8631bd1ddb0"))
+      (uuid "bbea2473-9699-5afd-a6af-53fa58577bb8"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R9")
+          (reference "R5")
           (unit 1)))))
-  (label "B_X_STEP"
+  (label "B_Z_DIR"
     (at 406.4 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "cd1d02b9-ce0e-553b-a0b2-5c04030cd4bf"))
+    (uuid "24126c38-18a2-5d02-833e-1d44e8bda1f9"))
   (label "GND"
     (at 406.4 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "136bf36e-3555-5e7a-a624-8bba4658e3fa"))
+    (uuid "4e25d792-aa3e-5f32-9c4c-5b5117fc9e83"))
   (symbol
     (lib_id "Device:R")
     (at 452.12 152.4 0)
@@ -5882,8 +5983,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "17e52096-dd4b-5a47-a935-41e04a910093")
-    (property "Reference" "R10"
+    (uuid "930f79bf-6ac5-53a8-bd3c-d44f05048163")
+    (property "Reference" "R6"
       (at 452.12 149.86 0)
       (effects
         (font
@@ -5905,35 +6006,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база X_DIR"
+    (property "Description" "база Z_ENA"
       (at 452.12 152.4 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "38e5a88b-3be7-53d1-be94-be7f0b7fa9d6"))
+      (uuid "64614ec4-9c15-5393-8c57-bf7dee91d70d"))
     (pin "2"
-      (uuid "07b447d8-b120-51ea-ab5c-158683be54e1"))
+      (uuid "bb54e2a5-e4bf-58a4-b018-4fb6e964c149"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R10")
+          (reference "R6")
           (unit 1)))))
-  (label "X_DIR"
+  (label "Z_ENA"
     (at 452.12 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "f76e8253-b2be-57e2-b098-47fcbcce130f"))
-  (label "B_X_DIR"
+    (uuid "3169dc6c-81ad-57ac-8ba5-eb527f8dbe87"))
+  (label "B_Z_ENA"
     (at 452.12 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "d6b5e886-167f-5c10-b505-7837b0ae71a8"))
+    (uuid "7c5dc252-844d-5082-bfe8-de0cda2a6894"))
   (symbol
     (lib_id "Device:R")
     (at 497.84 152.4 0)
@@ -5942,8 +6043,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "88787469-6ea4-5d21-875d-fa36505808be")
-    (property "Reference" "R11"
+    (uuid "10d12aa8-1106-5e25-91ca-beebe9575f9c")
+    (property "Reference" "R7"
       (at 497.84 149.86 0)
       (effects
         (font
@@ -5972,28 +6073,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "e2b27e2b-8011-52f6-ab22-2e1d7a538b56"))
+      (uuid "73d84d1a-9594-5a26-a61d-f57599739126"))
     (pin "2"
-      (uuid "69089823-a97b-586c-af1f-1d014e09dd81"))
+      (uuid "85350346-b10d-57c0-914a-0a9963b43dc9"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R11")
+          (reference "R7")
           (unit 1)))))
-  (label "B_X_DIR"
+  (label "B_Z_ENA"
     (at 497.84 148.59 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "581a168c-b345-5133-960a-d02b9dbcf1e4"))
+    (uuid "bdc538a8-03c1-59e3-9701-e421f7db128e"))
   (label "GND"
     (at 497.84 156.21 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "6a6355cc-5d70-5da7-8001-3405dd40c0fa"))
+    (uuid "243a2496-e03f-5a06-b45d-5917b090c45b"))
   (symbol
     (lib_id "Device:R")
     (at 48.26 182.88 0)
@@ -6002,8 +6103,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "12056fd8-8582-5886-af05-6db9017d68f7")
-    (property "Reference" "R12"
+    (uuid "5dc315a0-c73f-5a7e-b11e-1620297b02c0")
+    (property "Reference" "R8"
       (at 48.26 180.34 0)
       (effects
         (font
@@ -6025,35 +6126,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база X_ENA"
+    (property "Description" "база X_STEP"
       (at 48.26 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "46814feb-d5e1-5e75-8da1-6f8ed9e10b92"))
+      (uuid "edfdee40-2a11-5dd5-8bb8-1e609ed4c234"))
     (pin "2"
-      (uuid "a71c1e08-3508-5b9b-85ea-43a568abda99"))
+      (uuid "67719225-32ea-5ea4-b04a-b53d82c95f75"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R12")
+          (reference "R8")
           (unit 1)))))
-  (label "X_ENA"
+  (label "X_STEP"
     (at 48.26 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "601c2864-6d9b-5d78-98e5-bb3ce5e35be0"))
-  (label "B_X_ENA"
+    (uuid "792c659b-693c-548a-bebc-077751ec1c16"))
+  (label "B_X_STEP"
     (at 48.26 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "4af7be81-06b4-5610-9873-8e8e93341997"))
+    (uuid "959ccaf0-66fe-5d79-88fd-b1612814d7fd"))
   (symbol
     (lib_id "Device:R")
     (at 91.44 182.88 0)
@@ -6062,8 +6163,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "db3fdea4-ed24-55a1-a2ce-669f03ce9cb0")
-    (property "Reference" "R13"
+    (uuid "8e2723b6-e0db-57dc-9118-4052cdf07c42")
+    (property "Reference" "R9"
       (at 91.44 180.34 0)
       (effects
         (font
@@ -6092,28 +6193,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "eaf7b742-cc50-5b48-a0c7-991960f5eb4e"))
+      (uuid "d3031e48-c11d-569e-84cb-7f167c4f833a"))
     (pin "2"
-      (uuid "674678e4-6a96-5f5f-b97f-08a1a5cd6984"))
+      (uuid "e40e24bd-c0c3-563a-95c6-a8631bd1ddb0"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R13")
+          (reference "R9")
           (unit 1)))))
-  (label "B_X_ENA"
+  (label "B_X_STEP"
     (at 91.44 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "6721047b-08b0-59c5-a3b3-30c6a0c36866"))
+    (uuid "cd1d02b9-ce0e-553b-a0b2-5c04030cd4bf"))
   (label "GND"
     (at 91.44 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "f60782dd-fe4a-55e9-a5fb-fcb10f695f5b"))
+    (uuid "136bf36e-3555-5e7a-a624-8bba4658e3fa"))
   (symbol
     (lib_id "Device:R")
     (at 137.16 182.88 0)
@@ -6122,8 +6223,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "eb5ccecb-5a8a-521a-bfd9-8f333a5f08c3")
-    (property "Reference" "R14"
+    (uuid "17e52096-dd4b-5a47-a935-41e04a910093")
+    (property "Reference" "R10"
       (at 137.16 180.34 0)
       (effects
         (font
@@ -6145,35 +6246,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "база BEEPER"
+    (property "Description" "база X_DIR"
       (at 137.16 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "53f8ecd9-b4df-5d15-8ec5-1afb832805ec"))
+      (uuid "38e5a88b-3be7-53d1-be94-be7f0b7fa9d6"))
     (pin "2"
-      (uuid "8d2a3c61-5598-51fc-9e43-31801b385638"))
+      (uuid "07b447d8-b120-51ea-ab5c-158683be54e1"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R14")
+          (reference "R10")
           (unit 1)))))
-  (label "BEEPER"
+  (label "X_DIR"
     (at 137.16 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "2ccd3b67-7bb8-5e96-abff-56c37cda38b9"))
-  (label "B_BEEPER"
+    (uuid "f76e8253-b2be-57e2-b098-47fcbcce130f"))
+  (label "B_X_DIR"
     (at 137.16 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "c2e361b4-ff4f-5d06-ad8f-83caad56f1f7"))
+    (uuid "d6b5e886-167f-5c10-b505-7837b0ae71a8"))
   (symbol
     (lib_id "Device:R")
     (at 182.88 182.88 0)
@@ -6182,8 +6283,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "86511751-34b3-5372-b7d6-13339e988ea6")
-    (property "Reference" "R15"
+    (uuid "88787469-6ea4-5d21-875d-fa36505808be")
+    (property "Reference" "R11"
       (at 182.88 180.34 0)
       (effects
         (font
@@ -6212,28 +6313,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "8c2b91b2-fbbf-5aee-8a02-aca748f67085"))
+      (uuid "e2b27e2b-8011-52f6-ab22-2e1d7a538b56"))
     (pin "2"
-      (uuid "131985d5-633a-596c-9f74-d5bb78fe92bb"))
+      (uuid "69089823-a97b-586c-af1f-1d014e09dd81"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R15")
+          (reference "R11")
           (unit 1)))))
-  (label "B_BEEPER"
+  (label "B_X_DIR"
     (at 182.88 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "bfe277e6-39b8-593e-896b-0e06faf1cb69"))
+    (uuid "581a168c-b345-5133-960a-d02b9dbcf1e4"))
   (label "GND"
     (at 182.88 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "c55ac149-8b57-5507-aa14-2dc4ac1285c9"))
+    (uuid "6a6355cc-5d70-5da7-8001-3405dd40c0fa"))
   (symbol
     (lib_id "Device:R")
     (at 228.6 182.88 0)
@@ -6242,13 +6343,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "bf67b4a9-c9e0-5382-b2ea-b87ed3534b81")
-    (property "Reference" "R16"
+    (uuid "12056fd8-8582-5886-af05-6db9017d68f7")
+    (property "Reference" "R12"
       (at 228.6 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "220"
+    (property "Value" "1k"
       (at 228.6 185.42 0)
       (effects
         (font
@@ -6265,35 +6366,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "светодиод упора"
+    (property "Description" "база X_ENA"
       (at 228.6 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "1f57f775-6abc-5bd6-896b-b8c58a033bce"))
+      (uuid "46814feb-d5e1-5e75-8da1-6f8ed9e10b92"))
     (pin "2"
-      (uuid "a7c7f405-57fd-580f-a3e7-18ad45a89001"))
+      (uuid "a71c1e08-3508-5b9b-85ea-43a568abda99"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R16")
+          (reference "R12")
           (unit 1)))))
-  (label "LED_LEFT"
+  (label "X_ENA"
     (at 228.6 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "7705acc2-cbf8-5d77-84f1-dea95ee07782"))
-  (label "LED_LEFT_K"
+    (uuid "601c2864-6d9b-5d78-98e5-bb3ce5e35be0"))
+  (label "B_X_ENA"
     (at 228.6 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "1d51ab40-9443-5c7f-9d2d-8229a13565ba"))
+    (uuid "4af7be81-06b4-5610-9873-8e8e93341997"))
   (symbol
     (lib_id "Device:R")
     (at 271.78 182.88 0)
@@ -6302,13 +6403,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "e691d756-26fd-57ac-9257-a8211d57ea12")
-    (property "Reference" "R17"
+    (uuid "db3fdea4-ed24-55a1-a2ce-669f03ce9cb0")
+    (property "Reference" "R13"
       (at 271.78 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "220"
+    (property "Value" "10k"
       (at 271.78 185.42 0)
       (effects
         (font
@@ -6325,35 +6426,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "светодиод упора"
+    (property "Description" "закрывает ключ при старте"
       (at 271.78 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "82be9694-7678-58b3-a387-58376e588213"))
+      (uuid "eaf7b742-cc50-5b48-a0c7-991960f5eb4e"))
     (pin "2"
-      (uuid "00bda137-220e-5755-bcff-79bf4e8cd22f"))
+      (uuid "674678e4-6a96-5f5f-b97f-08a1a5cd6984"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R17")
+          (reference "R13")
           (unit 1)))))
-  (label "LED_RIGHT"
+  (label "B_X_ENA"
     (at 271.78 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "9480fcef-5f85-5341-855b-83056e84c8ca"))
-  (label "LED_RIGHT_K"
+    (uuid "6721047b-08b0-59c5-a3b3-30c6a0c36866"))
+  (label "GND"
     (at 271.78 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "af0145f8-2c70-51dc-93b9-6b0a56206ce4"))
+    (uuid "f60782dd-fe4a-55e9-a5fb-fcb10f695f5b"))
   (symbol
     (lib_id "Device:R")
     (at 317.5 182.88 0)
@@ -6362,13 +6463,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "1d9bab5f-9153-5d19-9303-e6f3da3f4806")
-    (property "Reference" "R18"
+    (uuid "eb5ccecb-5a8a-521a-bfd9-8f333a5f08c3")
+    (property "Reference" "R14"
       (at 317.5 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "220"
+    (property "Value" "1k"
       (at 317.5 185.42 0)
       (effects
         (font
@@ -6385,35 +6486,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "светодиод упора"
+    (property "Description" "база BEEPER"
       (at 317.5 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "ba551074-2d19-54bf-b760-888322146ef8"))
+      (uuid "53f8ecd9-b4df-5d15-8ec5-1afb832805ec"))
     (pin "2"
-      (uuid "0be75b2a-b91b-511c-8bd5-0d8fe7629a98"))
+      (uuid "8d2a3c61-5598-51fc-9e43-31801b385638"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R18")
+          (reference "R14")
           (unit 1)))))
-  (label "LED_FRONT"
+  (label "BEEPER"
     (at 317.5 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "79770e22-b051-5dea-b188-6548fa841c8f"))
-  (label "LED_FRONT_K"
+    (uuid "2ccd3b67-7bb8-5e96-abff-56c37cda38b9"))
+  (label "B_BEEPER"
     (at 317.5 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "3dce1b42-189b-507a-bdcc-59dd1104f09c"))
+    (uuid "c2e361b4-ff4f-5d06-ad8f-83caad56f1f7"))
   (symbol
     (lib_id "Device:R")
     (at 363.22 182.88 0)
@@ -6422,13 +6523,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "bad7c241-5a4f-514c-bfa0-bddd4c33a542")
-    (property "Reference" "R19"
+    (uuid "86511751-34b3-5372-b7d6-13339e988ea6")
+    (property "Reference" "R15"
       (at 363.22 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "220"
+    (property "Value" "10k"
       (at 363.22 185.42 0)
       (effects
         (font
@@ -6445,35 +6546,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "светодиод упора"
+    (property "Description" "закрывает ключ при старте"
       (at 363.22 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "39d752d4-f843-5242-9e7b-c5f0cc4c1fd1"))
+      (uuid "8c2b91b2-fbbf-5aee-8a02-aca748f67085"))
     (pin "2"
-      (uuid "71e2e31a-c2a2-5eab-beab-90fae292e552"))
+      (uuid "131985d5-633a-596c-9f74-d5bb78fe92bb"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R19")
+          (reference "R15")
           (unit 1)))))
-  (label "LED_REAR"
+  (label "B_BEEPER"
     (at 363.22 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "ba97706a-4251-5e8c-89f6-e5018ab89ad6"))
-  (label "LED_REAR_K"
+    (uuid "bfe277e6-39b8-593e-896b-0e06faf1cb69"))
+  (label "GND"
     (at 363.22 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "ab373087-d467-5594-993f-52b0864f481e"))
+    (uuid "c55ac149-8b57-5507-aa14-2dc4ac1285c9"))
   (symbol
     (lib_id "Device:R")
     (at 406.4 182.88 0)
@@ -6482,13 +6583,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "7e79b557-89d8-50bf-85e5-55c106ad6fbd")
-    (property "Reference" "R20"
+    (uuid "bf67b4a9-c9e0-5382-b2ea-b87ed3534b81")
+    (property "Reference" "R16"
       (at 406.4 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "100"
+    (property "Value" "220"
       (at 406.4 185.42 0)
       (effects
         (font
@@ -6505,35 +6606,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "тахометр"
+    (property "Description" "светодиод упора"
       (at 406.4 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "57fb636c-d8a9-559d-baf6-71772eb2dd39"))
+      (uuid "1f57f775-6abc-5bd6-896b-b8c58a033bce"))
     (pin "2"
-      (uuid "9ae148a5-b465-5aba-868d-6bb141a54922"))
+      (uuid "a7c7f405-57fd-580f-a3e7-18ad45a89001"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R20")
+          (reference "R16")
           (unit 1)))))
-  (label "TACHO"
+  (label "LED_LEFT"
     (at 406.4 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "78c2a4b1-8488-53fe-bc48-bf1b2a3f8bb1"))
-  (label "TACHO_OUT"
+    (uuid "7705acc2-cbf8-5d77-84f1-dea95ee07782"))
+  (label "LED_LEFT_K"
     (at 406.4 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "ab878487-3870-51fa-9bbd-19ef65d01641"))
+    (uuid "1d51ab40-9443-5c7f-9d2d-8229a13565ba"))
   (symbol
     (lib_id "Device:R")
     (at 452.12 182.88 0)
@@ -6542,13 +6643,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "db471768-e9d2-5baf-b47e-33b0495db600")
-    (property "Reference" "R21"
+    (uuid "e691d756-26fd-57ac-9257-a8211d57ea12")
+    (property "Reference" "R17"
       (at 452.12 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "470"
+    (property "Value" "220"
       (at 452.12 185.42 0)
       (effects
         (font
@@ -6565,35 +6666,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "линейка"
+    (property "Description" "светодиод упора"
       (at 452.12 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "c1219c41-0dbc-51a0-96ed-318f3f0b8e8b"))
+      (uuid "82be9694-7678-58b3-a387-58376e588213"))
     (pin "2"
-      (uuid "cd18f13d-2021-5fd8-8efa-b6c56156bfcc"))
+      (uuid "00bda137-220e-5755-bcff-79bf4e8cd22f"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R21")
+          (reference "R17")
           (unit 1)))))
-  (label "SCALE_Z_A"
+  (label "LED_RIGHT"
     (at 452.12 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "5f7c92ba-6718-57f4-a3a0-3daed42ebf6c"))
-  (label "SCALE_Z_A_T"
+    (uuid "9480fcef-5f85-5341-855b-83056e84c8ca"))
+  (label "LED_RIGHT_K"
     (at 452.12 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "27754169-5e3e-539d-b137-c2e8b25cd133"))
+    (uuid "af0145f8-2c70-51dc-93b9-6b0a56206ce4"))
   (symbol
     (lib_id "Device:R")
     (at 497.84 182.88 0)
@@ -6602,13 +6703,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "0690eea5-cf2f-5626-a6ef-cad0259e6e0a")
-    (property "Reference" "R22"
+    (uuid "1d9bab5f-9153-5d19-9303-e6f3da3f4806")
+    (property "Reference" "R18"
       (at 497.84 180.34 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "470"
+    (property "Value" "220"
       (at 497.84 185.42 0)
       (effects
         (font
@@ -6625,35 +6726,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "линейка"
+    (property "Description" "светодиод упора"
       (at 497.84 182.88 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "b81d840a-d662-5036-aae5-465fa61bf073"))
+      (uuid "ba551074-2d19-54bf-b760-888322146ef8"))
     (pin "2"
-      (uuid "3be4940d-ca43-53a0-8c32-6fc94a2389fd"))
+      (uuid "0be75b2a-b91b-511c-8bd5-0d8fe7629a98"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R22")
+          (reference "R18")
           (unit 1)))))
-  (label "SCALE_Z_B"
+  (label "LED_FRONT"
     (at 497.84 179.07 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "af8cfc6e-d3a8-5b83-8596-3fff92f4c647"))
-  (label "SCALE_Z_B_T"
+    (uuid "79770e22-b051-5dea-b188-6548fa841c8f"))
+  (label "LED_FRONT_K"
     (at 497.84 186.69 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "33a8775c-9cac-592b-9b59-5a4cb883af3b"))
+    (uuid "3dce1b42-189b-507a-bdcc-59dd1104f09c"))
   (symbol
     (lib_id "Device:R")
     (at 48.26 210.82 0)
@@ -6662,13 +6763,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "6224aff7-1161-50d0-bd75-183cf0b4c4a8")
-    (property "Reference" "R23"
+    (uuid "bad7c241-5a4f-514c-bfa0-bddd4c33a542")
+    (property "Reference" "R19"
       (at 48.26 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "470"
+    (property "Value" "220"
       (at 48.26 213.36 0)
       (effects
         (font
@@ -6685,35 +6786,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "линейка"
+    (property "Description" "светодиод упора"
       (at 48.26 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "e01e3a86-4740-50f1-adea-be2bb6912bfa"))
+      (uuid "39d752d4-f843-5242-9e7b-c5f0cc4c1fd1"))
     (pin "2"
-      (uuid "ffded0d6-5c06-547c-b9cc-ac01b7cc3fa1"))
+      (uuid "71e2e31a-c2a2-5eab-beab-90fae292e552"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R23")
+          (reference "R19")
           (unit 1)))))
-  (label "SCALE_Z_REQ"
+  (label "LED_REAR"
     (at 48.26 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "8f5c999e-d6f3-5fcc-944c-5e5db4aba5ed"))
-  (label "SCALE_Z_REQ_T"
+    (uuid "ba97706a-4251-5e8c-89f6-e5018ab89ad6"))
+  (label "LED_REAR_K"
     (at 48.26 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "3ea4bc9b-0360-5d97-885e-9a7e44c1d381"))
+    (uuid "ab373087-d467-5594-993f-52b0864f481e"))
   (symbol
     (lib_id "Device:R")
     (at 91.44 210.82 0)
@@ -6722,13 +6823,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "eb0dc290-229d-50db-ad2a-f55e4342b062")
-    (property "Reference" "R24"
+    (uuid "7e79b557-89d8-50bf-85e5-55c106ad6fbd")
+    (property "Reference" "R20"
       (at 91.44 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "470"
+    (property "Value" "100"
       (at 91.44 213.36 0)
       (effects
         (font
@@ -6745,35 +6846,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "линейка"
+    (property "Description" "тахометр"
       (at 91.44 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "20bc6f68-873e-560a-bb95-a254960f8e0a"))
+      (uuid "57fb636c-d8a9-559d-baf6-71772eb2dd39"))
     (pin "2"
-      (uuid "cb05a077-5a46-51ca-baca-a2ca69fca12f"))
+      (uuid "9ae148a5-b465-5aba-868d-6bb141a54922"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R24")
+          (reference "R20")
           (unit 1)))))
-  (label "SCALE_X_A"
+  (label "TACHO"
     (at 91.44 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "6fc8fa9c-30cb-595f-9e7a-4c99fe90213e"))
-  (label "SCALE_X_A_T"
+    (uuid "78c2a4b1-8488-53fe-bc48-bf1b2a3f8bb1"))
+  (label "TACHO_OUT"
     (at 91.44 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "0639a3a9-30a4-51ea-9252-31de74cd02e5"))
+    (uuid "ab878487-3870-51fa-9bbd-19ef65d01641"))
   (symbol
     (lib_id "Device:R")
     (at 137.16 210.82 0)
@@ -6782,8 +6883,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "f3c77e08-c894-5826-9143-1c35177c7287")
-    (property "Reference" "R25"
+    (uuid "db471768-e9d2-5baf-b47e-33b0495db600")
+    (property "Reference" "R21"
       (at 137.16 208.28 0)
       (effects
         (font
@@ -6812,28 +6913,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "3fff52d7-6663-502c-a2dd-b808244c0257"))
+      (uuid "c1219c41-0dbc-51a0-96ed-318f3f0b8e8b"))
     (pin "2"
-      (uuid "d432f442-c4e6-5004-8474-857f6a9d332c"))
+      (uuid "cd18f13d-2021-5fd8-8efa-b6c56156bfcc"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R25")
+          (reference "R21")
           (unit 1)))))
-  (label "SCALE_X_B"
+  (label "SCALE_Z_A"
     (at 137.16 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "857f208c-a105-52ee-a7c6-e167b1066ccf"))
-  (label "SCALE_X_B_T"
+    (uuid "5f7c92ba-6718-57f4-a3a0-3daed42ebf6c"))
+  (label "SCALE_Z_A_T"
     (at 137.16 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "afc359a3-7dc9-51d8-a9e5-dcef27131d7c"))
+    (uuid "27754169-5e3e-539d-b137-c2e8b25cd133"))
   (symbol
     (lib_id "Device:R")
     (at 182.88 210.82 0)
@@ -6842,8 +6943,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "6a8eb5a0-7fe0-5bc2-b605-5be77bb16e61")
-    (property "Reference" "R26"
+    (uuid "0690eea5-cf2f-5626-a6ef-cad0259e6e0a")
+    (property "Reference" "R22"
       (at 182.88 208.28 0)
       (effects
         (font
@@ -6872,28 +6973,28 @@
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "58581823-cf89-5c1d-b0fb-6804deae1d7f"))
+      (uuid "b81d840a-d662-5036-aae5-465fa61bf073"))
     (pin "2"
-      (uuid "37324511-df26-5ef9-9295-3cfbe03f7a67"))
+      (uuid "3be4940d-ca43-53a0-8c32-6fc94a2389fd"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R26")
+          (reference "R22")
           (unit 1)))))
-  (label "SCALE_X_REQ"
+  (label "SCALE_Z_B"
     (at 182.88 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "601292c8-2fcd-59e3-93cc-4ba3f2606e9c"))
-  (label "SCALE_X_REQ_T"
+    (uuid "af8cfc6e-d3a8-5b83-8596-3fff92f4c647"))
+  (label "SCALE_Z_B_T"
     (at 182.88 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "c9ba72dd-154d-5e92-a923-deb7a3307c84"))
+    (uuid "33a8775c-9cac-592b-9b59-5a4cb883af3b"))
   (symbol
     (lib_id "Device:R")
     (at 228.6 210.82 0)
@@ -6902,13 +7003,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "c3f421ab-ff48-5dfc-8da2-2a90c1542d6d")
-    (property "Reference" "R101"
+    (uuid "6224aff7-1161-50d0-bd75-183cf0b4c4a8")
+    (property "Reference" "R23"
       (at 228.6 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 228.6 213.36 0)
       (effects
         (font
@@ -6925,35 +7026,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_FEED"
+    (property "Description" "линейка"
       (at 228.6 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "0b8f57a1-9e75-5c58-9279-d64109c199cc"))
+      (uuid "e01e3a86-4740-50f1-adea-be2bb6912bfa"))
     (pin "2"
-      (uuid "09a98d51-cfcf-5b91-baa1-7f5f2c1bab60"))
+      (uuid "ffded0d6-5c06-547c-b9cc-ac01b7cc3fa1"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R101")
+          (reference "R23")
           (unit 1)))))
-  (label "+3V"
+  (label "SCALE_Z_REQ"
     (at 228.6 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "64d8e88f-ca02-5812-958e-92c64b6a61ed"))
-  (label "MODE_FEED"
+    (uuid "8f5c999e-d6f3-5fcc-944c-5e5db4aba5ed"))
+  (label "SCALE_Z_REQ_T"
     (at 228.6 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "dee9984b-bcc2-57e2-b456-5a85b67b76ea"))
+    (uuid "3ea4bc9b-0360-5d97-885e-9a7e44c1d381"))
   (symbol
     (lib_id "Device:R")
     (at 271.78 210.82 0)
@@ -6962,13 +7063,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "de355dea-2887-5d33-a964-395f55125e0c")
-    (property "Reference" "R102"
+    (uuid "eb0dc290-229d-50db-ad2a-f55e4342b062")
+    (property "Reference" "R24"
       (at 271.78 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 271.78 213.36 0)
       (effects
         (font
@@ -6985,35 +7086,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_AFEED"
+    (property "Description" "линейка"
       (at 271.78 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "0f33b5c1-bfb5-5333-b53e-1ecacee8afc8"))
+      (uuid "20bc6f68-873e-560a-bb95-a254960f8e0a"))
     (pin "2"
-      (uuid "ebca8266-e623-5a5e-9de6-19a008be0a75"))
+      (uuid "cb05a077-5a46-51ca-baca-a2ca69fca12f"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R102")
+          (reference "R24")
           (unit 1)))))
-  (label "+3V"
+  (label "SCALE_X_A"
     (at 271.78 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "ff86853b-b211-523d-abf1-31a627cb8ee0"))
-  (label "MODE_AFEED"
+    (uuid "6fc8fa9c-30cb-595f-9e7a-4c99fe90213e"))
+  (label "SCALE_X_A_T"
     (at 271.78 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "3516e49d-301d-5488-88fd-1659ae76e2c0"))
+    (uuid "0639a3a9-30a4-51ea-9252-31de74cd02e5"))
   (symbol
     (lib_id "Device:R")
     (at 317.5 210.82 0)
@@ -7022,13 +7123,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "7b1466ec-6f27-5384-b414-dc6aeafeabff")
-    (property "Reference" "R103"
+    (uuid "f3c77e08-c894-5826-9143-1c35177c7287")
+    (property "Reference" "R25"
       (at 317.5 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 317.5 213.36 0)
       (effects
         (font
@@ -7045,35 +7146,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_CONE_L"
+    (property "Description" "линейка"
       (at 317.5 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "6d76f5b0-54b9-5859-9023-efe64f0ce6b4"))
+      (uuid "3fff52d7-6663-502c-a2dd-b808244c0257"))
     (pin "2"
-      (uuid "30325b79-89a9-535a-b1de-53471e81d510"))
+      (uuid "d432f442-c4e6-5004-8474-857f6a9d332c"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R103")
+          (reference "R25")
           (unit 1)))))
-  (label "+3V"
+  (label "SCALE_X_B"
     (at 317.5 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "0cb2ad16-f3d0-50e2-968c-f738229a7ddb"))
-  (label "MODE_CONE_L"
+    (uuid "857f208c-a105-52ee-a7c6-e167b1066ccf"))
+  (label "SCALE_X_B_T"
     (at 317.5 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "dee05cc2-bea0-5872-800a-3214413edbe4"))
+    (uuid "afc359a3-7dc9-51d8-a9e5-dcef27131d7c"))
   (symbol
     (lib_id "Device:R")
     (at 363.22 210.82 0)
@@ -7082,13 +7183,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "3c900a13-1e9e-57f9-9dc6-c52ebacc6545")
-    (property "Reference" "R104"
+    (uuid "6a8eb5a0-7fe0-5bc2-b605-5be77bb16e61")
+    (property "Reference" "R26"
       (at 363.22 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 363.22 213.36 0)
       (effects
         (font
@@ -7105,35 +7206,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_CONE_R"
+    (property "Description" "линейка"
       (at 363.22 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "7acfae23-bb48-5a92-ad75-6d8edef61d34"))
+      (uuid "58581823-cf89-5c1d-b0fb-6804deae1d7f"))
     (pin "2"
-      (uuid "bcca6e51-5a80-50fa-99f5-94d0e654781a"))
+      (uuid "37324511-df26-5ef9-9295-3cfbe03f7a67"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R104")
+          (reference "R26")
           (unit 1)))))
-  (label "+3V"
+  (label "SCALE_X_REQ"
     (at 363.22 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "18ffcba5-079a-5535-a26b-ee98d18cf5e4"))
-  (label "MODE_CONE_R"
+    (uuid "601292c8-2fcd-59e3-93cc-4ba3f2606e9c"))
+  (label "SCALE_X_REQ_T"
     (at 363.22 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "00cd796b-f0d5-571b-83f0-9f0d0e7a5027"))
+    (uuid "c9ba72dd-154d-5e92-a923-deb7a3307c84"))
   (symbol
     (lib_id "Device:R")
     (at 406.4 210.82 0)
@@ -7142,13 +7243,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "632393c2-fde1-528b-861d-02e70ac009a8")
-    (property "Reference" "R105"
+    (uuid "b9d1b9fe-96e8-52e5-aed5-744d4046b63e")
+    (property "Reference" "R28"
       (at 406.4 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "220"
       (at 406.4 213.36 0)
       (effects
         (font
@@ -7165,35 +7266,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_THREAD"
+    (property "Description" "резервный выход"
       (at 406.4 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "d3b49c22-8efb-5f07-a7c6-31bbc1f7ccd2"))
+      (uuid "27db8258-801f-5930-a85d-75945042d113"))
     (pin "2"
-      (uuid "ff5ed6d6-8f3d-5344-841d-855e56648df0"))
+      (uuid "5e842312-2a29-5d1d-99a4-0fcfa1ffb308"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R105")
+          (reference "R28")
           (unit 1)))))
-  (label "+3V"
+  (label "RES_OUT2"
     (at 406.4 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "30dfe327-6941-51cd-b860-b70e781a1d72"))
-  (label "MODE_THREAD"
+    (uuid "4afd1c54-0672-5805-a487-54d48a4f7ad9"))
+  (label "RES_OUT2_T"
     (at 406.4 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "235cd89c-2427-5c4d-9a85-fa185b861d55"))
+    (uuid "5e9dd37d-b86a-5f42-996e-c9f0fd63bc43"))
   (symbol
     (lib_id "Device:R")
     (at 452.12 210.82 0)
@@ -7202,13 +7303,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "a4c155fd-ad61-5d55-aaeb-2a839240eef6")
-    (property "Reference" "R106"
+    (uuid "3dd0d59c-c769-59aa-97be-20940f07aaa6")
+    (property "Reference" "R30"
       (at 452.12 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "220"
       (at 452.12 213.36 0)
       (effects
         (font
@@ -7225,35 +7326,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_SPHERE"
+    (property "Description" "резервный выход"
       (at 452.12 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "4de8f0af-7d2a-567e-9bcc-86de673fd6d9"))
+      (uuid "04a3eab6-53b2-5497-b393-ff4ed537c183"))
     (pin "2"
-      (uuid "25866d60-228f-502c-8c56-349c60fab4c3"))
+      (uuid "f684707e-6481-5713-bb3d-80d5bd1f65ff"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R106")
+          (reference "R30")
           (unit 1)))))
-  (label "+3V"
+  (label "RES_OUT4"
     (at 452.12 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "f7caeef0-d9d9-5f66-853b-29505f9564be"))
-  (label "MODE_SPHERE"
+    (uuid "aa12789e-96c5-51a4-83ed-74dafad5d513"))
+  (label "RES_OUT4_T"
     (at 452.12 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "1c871d01-72a9-5cce-b18e-16e3b1f3ac00"))
+    (uuid "151c6837-0c57-5678-8ded-42cdc6092e8f"))
   (symbol
     (lib_id "Device:R")
     (at 497.84 210.82 0)
@@ -7262,13 +7363,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "5a551a01-61f3-5f9f-ae14-0e24cb805bf1")
-    (property "Reference" "R107"
+    (uuid "3c54805d-9484-5337-b038-20c1936e2d34")
+    (property "Reference" "R31"
       (at 497.84 208.28 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 497.84 213.36 0)
       (effects
         (font
@@ -7285,35 +7386,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_DIVIDER"
+    (property "Description" "резервный вход/выход"
       (at 497.84 210.82 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "9a2c7549-723b-59ef-8c62-af2737894c18"))
+      (uuid "4443fb34-45bf-5834-8247-449ee024aea4"))
     (pin "2"
-      (uuid "76aa0597-af93-554c-abf9-e7f43fb3c482"))
+      (uuid "8b44b552-4337-515d-b34e-467a804d610a"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R107")
+          (reference "R31")
           (unit 1)))))
-  (label "+3V"
+  (label "RES_IO1"
     (at 497.84 207.01 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "61a6b450-c981-57ed-816e-03b8d82f9b03"))
-  (label "MODE_DIVIDER"
+    (uuid "09b36522-ea63-5d78-bcde-64bb138bfffe"))
+  (label "RES_IO1_T"
     (at 497.84 214.63 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "304b8ced-dfbc-524b-9a88-1bbe088fb957"))
+    (uuid "35c4fc50-9bdb-53b2-bce6-858892f8774d"))
   (symbol
     (lib_id "Device:R")
     (at 48.26 238.76 0)
@@ -7322,13 +7423,13 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "079c4d8b-35a8-5480-98d1-3d12dadb3a76")
-    (property "Reference" "R108"
+    (uuid "abe5ab27-cad5-569f-9f1e-b1db6aa143d9")
+    (property "Reference" "R32"
       (at 48.26 236.22 0)
       (effects
         (font
           (size 1.27 1.27))))
-    (property "Value" "1k"
+    (property "Value" "470"
       (at 48.26 241.3 0)
       (effects
         (font
@@ -7345,35 +7446,35 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка MODE_RESERVE"
+    (property "Description" "резервный вход/выход"
       (at 48.26 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "985de271-8a89-51ab-a446-475959cefea8"))
+      (uuid "02d4edb7-fa5c-5840-b33d-73f992605139"))
     (pin "2"
-      (uuid "a4003802-ae52-5d51-b874-eaccb152157a"))
+      (uuid "10c16d27-3729-5604-b94b-4f40c1e72214"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R108")
+          (reference "R32")
           (unit 1)))))
-  (label "+3V"
+  (label "RES_IO2"
     (at 48.26 234.95 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "8facc60a-4d2c-58f6-acfa-f25265dd57a3"))
-  (label "MODE_RESERVE"
+    (uuid "17a3f053-5933-5180-820a-42bcb297b7de"))
+  (label "RES_IO2_T"
     (at 48.26 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "8a981c6d-561e-58ae-9257-bf8e2f927274"))
+    (uuid "aab82cd0-7a5a-57f7-b066-4359258533c9"))
   (symbol
     (lib_id "Device:R")
     (at 91.44 238.76 0)
@@ -7382,8 +7483,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "cf2eedcd-9608-5ba2-81a5-ec17682141aa")
-    (property "Reference" "R109"
+    (uuid "c3f421ab-ff48-5dfc-8da2-2a90c1542d6d")
+    (property "Reference" "R101"
       (at 91.44 236.22 0)
       (effects
         (font
@@ -7405,20 +7506,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка SUB_INT"
+    (property "Description" "подтяжка MODE_FEED"
       (at 91.44 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "28ea9993-21d7-5dba-986a-6f80b36d3328"))
+      (uuid "0b8f57a1-9e75-5c58-9279-d64109c199cc"))
     (pin "2"
-      (uuid "463b1e62-ce74-5a27-87df-f20d70e6287a"))
+      (uuid "09a98d51-cfcf-5b91-baa1-7f5f2c1bab60"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R109")
+          (reference "R101")
           (unit 1)))))
   (label "+3V"
     (at 91.44 234.95 90)
@@ -7426,14 +7527,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "f2b96e55-b5d8-5ba8-987a-f20694b3a8a2"))
-  (label "SUB_INT"
+    (uuid "64d8e88f-ca02-5812-958e-92c64b6a61ed"))
+  (label "MODE_FEED"
     (at 91.44 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "85440ef0-2c3e-51c5-827d-e99bdab8508c"))
+    (uuid "dee9984b-bcc2-57e2-b456-5a85b67b76ea"))
   (symbol
     (lib_id "Device:R")
     (at 137.16 238.76 0)
@@ -7442,8 +7543,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "69fb0846-7051-53f4-8b88-d92c14e6a416")
-    (property "Reference" "R110"
+    (uuid "de355dea-2887-5d33-a964-395f55125e0c")
+    (property "Reference" "R102"
       (at 137.16 236.22 0)
       (effects
         (font
@@ -7465,20 +7566,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка SUB_MAN"
+    (property "Description" "подтяжка MODE_AFEED"
       (at 137.16 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "effcd7bd-2558-5e0a-a4e5-cfa97a83fc90"))
+      (uuid "0f33b5c1-bfb5-5333-b53e-1ecacee8afc8"))
     (pin "2"
-      (uuid "165b9b4c-5eae-52fa-a4f8-e820abe30877"))
+      (uuid "ebca8266-e623-5a5e-9de6-19a008be0a75"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R110")
+          (reference "R102")
           (unit 1)))))
   (label "+3V"
     (at 137.16 234.95 90)
@@ -7486,14 +7587,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "e83b432b-3238-5eaa-aa28-c3f47ffe71e6"))
-  (label "SUB_MAN"
+    (uuid "ff86853b-b211-523d-abf1-31a627cb8ee0"))
+  (label "MODE_AFEED"
     (at 137.16 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "7731e433-f741-5729-b766-23bafe09b12d"))
+    (uuid "3516e49d-301d-5488-88fd-1659ae76e2c0"))
   (symbol
     (lib_id "Device:R")
     (at 182.88 238.76 0)
@@ -7502,8 +7603,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "b0bed773-e163-51c3-a6b8-04f45148c5fb")
-    (property "Reference" "R111"
+    (uuid "7b1466ec-6f27-5384-b414-dc6aeafeabff")
+    (property "Reference" "R103"
       (at 182.88 236.22 0)
       (effects
         (font
@@ -7525,20 +7626,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка SUB_EXT"
+    (property "Description" "подтяжка MODE_CONE_L"
       (at 182.88 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "ffc0f240-6d7e-57c6-8658-7dab76a6da67"))
+      (uuid "6d76f5b0-54b9-5859-9023-efe64f0ce6b4"))
     (pin "2"
-      (uuid "377f3013-2f72-507f-b9b4-8db24934ce52"))
+      (uuid "30325b79-89a9-535a-b1de-53471e81d510"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R111")
+          (reference "R103")
           (unit 1)))))
   (label "+3V"
     (at 182.88 234.95 90)
@@ -7546,14 +7647,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "00038d88-b335-57c6-a122-03c12674b99a"))
-  (label "SUB_EXT"
+    (uuid "0cb2ad16-f3d0-50e2-968c-f738229a7ddb"))
+  (label "MODE_CONE_L"
     (at 182.88 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "d98e3eae-3ed7-5724-bf12-91c0d2b22c24"))
+    (uuid "dee05cc2-bea0-5872-800a-3214413edbe4"))
   (symbol
     (lib_id "Device:R")
     (at 228.6 238.76 0)
@@ -7562,8 +7663,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "e49fe7a3-c588-5c8e-9ee1-1a305d4076eb")
-    (property "Reference" "R112"
+    (uuid "3c900a13-1e9e-57f9-9dc6-c52ebacc6545")
+    (property "Reference" "R104"
       (at 228.6 236.22 0)
       (effects
         (font
@@ -7585,20 +7686,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка BTN_LEFT"
+    (property "Description" "подтяжка MODE_CONE_R"
       (at 228.6 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "d63fce6b-a966-5acd-b6a8-f1605ac7996f"))
+      (uuid "7acfae23-bb48-5a92-ad75-6d8edef61d34"))
     (pin "2"
-      (uuid "32d25c8e-f3af-53fd-a06c-b900eefb9cd4"))
+      (uuid "bcca6e51-5a80-50fa-99f5-94d0e654781a"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R112")
+          (reference "R104")
           (unit 1)))))
   (label "+3V"
     (at 228.6 234.95 90)
@@ -7606,14 +7707,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "3c0a3f0a-0575-58c6-bfa8-53c40ec970da"))
-  (label "BTN_LEFT"
+    (uuid "18ffcba5-079a-5535-a26b-ee98d18cf5e4"))
+  (label "MODE_CONE_R"
     (at 228.6 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "b40cc321-5bb2-5790-903f-f163bda77b0d"))
+    (uuid "00cd796b-f0d5-571b-83f0-9f0d0e7a5027"))
   (symbol
     (lib_id "Device:R")
     (at 271.78 238.76 0)
@@ -7622,8 +7723,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "8d574ca6-b555-5647-8c2b-c0b995275505")
-    (property "Reference" "R113"
+    (uuid "632393c2-fde1-528b-861d-02e70ac009a8")
+    (property "Reference" "R105"
       (at 271.78 236.22 0)
       (effects
         (font
@@ -7645,20 +7746,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка BTN_RIGHT"
+    (property "Description" "подтяжка MODE_THREAD"
       (at 271.78 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "111c8c5d-2dbc-50b0-a9c8-63b3a97e2e00"))
+      (uuid "d3b49c22-8efb-5f07-a7c6-31bbc1f7ccd2"))
     (pin "2"
-      (uuid "241cbb42-a23f-5d7f-9218-57896a40410b"))
+      (uuid "ff5ed6d6-8f3d-5344-841d-855e56648df0"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R113")
+          (reference "R105")
           (unit 1)))))
   (label "+3V"
     (at 271.78 234.95 90)
@@ -7666,14 +7767,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "71ad66f3-cab4-50ba-87d4-8a7c84c69a16"))
-  (label "BTN_RIGHT"
+    (uuid "30dfe327-6941-51cd-b860-b70e781a1d72"))
+  (label "MODE_THREAD"
     (at 271.78 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "e50abe70-15e7-5af8-ac91-98d74f3a7ecc"))
+    (uuid "235cd89c-2427-5c4d-9a85-fa185b861d55"))
   (symbol
     (lib_id "Device:R")
     (at 317.5 238.76 0)
@@ -7682,8 +7783,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "9774974b-fc5c-55ae-a1b0-8c9825b57df7")
-    (property "Reference" "R114"
+    (uuid "a4c155fd-ad61-5d55-aaeb-2a839240eef6")
+    (property "Reference" "R106"
       (at 317.5 236.22 0)
       (effects
         (font
@@ -7705,20 +7806,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка BTN_UP"
+    (property "Description" "подтяжка MODE_SPHERE"
       (at 317.5 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "f8d9ffbd-b467-54cf-a990-111cbe9abd72"))
+      (uuid "4de8f0af-7d2a-567e-9bcc-86de673fd6d9"))
     (pin "2"
-      (uuid "8e8087ec-2945-586d-b8e1-e02aa1e037cc"))
+      (uuid "25866d60-228f-502c-8c56-349c60fab4c3"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R114")
+          (reference "R106")
           (unit 1)))))
   (label "+3V"
     (at 317.5 234.95 90)
@@ -7726,14 +7827,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "4ccc5a40-5631-569a-8870-6e4fc75c4b4d"))
-  (label "BTN_UP"
+    (uuid "f7caeef0-d9d9-5f66-853b-29505f9564be"))
+  (label "MODE_SPHERE"
     (at 317.5 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "da8b10e9-3f3f-5d96-a545-bb23fef1cc17"))
+    (uuid "1c871d01-72a9-5cce-b18e-16e3b1f3ac00"))
   (symbol
     (lib_id "Device:R")
     (at 363.22 238.76 0)
@@ -7742,8 +7843,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "30b1c3b1-3b7d-5ee0-a8b7-3b0cc656b99b")
-    (property "Reference" "R115"
+    (uuid "5a551a01-61f3-5f9f-ae14-0e24cb805bf1")
+    (property "Reference" "R107"
       (at 363.22 236.22 0)
       (effects
         (font
@@ -7765,20 +7866,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка BTN_DOWN"
+    (property "Description" "подтяжка MODE_DIVIDER"
       (at 363.22 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "dae69b18-984f-5193-b554-c30bc07fcec6"))
+      (uuid "9a2c7549-723b-59ef-8c62-af2737894c18"))
     (pin "2"
-      (uuid "b592a51f-57c2-5753-82cb-2be5bc8c1132"))
+      (uuid "76aa0597-af93-554c-abf9-e7f43fb3c482"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R115")
+          (reference "R107")
           (unit 1)))))
   (label "+3V"
     (at 363.22 234.95 90)
@@ -7786,14 +7887,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "66aebe4d-c28b-502a-ab01-e66202a0e999"))
-  (label "BTN_DOWN"
+    (uuid "61a6b450-c981-57ed-816e-03b8d82f9b03"))
+  (label "MODE_DIVIDER"
     (at 363.22 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "5f1717ab-78a6-5c03-a86a-27dd0944fce2"))
+    (uuid "304b8ced-dfbc-524b-9a88-1bbe088fb957"))
   (symbol
     (lib_id "Device:R")
     (at 406.4 238.76 0)
@@ -7802,8 +7903,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "ed20d4a5-7bd1-51b6-981d-26fbbf24a109")
-    (property "Reference" "R116"
+    (uuid "079c4d8b-35a8-5480-98d1-3d12dadb3a76")
+    (property "Reference" "R108"
       (at 406.4 236.22 0)
       (effects
         (font
@@ -7825,20 +7926,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка BTN_SELECT"
+    (property "Description" "подтяжка MODE_RESERVE"
       (at 406.4 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "b3870b08-8599-520c-b6d6-e2c4d837f3b5"))
+      (uuid "985de271-8a89-51ab-a446-475959cefea8"))
     (pin "2"
-      (uuid "abc07389-78fd-55d0-a5de-159915562670"))
+      (uuid "a4003802-ae52-5d51-b874-eaccb152157a"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R116")
+          (reference "R108")
           (unit 1)))))
   (label "+3V"
     (at 406.4 234.95 90)
@@ -7846,14 +7947,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "9f7a0beb-4d8c-5040-a0aa-2f06c99eb2f3"))
-  (label "BTN_SELECT"
+    (uuid "8facc60a-4d2c-58f6-acfa-f25265dd57a3"))
+  (label "MODE_RESERVE"
     (at 406.4 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "67185c0c-ec33-5247-a9a5-73f5a0fcf010"))
+    (uuid "8a981c6d-561e-58ae-9257-bf8e2f927274"))
   (symbol
     (lib_id "Device:R")
     (at 452.12 238.76 0)
@@ -7862,8 +7963,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "92965191-ef9f-59b5-830a-9d58c1e50a1e")
-    (property "Reference" "R117"
+    (uuid "cf2eedcd-9608-5ba2-81a5-ec17682141aa")
+    (property "Reference" "R109"
       (at 452.12 236.22 0)
       (effects
         (font
@@ -7885,20 +7986,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка JOY_LEFT"
+    (property "Description" "подтяжка SUB_INT"
       (at 452.12 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "e975f74f-cbfa-5b00-a804-4e6d79ca3134"))
+      (uuid "28ea9993-21d7-5dba-986a-6f80b36d3328"))
     (pin "2"
-      (uuid "7b3b2112-7e23-59f7-9d18-931996049759"))
+      (uuid "463b1e62-ce74-5a27-87df-f20d70e6287a"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R117")
+          (reference "R109")
           (unit 1)))))
   (label "+3V"
     (at 452.12 234.95 90)
@@ -7906,14 +8007,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "75882867-1647-5523-9259-97776c38bd26"))
-  (label "JOY_LEFT"
+    (uuid "f2b96e55-b5d8-5ba8-987a-f20694b3a8a2"))
+  (label "SUB_INT"
     (at 452.12 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "a4319c6c-b66e-5f22-9af3-053b6e7af11a"))
+    (uuid "85440ef0-2c3e-51c5-827d-e99bdab8508c"))
   (symbol
     (lib_id "Device:R")
     (at 497.84 238.76 0)
@@ -7922,8 +8023,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "96a93de6-2c74-5635-9fe1-ad3f17de3138")
-    (property "Reference" "R118"
+    (uuid "69fb0846-7051-53f4-8b88-d92c14e6a416")
+    (property "Reference" "R110"
       (at 497.84 236.22 0)
       (effects
         (font
@@ -7945,20 +8046,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка JOY_RIGHT"
+    (property "Description" "подтяжка SUB_MAN"
       (at 497.84 238.76 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "f90435cb-2b80-5c35-9138-041ef2b108bb"))
+      (uuid "effcd7bd-2558-5e0a-a4e5-cfa97a83fc90"))
     (pin "2"
-      (uuid "32072fa4-41bd-5fe0-af43-d009348658fc"))
+      (uuid "165b9b4c-5eae-52fa-a4f8-e820abe30877"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R118")
+          (reference "R110")
           (unit 1)))))
   (label "+3V"
     (at 497.84 234.95 90)
@@ -7966,14 +8067,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "4b208b34-89d4-5ce0-a7ad-1d28bf04d5fb"))
-  (label "JOY_RIGHT"
+    (uuid "e83b432b-3238-5eaa-aa28-c3f47ffe71e6"))
+  (label "SUB_MAN"
     (at 497.84 242.57 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "979c0573-7baa-555f-88d3-15222e42f2c1"))
+    (uuid "7731e433-f741-5729-b766-23bafe09b12d"))
   (symbol
     (lib_id "Device:R")
     (at 48.26 266.7 0)
@@ -7982,8 +8083,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "b8717cd5-25f6-5117-a7b5-ec8e100c2700")
-    (property "Reference" "R119"
+    (uuid "b0bed773-e163-51c3-a6b8-04f45148c5fb")
+    (property "Reference" "R111"
       (at 48.26 264.16 0)
       (effects
         (font
@@ -8005,20 +8106,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка JOY_UP"
+    (property "Description" "подтяжка SUB_EXT"
       (at 48.26 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "0ce87c66-e5d1-533a-bf08-2537a4665b5f"))
+      (uuid "ffc0f240-6d7e-57c6-8658-7dab76a6da67"))
     (pin "2"
-      (uuid "83aa6be9-2a84-5522-8a42-5b20f7390206"))
+      (uuid "377f3013-2f72-507f-b9b4-8db24934ce52"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R119")
+          (reference "R111")
           (unit 1)))))
   (label "+3V"
     (at 48.26 262.89 90)
@@ -8026,14 +8127,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "4a716927-454e-51da-84fc-3fe72bb504cf"))
-  (label "JOY_UP"
+    (uuid "00038d88-b335-57c6-a122-03c12674b99a"))
+  (label "SUB_EXT"
     (at 48.26 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "b3ef0165-6a89-598c-b23d-446a3d4ac99c"))
+    (uuid "d98e3eae-3ed7-5724-bf12-91c0d2b22c24"))
   (symbol
     (lib_id "Device:R")
     (at 91.44 266.7 0)
@@ -8042,8 +8143,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "624142eb-0ffe-5ba2-bbd8-4cf75bedddc8")
-    (property "Reference" "R120"
+    (uuid "e49fe7a3-c588-5c8e-9ee1-1a305d4076eb")
+    (property "Reference" "R112"
       (at 91.44 264.16 0)
       (effects
         (font
@@ -8065,20 +8166,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка JOY_DOWN"
+    (property "Description" "подтяжка BTN_LEFT"
       (at 91.44 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "868c4bff-c67e-5455-a8e6-ada41c9d7b72"))
+      (uuid "d63fce6b-a966-5acd-b6a8-f1605ac7996f"))
     (pin "2"
-      (uuid "bdc912cf-46ad-5d84-883e-4023c86a12c4"))
+      (uuid "32d25c8e-f3af-53fd-a06c-b900eefb9cd4"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R120")
+          (reference "R112")
           (unit 1)))))
   (label "+3V"
     (at 91.44 262.89 90)
@@ -8086,14 +8187,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "3108e93c-7c0d-5d85-8ab6-56fd8348d1fa"))
-  (label "JOY_DOWN"
+    (uuid "3c0a3f0a-0575-58c6-bfa8-53c40ec970da"))
+  (label "BTN_LEFT"
     (at 91.44 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "45c83de1-e94d-5eb1-8067-eef65df35084"))
+    (uuid "b40cc321-5bb2-5790-903f-f163bda77b0d"))
   (symbol
     (lib_id "Device:R")
     (at 137.16 266.7 0)
@@ -8102,8 +8203,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "dc9bb156-89ec-5c3a-ad53-8f49691b9181")
-    (property "Reference" "R121"
+    (uuid "8d574ca6-b555-5647-8c2b-c0b995275505")
+    (property "Reference" "R113"
       (at 137.16 264.16 0)
       (effects
         (font
@@ -8125,20 +8226,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка JOY_RAPID"
+    (property "Description" "подтяжка BTN_RIGHT"
       (at 137.16 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "b3911185-3e26-590c-819e-000959e2bd10"))
+      (uuid "111c8c5d-2dbc-50b0-a9c8-63b3a97e2e00"))
     (pin "2"
-      (uuid "40c5357e-f04f-5154-9d71-c66db01f3178"))
+      (uuid "241cbb42-a23f-5d7f-9218-57896a40410b"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R121")
+          (reference "R113")
           (unit 1)))))
   (label "+3V"
     (at 137.16 262.89 90)
@@ -8146,14 +8247,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "ab6063e0-a940-5c04-864e-1c47ae26c16c"))
-  (label "JOY_RAPID"
+    (uuid "71ad66f3-cab4-50ba-87d4-8a7c84c69a16"))
+  (label "BTN_RIGHT"
     (at 137.16 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "570d8ba1-ca8d-592b-9075-cada18742032"))
+    (uuid "e50abe70-15e7-5af8-ac91-98d74f3a7ecc"))
   (symbol
     (lib_id "Device:R")
     (at 182.88 266.7 0)
@@ -8162,8 +8263,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "cff9dbee-b328-5bf6-a157-e2893677cd5e")
-    (property "Reference" "R122"
+    (uuid "9774974b-fc5c-55ae-a1b0-8c9825b57df7")
+    (property "Reference" "R114"
       (at 182.88 264.16 0)
       (effects
         (font
@@ -8185,20 +8286,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка LIM_LEFT"
+    (property "Description" "подтяжка BTN_UP"
       (at 182.88 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "e8c1bfd4-2caa-5a44-abf5-daffa89e7d4e"))
+      (uuid "f8d9ffbd-b467-54cf-a990-111cbe9abd72"))
     (pin "2"
-      (uuid "4c18fbf0-9b87-5ff4-9ed6-523bc39885cd"))
+      (uuid "8e8087ec-2945-586d-b8e1-e02aa1e037cc"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R122")
+          (reference "R114")
           (unit 1)))))
   (label "+3V"
     (at 182.88 262.89 90)
@@ -8206,14 +8307,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "5dc652f4-756a-5aa4-bcb3-4c03c7be292e"))
-  (label "LIM_LEFT"
+    (uuid "4ccc5a40-5631-569a-8870-6e4fc75c4b4d"))
+  (label "BTN_UP"
     (at 182.88 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "a4edf117-9198-5dc2-b1eb-635032e58318"))
+    (uuid "da8b10e9-3f3f-5d96-a545-bb23fef1cc17"))
   (symbol
     (lib_id "Device:R")
     (at 228.6 266.7 0)
@@ -8222,8 +8323,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "9db2c393-25a9-598c-819b-38b65a9d94a8")
-    (property "Reference" "R123"
+    (uuid "30b1c3b1-3b7d-5ee0-a8b7-3b0cc656b99b")
+    (property "Reference" "R115"
       (at 228.6 264.16 0)
       (effects
         (font
@@ -8245,20 +8346,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка LIM_RIGHT"
+    (property "Description" "подтяжка BTN_DOWN"
       (at 228.6 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "3d019d8f-3820-54c0-9eab-184ce8ec59c5"))
+      (uuid "dae69b18-984f-5193-b554-c30bc07fcec6"))
     (pin "2"
-      (uuid "5fa54e74-6b71-522f-830c-c629b4b3264a"))
+      (uuid "b592a51f-57c2-5753-82cb-2be5bc8c1132"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R123")
+          (reference "R115")
           (unit 1)))))
   (label "+3V"
     (at 228.6 262.89 90)
@@ -8266,14 +8367,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "042cd446-b944-5168-8efb-ce23e6e57ef6"))
-  (label "LIM_RIGHT"
+    (uuid "66aebe4d-c28b-502a-ab01-e66202a0e999"))
+  (label "BTN_DOWN"
     (at 228.6 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "12fed41e-d6f8-5785-8ba6-ffe577889825"))
+    (uuid "5f1717ab-78a6-5c03-a86a-27dd0944fce2"))
   (symbol
     (lib_id "Device:R")
     (at 271.78 266.7 0)
@@ -8282,8 +8383,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "19a823e4-075e-5959-8c0a-d7f5da3d8d73")
-    (property "Reference" "R124"
+    (uuid "ed20d4a5-7bd1-51b6-981d-26fbbf24a109")
+    (property "Reference" "R116"
       (at 271.78 264.16 0)
       (effects
         (font
@@ -8305,20 +8406,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка LIM_FRONT"
+    (property "Description" "подтяжка BTN_SELECT"
       (at 271.78 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "fb2d9f2d-7791-5e48-8973-d6ba9b758cb6"))
+      (uuid "b3870b08-8599-520c-b6d6-e2c4d837f3b5"))
     (pin "2"
-      (uuid "d8dd318b-3121-5b68-9fa6-ed79a4a736a2"))
+      (uuid "abc07389-78fd-55d0-a5de-159915562670"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R124")
+          (reference "R116")
           (unit 1)))))
   (label "+3V"
     (at 271.78 262.89 90)
@@ -8326,14 +8427,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "c5b71401-1b3c-5f88-b1a6-099dba7abe7a"))
-  (label "LIM_FRONT"
+    (uuid "9f7a0beb-4d8c-5040-a0aa-2f06c99eb2f3"))
+  (label "BTN_SELECT"
     (at 271.78 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "821b95ea-01be-5d96-81ec-8f8ed3feb780"))
+    (uuid "67185c0c-ec33-5247-a9a5-73f5a0fcf010"))
   (symbol
     (lib_id "Device:R")
     (at 317.5 266.7 0)
@@ -8342,8 +8443,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "f9d73817-f3c2-58d3-9e6a-744eeead2c23")
-    (property "Reference" "R125"
+    (uuid "92965191-ef9f-59b5-830a-9d58c1e50a1e")
+    (property "Reference" "R117"
       (at 317.5 264.16 0)
       (effects
         (font
@@ -8365,20 +8466,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка LIM_REAR"
+    (property "Description" "подтяжка JOY_LEFT"
       (at 317.5 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "714b1cc7-ba72-56df-ac2a-2c55c6c58769"))
+      (uuid "e975f74f-cbfa-5b00-a804-4e6d79ca3134"))
     (pin "2"
-      (uuid "59a7323f-c4ca-529b-9e89-2ee90c6444ee"))
+      (uuid "7b3b2112-7e23-59f7-9d18-931996049759"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R125")
+          (reference "R117")
           (unit 1)))))
   (label "+3V"
     (at 317.5 262.89 90)
@@ -8386,14 +8487,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "19ad2db2-a616-507a-8f05-0d982a77c5c7"))
-  (label "LIM_REAR"
+    (uuid "75882867-1647-5523-9259-97776c38bd26"))
+  (label "JOY_LEFT"
     (at 317.5 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "fec2192e-aa14-50e5-9f62-4165052f72f3"))
+    (uuid "a4319c6c-b66e-5f22-9af3-053b6e7af11a"))
   (symbol
     (lib_id "Device:R")
     (at 363.22 266.7 0)
@@ -8402,8 +8503,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "0fb18698-de78-5bf8-9795-470db93971ae")
-    (property "Reference" "R126"
+    (uuid "96a93de6-2c74-5635-9fe1-ad3f17de3138")
+    (property "Reference" "R118"
       (at 363.22 264.16 0)
       (effects
         (font
@@ -8425,20 +8526,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_AXIS_Z"
+    (property "Description" "подтяжка JOY_RIGHT"
       (at 363.22 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "feac40ce-99a0-5016-89d3-0f37c04bd02a"))
+      (uuid "f90435cb-2b80-5c35-9138-041ef2b108bb"))
     (pin "2"
-      (uuid "420e4abc-4343-5550-bd78-be54a53fd627"))
+      (uuid "32072fa4-41bd-5fe0-af43-d009348658fc"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R126")
+          (reference "R118")
           (unit 1)))))
   (label "+3V"
     (at 363.22 262.89 90)
@@ -8446,14 +8547,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "8b0b122f-ab3d-5811-82be-3ceb4480ed7c"))
-  (label "HAND_AXIS_Z"
+    (uuid "4b208b34-89d4-5ce0-a7ad-1d28bf04d5fb"))
+  (label "JOY_RIGHT"
     (at 363.22 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "890002f9-46be-5398-a766-729ed0f09686"))
+    (uuid "979c0573-7baa-555f-88d3-15222e42f2c1"))
   (symbol
     (lib_id "Device:R")
     (at 406.4 266.7 0)
@@ -8462,8 +8563,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "1ad64d99-cd90-5647-acba-95e54008baa8")
-    (property "Reference" "R127"
+    (uuid "b8717cd5-25f6-5117-a7b5-ec8e100c2700")
+    (property "Reference" "R119"
       (at 406.4 264.16 0)
       (effects
         (font
@@ -8485,20 +8586,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_AXIS_X"
+    (property "Description" "подтяжка JOY_UP"
       (at 406.4 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "79b3b149-dd66-5e36-92a7-4a5292110840"))
+      (uuid "0ce87c66-e5d1-533a-bf08-2537a4665b5f"))
     (pin "2"
-      (uuid "3a9e1f3b-a710-51a4-a935-c561ec6e1a8f"))
+      (uuid "83aa6be9-2a84-5522-8a42-5b20f7390206"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R127")
+          (reference "R119")
           (unit 1)))))
   (label "+3V"
     (at 406.4 262.89 90)
@@ -8506,14 +8607,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "a3df647a-bfe3-5d1c-a5ab-5dda808a4afa"))
-  (label "HAND_AXIS_X"
+    (uuid "4a716927-454e-51da-84fc-3fe72bb504cf"))
+  (label "JOY_UP"
     (at 406.4 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "506c3f0a-daac-57be-9a6e-d839017605c1"))
+    (uuid "b3ef0165-6a89-598c-b23d-446a3d4ac99c"))
   (symbol
     (lib_id "Device:R")
     (at 452.12 266.7 0)
@@ -8522,8 +8623,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "8502578a-7875-5d4d-bc68-dd04fae9b45a")
-    (property "Reference" "R128"
+    (uuid "624142eb-0ffe-5ba2-bbd8-4cf75bedddc8")
+    (property "Reference" "R120"
       (at 452.12 264.16 0)
       (effects
         (font
@@ -8545,20 +8646,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_X1"
+    (property "Description" "подтяжка JOY_DOWN"
       (at 452.12 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "702dea52-facb-5d1b-846b-bd60970225f8"))
+      (uuid "868c4bff-c67e-5455-a8e6-ada41c9d7b72"))
     (pin "2"
-      (uuid "7b71ad33-fefc-5e60-b5ce-de02f53c784a"))
+      (uuid "bdc912cf-46ad-5d84-883e-4023c86a12c4"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R128")
+          (reference "R120")
           (unit 1)))))
   (label "+3V"
     (at 452.12 262.89 90)
@@ -8566,14 +8667,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "e9fef308-de83-547c-9100-99c4a9839bd7"))
-  (label "HAND_X1"
+    (uuid "3108e93c-7c0d-5d85-8ab6-56fd8348d1fa"))
+  (label "JOY_DOWN"
     (at 452.12 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "20cca4f4-8e33-5ea2-8231-393baddf605d"))
+    (uuid "45c83de1-e94d-5eb1-8067-eef65df35084"))
   (symbol
     (lib_id "Device:R")
     (at 497.84 266.7 0)
@@ -8582,8 +8683,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "27daf273-797c-5cd3-b13a-3df8d61dfd40")
-    (property "Reference" "R129"
+    (uuid "dc9bb156-89ec-5c3a-ad53-8f49691b9181")
+    (property "Reference" "R121"
       (at 497.84 264.16 0)
       (effects
         (font
@@ -8605,20 +8706,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_X10"
+    (property "Description" "подтяжка JOY_RAPID"
       (at 497.84 266.7 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "5a2c65cd-723e-5ab1-a86a-e52d0ea75b6b"))
+      (uuid "b3911185-3e26-590c-819e-000959e2bd10"))
     (pin "2"
-      (uuid "3718abd5-18c0-5e49-b463-8c9281516654"))
+      (uuid "40c5357e-f04f-5154-9d71-c66db01f3178"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R129")
+          (reference "R121")
           (unit 1)))))
   (label "+3V"
     (at 497.84 262.89 90)
@@ -8626,14 +8727,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "3e531e62-42e8-5470-9847-36793f7edbe6"))
-  (label "HAND_X10"
+    (uuid "ab6063e0-a940-5c04-864e-1c47ae26c16c"))
+  (label "JOY_RAPID"
     (at 497.84 270.51 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "2a85de95-2974-577e-8607-41da9f513cfc"))
+    (uuid "570d8ba1-ca8d-592b-9075-cada18742032"))
   (symbol
     (lib_id "Device:R")
     (at 48.26 294.64 0)
@@ -8642,8 +8743,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "67299666-6006-5f76-9280-ee85016c2fce")
-    (property "Reference" "R130"
+    (uuid "cff9dbee-b328-5bf6-a157-e2893677cd5e")
+    (property "Reference" "R122"
       (at 48.26 292.1 0)
       (effects
         (font
@@ -8665,20 +8766,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка ENC_A"
+    (property "Description" "подтяжка LIM_LEFT"
       (at 48.26 294.64 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "627c1f6b-8a4d-5283-b304-f1b0042d4f5e"))
+      (uuid "e8c1bfd4-2caa-5a44-abf5-daffa89e7d4e"))
     (pin "2"
-      (uuid "9ae38f5d-6775-5d99-b655-2186a6cef43a"))
+      (uuid "4c18fbf0-9b87-5ff4-9ed6-523bc39885cd"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R130")
+          (reference "R122")
           (unit 1)))))
   (label "+3V"
     (at 48.26 290.83 90)
@@ -8686,14 +8787,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "9af3a9f5-5ec4-5f28-af1a-9cf08f9ed076"))
-  (label "ENC_A"
+    (uuid "5dc652f4-756a-5aa4-bcb3-4c03c7be292e"))
+  (label "LIM_LEFT"
     (at 48.26 298.45 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "07f3cdcc-063a-5424-bdce-8b2069460049"))
+    (uuid "a4edf117-9198-5dc2-b1eb-635032e58318"))
   (symbol
     (lib_id "Device:R")
     (at 91.44 294.64 0)
@@ -8702,8 +8803,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "c3506909-85dd-5849-9ca4-0f6031b6fb48")
-    (property "Reference" "R131"
+    (uuid "9db2c393-25a9-598c-819b-38b65a9d94a8")
+    (property "Reference" "R123"
       (at 91.44 292.1 0)
       (effects
         (font
@@ -8725,20 +8826,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка ENC_B"
+    (property "Description" "подтяжка LIM_RIGHT"
       (at 91.44 294.64 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "c76d9b03-fd42-59a9-9259-b72d1add3088"))
+      (uuid "3d019d8f-3820-54c0-9eab-184ce8ec59c5"))
     (pin "2"
-      (uuid "14f3ecc4-431c-5ce5-be05-0dea822e2ade"))
+      (uuid "5fa54e74-6b71-522f-830c-c629b4b3264a"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R131")
+          (reference "R123")
           (unit 1)))))
   (label "+3V"
     (at 91.44 290.83 90)
@@ -8746,14 +8847,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "53c35470-f454-50e2-bc3c-d84717449f7e"))
-  (label "ENC_B"
+    (uuid "042cd446-b944-5168-8efb-ce23e6e57ef6"))
+  (label "LIM_RIGHT"
     (at 91.44 298.45 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "31a6e8d2-2eba-5ea4-a953-731beacef972"))
+    (uuid "12fed41e-d6f8-5785-8ba6-ffe577889825"))
   (symbol
     (lib_id "Device:R")
     (at 137.16 294.64 0)
@@ -8762,8 +8863,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "4198561a-f1f6-538c-bd14-75ce46c83ddc")
-    (property "Reference" "R132"
+    (uuid "19a823e4-075e-5959-8c0a-d7f5da3d8d73")
+    (property "Reference" "R124"
       (at 137.16 292.1 0)
       (effects
         (font
@@ -8785,20 +8886,20 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_A"
+    (property "Description" "подтяжка LIM_FRONT"
       (at 137.16 294.64 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (pin "1"
-      (uuid "d30b4c35-5eec-54ce-8783-a06c85dac097"))
+      (uuid "fb2d9f2d-7791-5e48-8973-d6ba9b758cb6"))
     (pin "2"
-      (uuid "7ccc0b78-fcf5-54d6-a243-bd935cfcfb28"))
+      (uuid "d8dd318b-3121-5b68-9fa6-ed79a4a736a2"))
     (instances
       (project "els_shield"
         (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
-          (reference "R132")
+          (reference "R124")
           (unit 1)))))
   (label "+3V"
     (at 137.16 290.83 90)
@@ -8806,14 +8907,14 @@
       (font
         (size 1 1))
       (justify left bottom))
-    (uuid "3841df89-d302-5607-ab8f-5f0d46065553"))
-  (label "HAND_A"
+    (uuid "c5b71401-1b3c-5f88-b1a6-099dba7abe7a"))
+  (label "LIM_FRONT"
     (at 137.16 298.45 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
-    (uuid "983cf963-bf12-5d5b-a4e8-260b9b1b7459"))
+    (uuid "821b95ea-01be-5d96-81ec-8f8ed3feb780"))
   (symbol
     (lib_id "Device:R")
     (at 182.88 294.64 0)
@@ -8822,8 +8923,8 @@
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "de4e6413-c31f-5882-9ef4-aef11d996772")
-    (property "Reference" "R133"
+    (uuid "f9d73817-f3c2-58d3-9e6a-744eeead2c23")
+    (property "Reference" "R125"
       (at 182.88 292.1 0)
       (effects
         (font
@@ -8845,8 +8946,488 @@
         (font
           (size 1.27 1.27))
         (hide yes)))
-    (property "Description" "подтяжка HAND_B"
+    (property "Description" "подтяжка LIM_REAR"
       (at 182.88 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "714b1cc7-ba72-56df-ac2a-2c55c6c58769"))
+    (pin "2"
+      (uuid "59a7323f-c4ca-529b-9e89-2ee90c6444ee"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R125")
+          (unit 1)))))
+  (label "+3V"
+    (at 182.88 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "19ad2db2-a616-507a-8f05-0d982a77c5c7"))
+  (label "LIM_REAR"
+    (at 182.88 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "fec2192e-aa14-50e5-9f62-4165052f72f3"))
+  (symbol
+    (lib_id "Device:R")
+    (at 228.6 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "0fb18698-de78-5bf8-9795-470db93971ae")
+    (property "Reference" "R126"
+      (at 228.6 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 228.6 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 228.6 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 228.6 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_AXIS_Z"
+      (at 228.6 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "feac40ce-99a0-5016-89d3-0f37c04bd02a"))
+    (pin "2"
+      (uuid "420e4abc-4343-5550-bd78-be54a53fd627"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R126")
+          (unit 1)))))
+  (label "+3V"
+    (at 228.6 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "8b0b122f-ab3d-5811-82be-3ceb4480ed7c"))
+  (label "HAND_AXIS_Z"
+    (at 228.6 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "890002f9-46be-5398-a766-729ed0f09686"))
+  (symbol
+    (lib_id "Device:R")
+    (at 271.78 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "1ad64d99-cd90-5647-acba-95e54008baa8")
+    (property "Reference" "R127"
+      (at 271.78 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 271.78 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 271.78 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 271.78 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_AXIS_X"
+      (at 271.78 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "79b3b149-dd66-5e36-92a7-4a5292110840"))
+    (pin "2"
+      (uuid "3a9e1f3b-a710-51a4-a935-c561ec6e1a8f"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R127")
+          (unit 1)))))
+  (label "+3V"
+    (at 271.78 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "a3df647a-bfe3-5d1c-a5ab-5dda808a4afa"))
+  (label "HAND_AXIS_X"
+    (at 271.78 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "506c3f0a-daac-57be-9a6e-d839017605c1"))
+  (symbol
+    (lib_id "Device:R")
+    (at 317.5 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "8502578a-7875-5d4d-bc68-dd04fae9b45a")
+    (property "Reference" "R128"
+      (at 317.5 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 317.5 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 317.5 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 317.5 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_X1"
+      (at 317.5 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "702dea52-facb-5d1b-846b-bd60970225f8"))
+    (pin "2"
+      (uuid "7b71ad33-fefc-5e60-b5ce-de02f53c784a"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R128")
+          (unit 1)))))
+  (label "+3V"
+    (at 317.5 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "e9fef308-de83-547c-9100-99c4a9839bd7"))
+  (label "HAND_X1"
+    (at 317.5 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "20cca4f4-8e33-5ea2-8231-393baddf605d"))
+  (symbol
+    (lib_id "Device:R")
+    (at 363.22 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "27daf273-797c-5cd3-b13a-3df8d61dfd40")
+    (property "Reference" "R129"
+      (at 363.22 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 363.22 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 363.22 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 363.22 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_X10"
+      (at 363.22 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "5a2c65cd-723e-5ab1-a86a-e52d0ea75b6b"))
+    (pin "2"
+      (uuid "3718abd5-18c0-5e49-b463-8c9281516654"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R129")
+          (unit 1)))))
+  (label "+3V"
+    (at 363.22 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "3e531e62-42e8-5470-9847-36793f7edbe6"))
+  (label "HAND_X10"
+    (at 363.22 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "2a85de95-2974-577e-8607-41da9f513cfc"))
+  (symbol
+    (lib_id "Device:R")
+    (at 406.4 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "67299666-6006-5f76-9280-ee85016c2fce")
+    (property "Reference" "R130"
+      (at 406.4 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 406.4 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 406.4 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 406.4 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка ENC_A"
+      (at 406.4 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "627c1f6b-8a4d-5283-b304-f1b0042d4f5e"))
+    (pin "2"
+      (uuid "9ae38f5d-6775-5d99-b655-2186a6cef43a"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R130")
+          (unit 1)))))
+  (label "+3V"
+    (at 406.4 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "9af3a9f5-5ec4-5f28-af1a-9cf08f9ed076"))
+  (label "ENC_A"
+    (at 406.4 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "07f3cdcc-063a-5424-bdce-8b2069460049"))
+  (symbol
+    (lib_id "Device:R")
+    (at 452.12 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "c3506909-85dd-5849-9ca4-0f6031b6fb48")
+    (property "Reference" "R131"
+      (at 452.12 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 452.12 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 452.12 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 452.12 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка ENC_B"
+      (at 452.12 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "c76d9b03-fd42-59a9-9259-b72d1add3088"))
+    (pin "2"
+      (uuid "14f3ecc4-431c-5ce5-be05-0dea822e2ade"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R131")
+          (unit 1)))))
+  (label "+3V"
+    (at 452.12 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "53c35470-f454-50e2-bc3c-d84717449f7e"))
+  (label "ENC_B"
+    (at 452.12 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "31a6e8d2-2eba-5ea4-a953-731beacef972"))
+  (symbol
+    (lib_id "Device:R")
+    (at 497.84 294.64 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "4198561a-f1f6-538c-bd14-75ce46c83ddc")
+    (property "Reference" "R132"
+      (at 497.84 292.1 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 497.84 297.18 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 497.84 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 497.84 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_A"
+      (at 497.84 294.64 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "d30b4c35-5eec-54ce-8783-a06c85dac097"))
+    (pin "2"
+      (uuid "7ccc0b78-fcf5-54d6-a243-bd935cfcfb28"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R132")
+          (unit 1)))))
+  (label "+3V"
+    (at 497.84 290.83 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "3841df89-d302-5607-ab8f-5f0d46065553"))
+  (label "HAND_A"
+    (at 497.84 298.45 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "983cf963-bf12-5d5b-a4e8-260b9b1b7459"))
+  (symbol
+    (lib_id "Device:R")
+    (at 48.26 322.58 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "de4e6413-c31f-5882-9ef4-aef11d996772")
+    (property "Reference" "R133"
+      (at 48.26 320.04 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 48.26 325.12 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 48.26 322.58 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 48.26 322.58 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка HAND_B"
+      (at 48.26 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -8861,22 +9442,82 @@
           (reference "R133")
           (unit 1)))))
   (label "+3V"
-    (at 182.88 290.83 90)
+    (at 48.26 318.77 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "7a076f0d-8bd6-5339-b583-b433e20cae48"))
   (label "HAND_B"
-    (at 182.88 298.45 270)
+    (at 48.26 326.39 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "1ea795d3-15aa-5b23-af5e-b1d8930a177c"))
   (symbol
+    (lib_id "Device:R")
+    (at 91.44 322.58 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "8e645911-37ab-51d1-a95c-8b70d129c176")
+    (property "Reference" "R134"
+      (at 91.44 320.04 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "1k"
+      (at 91.44 325.12 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+      (at 91.44 322.58 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 91.44 322.58 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "подтяжка PROBE"
+      (at 91.44 322.58 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "526642a8-e76d-5419-80cb-b65540018a2e"))
+    (pin "2"
+      (uuid "dea53490-aa79-5918-ba65-9b7df5713fb4"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "R134")
+          (unit 1)))))
+  (label "+3V"
+    (at 91.44 318.77 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "7d01abd3-bc10-5b9b-b2fb-7112c7523ecd"))
+  (label "PROBE"
+    (at 91.44 326.39 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "b3e21cc9-336c-5fdf-b466-2a1cd24efd43"))
+  (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 233.68 294.64 0)
+    (at 142.24 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -8884,29 +9525,29 @@
     (dnp no)
     (uuid "141669af-7079-546c-81f8-853b9e7194f8")
     (property "Reference" "Q1"
-      (at 233.68 292.1 0)
+      (at 142.24 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 233.68 297.18 0)
+      (at 142.24 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 233.68 294.64 0)
+      (at 142.24 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 233.68 294.64 0)
+      (at 142.24 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ Z_STEP"
-      (at 233.68 294.64 0)
+      (at 142.24 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -8923,21 +9564,21 @@
           (reference "Q1")
           (unit 1)))))
   (label "B_Z_STEP"
-    (at 228.6 294.64 180)
+    (at 137.16 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "42602e7b-49f9-5bc2-85f7-bf59f24b5a38"))
   (label "GND"
-    (at 236.22 299.72 270)
+    (at 144.78 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "7456e08a-8b88-5670-9431-d2e459e82e55"))
   (label "Z_PUL_N"
-    (at 236.22 289.56 90)
+    (at 144.78 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -8945,7 +9586,7 @@
     (uuid "46a8898a-889a-58c4-9c18-caa0392016ab"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 284.48 294.64 0)
+    (at 195.58 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -8953,29 +9594,29 @@
     (dnp no)
     (uuid "76b60480-fe08-5f5d-9767-0857b3c17963")
     (property "Reference" "Q2"
-      (at 284.48 292.1 0)
+      (at 195.58 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 284.48 297.18 0)
+      (at 195.58 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 284.48 294.64 0)
+      (at 195.58 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 284.48 294.64 0)
+      (at 195.58 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ Z_DIR"
-      (at 284.48 294.64 0)
+      (at 195.58 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -8992,21 +9633,21 @@
           (reference "Q2")
           (unit 1)))))
   (label "B_Z_DIR"
-    (at 279.4 294.64 180)
+    (at 190.5 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "8a586a43-5408-53e3-aee4-a347e517053d"))
   (label "GND"
-    (at 287.02 299.72 270)
+    (at 198.12 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "50f1079f-fa75-5254-a9b5-06c9f5eba9c0"))
   (label "Z_DIR_N"
-    (at 287.02 289.56 90)
+    (at 198.12 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9014,7 +9655,7 @@
     (uuid "c4336b79-1e39-5014-9855-b00532904c34"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 337.82 294.64 0)
+    (at 248.92 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9022,29 +9663,29 @@
     (dnp no)
     (uuid "1915d672-af48-5092-ae66-3473ec292f89")
     (property "Reference" "Q3"
-      (at 337.82 292.1 0)
+      (at 248.92 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 337.82 297.18 0)
+      (at 248.92 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 337.82 294.64 0)
+      (at 248.92 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 337.82 294.64 0)
+      (at 248.92 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ Z_ENA"
-      (at 337.82 294.64 0)
+      (at 248.92 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9061,21 +9702,21 @@
           (reference "Q3")
           (unit 1)))))
   (label "B_Z_ENA"
-    (at 332.74 294.64 180)
+    (at 243.84 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "37b3df0a-9f2f-5df1-bcc7-ea0b3138731f"))
   (label "GND"
-    (at 340.36 299.72 270)
+    (at 251.46 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "92408801-1730-58df-b586-759d28a00ebe"))
   (label "Z_ENA_N"
-    (at 340.36 289.56 90)
+    (at 251.46 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9083,7 +9724,7 @@
     (uuid "158af616-72c6-5a5a-8bc0-077cde61788b"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 391.16 294.64 0)
+    (at 299.72 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9091,29 +9732,29 @@
     (dnp no)
     (uuid "5023d891-7674-5347-b724-691262eb6600")
     (property "Reference" "Q4"
-      (at 391.16 292.1 0)
+      (at 299.72 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 391.16 297.18 0)
+      (at 299.72 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 391.16 294.64 0)
+      (at 299.72 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 391.16 294.64 0)
+      (at 299.72 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ X_STEP"
-      (at 391.16 294.64 0)
+      (at 299.72 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9130,21 +9771,21 @@
           (reference "Q4")
           (unit 1)))))
   (label "B_X_STEP"
-    (at 386.08 294.64 180)
+    (at 294.64 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "511491f0-0de6-5cbe-8629-546294b18c40"))
   (label "GND"
-    (at 393.7 299.72 270)
+    (at 302.26 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "2ac1b658-dccc-536f-8c44-96b1511d80e9"))
   (label "X_PUL_N"
-    (at 393.7 289.56 90)
+    (at 302.26 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9152,7 +9793,7 @@
     (uuid "cf5eebc4-d8f8-5e77-a2e4-62b0094ec996"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 441.96 294.64 0)
+    (at 353.06 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9160,29 +9801,29 @@
     (dnp no)
     (uuid "553c8be7-d617-51fd-a51c-64e85725a0f0")
     (property "Reference" "Q5"
-      (at 441.96 292.1 0)
+      (at 353.06 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 441.96 297.18 0)
+      (at 353.06 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 441.96 294.64 0)
+      (at 353.06 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 441.96 294.64 0)
+      (at 353.06 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ X_DIR"
-      (at 441.96 294.64 0)
+      (at 353.06 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9199,21 +9840,21 @@
           (reference "Q5")
           (unit 1)))))
   (label "B_X_DIR"
-    (at 436.88 294.64 180)
+    (at 347.98 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "9f8aced0-4c8c-52d8-a611-e463cb4de0a1"))
   (label "GND"
-    (at 444.5 299.72 270)
+    (at 355.6 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "4f929487-2dd2-5504-9c34-4c54209a7034"))
   (label "X_DIR_N"
-    (at 444.5 289.56 90)
+    (at 355.6 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9221,7 +9862,7 @@
     (uuid "a5928b3f-96b1-5385-9eed-a09148cfb964"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 495.3 294.64 0)
+    (at 406.4 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9229,29 +9870,29 @@
     (dnp no)
     (uuid "7be05fe6-f71f-59da-bbe6-5d2a9edd1314")
     (property "Reference" "Q6"
-      (at 495.3 292.1 0)
+      (at 406.4 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 495.3 297.18 0)
+      (at 406.4 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 495.3 294.64 0)
+      (at 406.4 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 495.3 294.64 0)
+      (at 406.4 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ X_ENA"
-      (at 495.3 294.64 0)
+      (at 406.4 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9268,21 +9909,21 @@
           (reference "Q6")
           (unit 1)))))
   (label "B_X_ENA"
-    (at 490.22 294.64 180)
+    (at 401.32 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "163c7f95-4989-51eb-88f8-7118c9d05dbf"))
   (label "GND"
-    (at 497.84 299.72 270)
+    (at 408.94 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "89a91e2f-bb0c-54b4-8320-29bff17de2a1"))
   (label "X_ENA_N"
-    (at 497.84 289.56 90)
+    (at 408.94 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9290,7 +9931,7 @@
     (uuid "df3d8a02-24a0-5668-b247-7fbe721c68a1"))
   (symbol
     (lib_id "Transistor_BJT:Q_NPN_BEC")
-    (at 53.34 325.12 0)
+    (at 457.2 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9298,29 +9939,29 @@
     (dnp no)
     (uuid "cd123d9a-05f6-5923-8c43-9a3febc11a8d")
     (property "Reference" "Q7"
-      (at 53.34 322.58 0)
+      (at 457.2 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "MMBT3904"
-      (at 53.34 327.66 0)
+      (at 457.2 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Package_TO_SOT_SMD:SOT-23"
-      (at 53.34 325.12 0)
+      (at 457.2 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 53.34 325.12 0)
+      (at 457.2 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "ключ BEEPER"
-      (at 53.34 325.12 0)
+      (at 457.2 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9337,21 +9978,21 @@
           (reference "Q7")
           (unit 1)))))
   (label "B_BEEPER"
-    (at 48.26 325.12 180)
+    (at 452.12 322.58 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "d6693a62-39e5-52f2-aa37-d234779cb380"))
   (label "GND"
-    (at 55.88 330.2 270)
+    (at 459.74 327.66 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "fa8e4e84-0f31-532f-916a-73a829fe89b7"))
   (label "BEEP_N"
-    (at 55.88 320.04 90)
+    (at 459.74 317.5 90)
     (effects
       (font
         (size 1 1))
@@ -9359,7 +10000,7 @@
     (uuid "1843a828-c0d7-5843-a1b5-75847c1619b0"))
   (symbol
     (lib_id "Device:C")
-    (at 99.06 325.12 0)
+    (at 505.46 322.58 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9367,29 +10008,29 @@
     (dnp no)
     (uuid "199e78bd-f686-5791-b645-4fe141c2eb55")
     (property "Reference" "C1"
-      (at 99.06 322.58 0)
+      (at 505.46 320.04 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "1nF"
-      (at 99.06 327.66 0)
+      (at 505.46 325.12 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 99.06 325.12 0)
+      (at 505.46 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 99.06 325.12 0)
+      (at 505.46 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "энкодер A"
-      (at 99.06 325.12 0)
+      (at 505.46 322.58 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9404,14 +10045,14 @@
           (reference "C1")
           (unit 1)))))
   (label "ENC_A"
-    (at 99.06 321.31 90)
+    (at 505.46 318.77 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "75ced89b-956f-5f6b-83d4-d8d06bb4de66"))
   (label "GND"
-    (at 99.06 328.93 270)
+    (at 505.46 326.39 270)
     (effects
       (font
         (size 1 1))
@@ -9419,7 +10060,7 @@
     (uuid "ddc524a7-1fdf-553e-8c18-46929c4c5175"))
   (symbol
     (lib_id "Device:C")
-    (at 144.78 325.12 0)
+    (at 48.26 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9427,29 +10068,29 @@
     (dnp no)
     (uuid "b1b1e0b0-0cea-5cbb-9409-e2e417573d48")
     (property "Reference" "C2"
-      (at 144.78 322.58 0)
+      (at 48.26 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "1nF"
-      (at 144.78 327.66 0)
+      (at 48.26 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 144.78 325.12 0)
+      (at 48.26 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 144.78 325.12 0)
+      (at 48.26 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "энкодер B"
-      (at 144.78 325.12 0)
+      (at 48.26 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9464,14 +10105,14 @@
           (reference "C2")
           (unit 1)))))
   (label "ENC_B"
-    (at 144.78 321.31 90)
+    (at 48.26 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "5745f2b7-237a-5c00-9df8-6feea319ac89"))
   (label "GND"
-    (at 144.78 328.93 270)
+    (at 48.26 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9479,7 +10120,7 @@
     (uuid "4db908d9-e985-5f79-8e15-7f285f35a6c2"))
   (symbol
     (lib_id "Device:C")
-    (at 190.5 325.12 0)
+    (at 91.44 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9487,29 +10128,29 @@
     (dnp no)
     (uuid "6a3ee5d9-d840-502e-9b5c-62f060467d8e")
     (property "Reference" "C3"
-      (at 190.5 322.58 0)
+      (at 91.44 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "10nF"
-      (at 190.5 327.66 0)
+      (at 91.44 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 190.5 325.12 0)
+      (at 91.44 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 190.5 325.12 0)
+      (at 91.44 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "РГИ A"
-      (at 190.5 325.12 0)
+      (at 91.44 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9524,14 +10165,14 @@
           (reference "C3")
           (unit 1)))))
   (label "HAND_A"
-    (at 190.5 321.31 90)
+    (at 91.44 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "5334b02f-e6e9-5560-8bc2-ef0066578659"))
   (label "GND"
-    (at 190.5 328.93 270)
+    (at 91.44 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9539,7 +10180,7 @@
     (uuid "9aaec0d6-a78b-5482-b929-0cf083591774"))
   (symbol
     (lib_id "Device:C")
-    (at 236.22 325.12 0)
+    (at 137.16 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9547,29 +10188,29 @@
     (dnp no)
     (uuid "3e36b119-4c5d-5d89-8497-c3e15dc50826")
     (property "Reference" "C4"
-      (at 236.22 322.58 0)
+      (at 137.16 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "10nF"
-      (at 236.22 327.66 0)
+      (at 137.16 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 236.22 325.12 0)
+      (at 137.16 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 236.22 325.12 0)
+      (at 137.16 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "РГИ B"
-      (at 236.22 325.12 0)
+      (at 137.16 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9584,14 +10225,14 @@
           (reference "C4")
           (unit 1)))))
   (label "HAND_B"
-    (at 236.22 321.31 90)
+    (at 137.16 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "040d820e-d0b3-5b15-ab01-c918e6ec2ff7"))
   (label "GND"
-    (at 236.22 328.93 270)
+    (at 137.16 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9599,7 +10240,7 @@
     (uuid "3fbd3cba-da92-5b2b-a237-a8bab3a1f6eb"))
   (symbol
     (lib_id "Device:C")
-    (at 279.4 325.12 0)
+    (at 182.88 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9607,29 +10248,29 @@
     (dnp no)
     (uuid "6be4ba98-59d8-5ef6-9c7c-a62f0ee22a98")
     (property "Reference" "C5"
-      (at 279.4 322.58 0)
+      (at 182.88 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "100nF"
-      (at 279.4 327.66 0)
+      (at 182.88 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 279.4 325.12 0)
+      (at 182.88 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 279.4 325.12 0)
+      (at 182.88 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "переменник"
-      (at 279.4 325.12 0)
+      (at 182.88 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9644,14 +10285,14 @@
           (reference "C5")
           (unit 1)))))
   (label "FEED_POT"
-    (at 279.4 321.31 90)
+    (at 182.88 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "82f0682d-2af8-510f-97c4-dbbf965fdcac"))
   (label "GND"
-    (at 279.4 328.93 270)
+    (at 182.88 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9659,7 +10300,7 @@
     (uuid "85cc2d62-b6fd-5263-99e3-2587d5c0911a"))
   (symbol
     (lib_id "Device:C")
-    (at 325.12 325.12 0)
+    (at 228.6 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9667,29 +10308,29 @@
     (dnp no)
     (uuid "6005f048-49b3-5bfe-8182-5007b2755160")
     (property "Reference" "C6"
-      (at 325.12 322.58 0)
+      (at 228.6 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "100nF"
-      (at 325.12 327.66 0)
+      (at 228.6 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 325.12 325.12 0)
+      (at 228.6 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 325.12 325.12 0)
+      (at 228.6 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" ""
-      (at 325.12 325.12 0)
+      (at 228.6 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9704,14 +10345,14 @@
           (reference "C6")
           (unit 1)))))
   (label "+5V"
-    (at 325.12 321.31 90)
+    (at 228.6 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "5a788af0-81a6-57ac-8970-febf2d9a3ac3"))
   (label "GND"
-    (at 325.12 328.93 270)
+    (at 228.6 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9719,7 +10360,7 @@
     (uuid "7dc97d3f-de2a-51bf-9a4d-a4b9098cd680"))
   (symbol
     (lib_id "Device:C")
-    (at 370.84 325.12 0)
+    (at 271.78 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9727,29 +10368,29 @@
     (dnp no)
     (uuid "27180443-052f-57fe-ad30-f01b72b72354")
     (property "Reference" "C7"
-      (at 370.84 322.58 0)
+      (at 271.78 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "100nF"
-      (at 370.84 327.66 0)
+      (at 271.78 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
-      (at 370.84 325.12 0)
+      (at 271.78 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 370.84 325.12 0)
+      (at 271.78 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" ""
-      (at 370.84 325.12 0)
+      (at 271.78 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9764,14 +10405,14 @@
           (reference "C7")
           (unit 1)))))
   (label "+3V"
-    (at 370.84 321.31 90)
+    (at 271.78 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "72741733-c20c-57b2-af84-2c89e02ca02c"))
   (label "GND"
-    (at 370.84 328.93 270)
+    (at 271.78 356.87 270)
     (effects
       (font
         (size 1 1))
@@ -9779,7 +10420,7 @@
     (uuid "02474f3f-b997-56ac-a42f-4da8c38e908e"))
   (symbol
     (lib_id "Device:C")
-    (at 414.02 325.12 0)
+    (at 317.5 353.06 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -9787,29 +10428,29 @@
     (dnp no)
     (uuid "cb6e2a6e-601f-501d-a6dc-681f3e9e3002")
     (property "Reference" "C8"
-      (at 414.02 322.58 0)
+      (at 317.5 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "22uF 10V"
-      (at 414.02 327.66 0)
+      (at 317.5 355.6 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
-      (at 414.02 325.12 0)
+      (at 317.5 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 414.02 325.12 0)
+      (at 317.5 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "керамика X5R, низкая — под Discovery"
-      (at 414.02 325.12 0)
+      (at 317.5 353.06 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9824,22 +10465,82 @@
           (reference "C8")
           (unit 1)))))
   (label "+5V"
-    (at 414.02 321.31 90)
+    (at 317.5 349.25 90)
     (effects
       (font
         (size 1 1))
       (justify left bottom))
     (uuid "b6f420d4-26e1-5e92-9671-f4bd72f485f2"))
   (label "GND"
-    (at 414.02 328.93 270)
+    (at 317.5 356.87 270)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "25567acb-1bc0-5076-b832-743e59c0dd68"))
   (symbol
+    (lib_id "Device:C")
+    (at 363.22 353.06 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "886eea44-7f8e-544c-aeeb-76739ddb2604")
+    (property "Reference" "C9"
+      (at 363.22 350.52 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Value" "10nF"
+      (at 363.22 355.6 0)
+      (effects
+        (font
+          (size 1.27 1.27))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+      (at 363.22 353.06 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Datasheet" "~"
+      (at 363.22 353.06 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (property "Description" "датчик"
+      (at 363.22 353.06 0)
+      (effects
+        (font
+          (size 1.27 1.27))
+        (hide yes)))
+    (pin "1"
+      (uuid "4458d74d-c7ab-520e-a4f3-970778fb953a"))
+    (pin "2"
+      (uuid "6740c609-568c-586a-8c8c-00e6339b64df"))
+    (instances
+      (project "els_shield"
+        (path "/6ac5e621-28b5-5fb8-82a6-7aa8d02a8880"
+          (reference "C9")
+          (unit 1)))))
+  (label "PROBE"
+    (at 363.22 349.25 90)
+    (effects
+      (font
+        (size 1 1))
+      (justify left bottom))
+    (uuid "42c919c8-dfa3-52ab-a8a9-3e50f50c8f2b"))
+  (label "GND"
+    (at 363.22 356.87 270)
+    (effects
+      (font
+        (size 1 1))
+      (justify right bottom))
+    (uuid "5034057d-20fe-56d3-b732-d4f450096fb7"))
+  (symbol
     (lib_id "Mechanical:MountingHole")
-    (at 459.74 320.04 0)
+    (at 406.4 347.98 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom no)
@@ -9847,29 +10548,29 @@
     (dnp no)
     (uuid "fb0aa250-1329-56eb-8177-ea5d5ea1228a")
     (property "Reference" "H1"
-      (at 459.74 317.5 0)
+      (at 406.4 345.44 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "M3"
-      (at 459.74 322.58 0)
+      (at 406.4 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-      (at 459.74 320.04 0)
+      (at 406.4 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 459.74 320.04 0)
+      (at 406.4 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "крепёжное отверстие"
-      (at 459.74 320.04 0)
+      (at 406.4 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9881,7 +10582,7 @@
           (unit 1)))))
   (symbol
     (lib_id "Mechanical:MountingHole")
-    (at 505.46 320.04 0)
+    (at 452.12 347.98 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom no)
@@ -9889,29 +10590,29 @@
     (dnp no)
     (uuid "567a6791-f56c-5357-acf6-074c11df8fb0")
     (property "Reference" "H2"
-      (at 505.46 317.5 0)
+      (at 452.12 345.44 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "M3"
-      (at 505.46 322.58 0)
+      (at 452.12 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-      (at 505.46 320.04 0)
+      (at 452.12 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 505.46 320.04 0)
+      (at 452.12 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "крепёжное отверстие"
-      (at 505.46 320.04 0)
+      (at 452.12 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9923,7 +10624,7 @@
           (unit 1)))))
   (symbol
     (lib_id "Mechanical:MountingHole")
-    (at 48.26 350.52 0)
+    (at 497.84 347.98 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom no)
@@ -9931,29 +10632,29 @@
     (dnp no)
     (uuid "eb293d7f-3169-5634-bb5d-c35fa723d3b0")
     (property "Reference" "H3"
-      (at 48.26 347.98 0)
+      (at 497.84 345.44 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "M3"
-      (at 48.26 353.06 0)
+      (at 497.84 350.52 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-      (at 48.26 350.52 0)
+      (at 497.84 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 48.26 350.52 0)
+      (at 497.84 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "крепёжное отверстие"
-      (at 48.26 350.52 0)
+      (at 497.84 347.98 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -9965,7 +10666,7 @@
           (unit 1)))))
   (symbol
     (lib_id "Mechanical:MountingHole")
-    (at 91.44 350.52 0)
+    (at 48.26 375.92 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom no)
@@ -9973,29 +10674,29 @@
     (dnp no)
     (uuid "885c9929-fb2d-5c88-ac49-c75f34a4cdcf")
     (property "Reference" "H4"
-      (at 91.44 347.98 0)
+      (at 48.26 373.38 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "M3"
-      (at 91.44 353.06 0)
+      (at 48.26 378.46 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-      (at 91.44 350.52 0)
+      (at 48.26 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 91.44 350.52 0)
+      (at 48.26 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "крепёжное отверстие"
-      (at 91.44 350.52 0)
+      (at 48.26 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -10007,7 +10708,7 @@
           (unit 1)))))
   (symbol
     (lib_id "Device:D_Schottky")
-    (at 142.24 350.52 0)
+    (at 96.52 375.92 0)
     (unit 1)
     (exclude_from_sim no)
     (in_bom yes)
@@ -10015,29 +10716,29 @@
     (dnp no)
     (uuid "db53ee62-c55a-5027-ba8c-ebd7f047d0d3")
     (property "Reference" "D1"
-      (at 142.24 347.98 0)
+      (at 96.52 373.38 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Value" "B5819W"
-      (at 142.24 353.06 0)
+      (at 96.52 378.46 0)
       (effects
         (font
           (size 1.27 1.27))))
     (property "Footprint" "Diode_SMD:D_SOD-123"
-      (at 142.24 350.52 0)
+      (at 96.52 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Datasheet" "~"
-      (at 142.24 350.52 0)
+      (at 96.52 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
         (hide yes)))
     (property "Description" "Шоттки 1 А, SOD-123 (B5819W, 1N5819W)"
-      (at 142.24 350.52 0)
+      (at 96.52 375.92 0)
       (effects
         (font
           (size 1.27 1.27))
@@ -10052,14 +10753,14 @@
           (reference "D1")
           (unit 1)))))
   (label "+5V_DISCO"
-    (at 138.43 350.52 180)
+    (at 92.71 375.92 180)
     (effects
       (font
         (size 1 1))
       (justify right bottom))
     (uuid "643b8cc6-01c7-5723-a541-bfb6b658c03b"))
   (label "+5V"
-    (at 146.05 350.52 0)
+    (at 100.33 375.92 0)
     (effects
       (font
         (size 1 1))

@@ -93,7 +93,7 @@ def label_at(pad):
 
 def fw_name_of(sig):
     for k, (pin, _) in FW.items():
-        if pin == sig and k not in ('DRO_TX', 'AUDIO_RESET'):
+        if pin == sig and k != 'AUDIO_RESET':
             return k
     return None
 
@@ -126,16 +126,17 @@ for ref, title, nets, labels in design.TERMINALS:
         fwn = fw_name_of(sig)
         if fwn:
             used_fw.add(fwn)
-        fwc = FW[fwn][1] if fwn else '— нет в прошивке'
-        if not fwn:
+        fwc = FW[fwn][1] if fwn else ('сброс платы (кнопка на панель, параллельно RESET Discovery)' if sig == 'NRST'
+                                      else '— нет в прошивке')
+        if not fwn and sig != 'NRST':
             problems.append(f'{ref}.{pad.GetNumber()} ({net}) → {h}.{hn} {sig}: вывод не используется прошивкой')
-        exp = net.replace('_N', '').replace('_K', '').replace('_OUT', '').replace('_T', '')
+        exp = re.sub(r'(_N|_K|_T|_OUT)$', '', net)   # только суффикс: RES_OUT2_T → RES_OUT2, TACHO_OUT → TACHO
         if fwn and fwn not in (net, exp) and not net.endswith(('_PUL_N', '_DIR_N', '_ENA_N', 'BEEP_N')):
             problems.append(f'{ref}.{pad.GetNumber()}: цепь {net}, а вывод {sig} в прошивке — {fwn}')
         rows.append((ref, title, pad.GetNumber(), lab, net, ' → '.join(path) or 'напрямую',
                      f'{"P1" if h == "J1" else "P2"}-{hn}', sig, f'{fwn}: {fwc}' if fwn else fwc))
 
-missing = [k for k in FW if k not in used_fw and k not in ('DRO_TX', 'AUDIO_RESET')]
+missing = [k for k in FW if k not in used_fw and k != 'AUDIO_RESET']
 for k in missing:
     problems.append(f'вывод прошивки {k} ({FW[k][0]}) не выведен ни на один разъём')
 

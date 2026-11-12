@@ -91,9 +91,18 @@
 #define E2_PIN_DISP_TX      B, 10    // USART3 TX → дисплей ESP32 (RX)
 #define E2_PIN_DISP_RX      B, 11    // USART3 RX ← дисплей ESP32 (TX)
 #define E2_PIN_DRO_RX       A, 3     // USART2 RX ← блок DRO HS800-2 (TX)
-#define E2_PIN_DRO_TX       A, 2     // USART2 TX — не подключается
 #define E2_PIN_DBG_TX       A, 9     // USART1 TX — отладочный порт (Serial)
 #define E2_PIN_DBG_RX       A, 10    // USART1 RX
 // Линейки напрямую (Core/els_config.h): Z — PA15/PB3 (TIM2), X — PB4/PB5 (TIM3),
 // REQ для Digimatic: Z — PC6, X — PC7
 #define E2_PIN_AUDIO_RESET  D, 4     // сброс аудио-ЦАП платы: держим 0, чтобы ЦАП не мешал
+
+// ── Резерв (разъёмы шилда на будущее; прошивка эти выводы пока не трогает) ─────
+#define E2_PIN_PROBE        A, 2     // J25 «ДАТЧИК (РЕЗЕРВ)»: щуп / датчик привязки, подтяжка 1k к 3V.
+                                     // Это USART2 TX: блок DRO читается только на приём, PA2 после
+                                     // DROSerial.begin() возвращается во вход (drv_dro.cpp)
+#define E2_PIN_RES_OUT2     D, 13    // J26 «РЕЗЕРВ ВЫХОДЫ» D13 через 220 Ом; на Discovery — LD3 оранжевый (TIM4 CH2 — ШИМ)
+#define E2_PIN_RES_OUT4     D, 15    // J26 D15 через 220 Ом; на Discovery — LD6 синий (TIM4 CH4 — ШИМ)
+                                     // PD12/PD14 на шилд не выведены (внутренний ряд P1, не развести)
+#define E2_PIN_RES_IO1      A, 5     // J27 «РЕЗЕРВ ВХ/ВЫХ» через 470 Ом; АЦП, ЦАП2; на плате — SCK акселерометра
+#define E2_PIN_RES_IO2      A, 7     // ... АЦП; на плате — MOSI акселерометра (оба — входы акселерометра, не мешают)

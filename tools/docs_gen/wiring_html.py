@@ -25,7 +25,7 @@ ROOT = W.ROOT
 OUT = os.path.join(ROOT, 'docs', 'wiring.html')
 
 GCOL = {'enc': '#ff6b6b', 'drv': '#ffa94d', 'hand': '#c084fc', 'mode': '#2dd4bf', 'btn': '#60a5fa',
-        'joy': '#38bdf8', 'lim': '#a3e635', 'out': '#e0b07a', 'link': '#e5e7eb', 'scale': '#fb923c'}
+        'joy': '#38bdf8', 'lim': '#a3e635', 'out': '#e0b07a', 'link': '#e5e7eb', 'scale': '#fb923c', 'res': '#a5b4c8'}
 GNAME = {g: n for g, _, n in W.GROUPS}
 HALO = ' stroke="#0b0f17" stroke-width="3.5" paint-order="stroke"'
 
@@ -78,6 +78,13 @@ MODULES = [
     ('scx', 'Линейка X', 'напрямую, без блока DRO', 'scale',
      [('SCALE_X_A', 'A / CLK'), ('SCALE_X_B', 'B / DATA'), ('SCALE_X_REQ', 'REQ (Digimatic)')],
      ['+5V, GND → J23-1, J23-2']),
+    ('probe', 'Датчик / щуп (РЕЗЕРВ)', 'на будущее: привязка резца, касание', 'res',
+     [('PROBE', 'вход (контакт или NPN на GND)')], ['+5V, GND → J25-1, J25-2', 'в прошивке пока не используется']),
+    ('resout', 'РЕЗЕРВ: выходы', '3.3 В через 220 Ом — модули реле и т. п.', 'res',
+     [('RES_OUT2', 'D13'), ('RES_OUT4', 'D15')],
+     ['+5V, GND → J26-1, J26-2', 'в прошивке пока не используются']),
+    ('resio', 'РЕЗЕРВ: вход/выход', 'через 470 Ом; АЦП, на PA5 — ЦАП', 'res',
+     [('RES_IO1', 'A5'), ('RES_IO2', 'A7')], ['+3V, GND → J27-1, J27-2', 'в прошивке пока не используются']),
 ]
 SIG_MOD = {s: (m[0], t) for m in MODULES for s, t in m[4]}
 MOD = {m[0]: m for m in MODULES}
@@ -90,7 +97,7 @@ ONBOARD = {'PA0': 'кнопка USER', 'PD12': 'светодиод LD4', 'PD13':
            'PA9': 'USB OTG VBUS (C49 4.7 мкФ)', 'PH0': 'кварц 8 МГц', 'PH1': 'кварц 8 МГц', 'PC14': 'кварц 32 кГц',
            'PC15': 'кварц 32 кГц', 'PC3': 'микрофон PDM', 'PB10': 'микрофон CLK (не мешает)', 'PC4': 'микрофон (R49 не установлен)'}
 POWER = {'GND': 'земля', 'VDD': '3 В питания чипа', '5V': '5 В: вход питания платы (на шилде — через диод D1)',
-         '3V': '3 В: подтяжки и светодиоды шилда (до 100 мА)', 'NRST': 'сброс', 'BOOT0': 'BOOT0', 'NC': 'не подключён'}
+         '3V': '3 В: подтяжки и светодиоды шилда (до 100 мА)', 'NRST': 'сброс — на шилде разъём J24 «СБРОС»: кнопка на GND (параллельно RESET Discovery)', 'BOOT0': 'BOOT0', 'NC': 'не подключён'}
 
 
 def comps(sig):
@@ -122,7 +129,8 @@ def signals():
             'sh': W.shield_pin(p['name']).replace('—', ''), 'g': p['group'], 'mega': p['mega'],
             'mod': MOD[mod[0]][1] if mod else '', 'term': mod[1] if mod else '', 'mid': mod[0] if mod else '',
             'c': ' · '.join(comps(name)),
-            'note': {'DRO_TX': 'на шилде наружу не выводится', 'AUDIO_RESET': 'держит аудиочип Discovery в сбросе, наружу не выводится'}.get(name, ''),
+            'note': {'AUDIO_RESET': 'держит аудиочип Discovery в сбросе, наружу не выводится',
+                     'PROBE': 'это и USART2 TX: блок DRO читается только на приём, PA2 после запуска — вход'}.get(name, ''),
         }
     return sigs
 
@@ -171,6 +179,9 @@ def icon(kind, x, y):
                tx(23, 33, '005.00', 10, '#ef4444', 'middle', True),
         'uart': '<rect x="2" y="14" width="34" height="18" rx="2" fill="#1d4ed8"/><rect x="34" y="17" width="10" height="12" fill="#d1d5db"/>'
                 '<rect x="6" y="18" width="8" height="8" fill="#111827"/>',
+        'res': '<rect x="3" y="12" width="40" height="22" rx="3" fill="#e5e7eb"/>' +
+               ''.join(f'<rect x="{8 + i * 9}" y="17" width="6" height="12" fill="#6b7280"/>' for i in range(4)) +
+               '<path d="M23 34 v10" stroke="#a5b4c8" stroke-width="3"/>',
         'scale': '<rect x="0" y="16" width="46" height="14" fill="#9ca3af"/>' +
                  ''.join(f'<line x1="{2 + i * 4}" y1="16" x2="{2 + i * 4}" y2="{21 if i % 5 else 24}" stroke="#111827"/>' for i in range(12)) +
                  '<rect x="14" y="8" width="18" height="26" rx="2" fill="#374151"/>',
@@ -318,7 +329,7 @@ def net_sig(net, sigs):
 
 def shield(sigs):
     fp = SD.footprints()
-    K, OX, OY = 7.0, 330, 60
+    K, OX, OY = 7.0, 330, 120
     Wd, H = 1340, int(OY + 126 * K + 170)
     X = lambda v: OX + v * K
     Y = lambda v: OY + v * K
@@ -341,7 +352,7 @@ def shield(sigs):
                 p.append(f'<circle class="hot" data-tip="{e(f"{ref} = P{ref[1]}-{n} · {name}")}" cx="{X(px)}" cy="{Y(py)}" r="4" fill="#4b5563"/>')
         p.append(tx(X(sum(q[0] for q in fp[ref].values()) / 50), Y(max(q[1] for q in fp[ref].values())) + 34,
                     f'{ref} — гнездо P{ref[1]}', 13, '#f1f5f9', 'middle', True))
-    bottom = []
+    bottom, top = [], []
     for ref, (title, nets, labels) in SD.TERM.items():
         ps = fp[ref]
         xs = [q[0] for q in ps.values()]; ys = [q[1] for q in ps.values()]
@@ -364,8 +375,16 @@ def shield(sigs):
             p.append(tx(xx, Y(min(ys)) - 13, ref + ' ' + title, 13, '#f1f5f9', anc, True))
             for n, (px, py) in ps.items():
                 p.append(tx(xx, Y(py) + 4, full[n - 1], 10.5, '#cbd5e1', anc))
+        elif max(ys) < 15:                               # верхний край — подписи над платой
+            top.append((X(mx_), Y(min(ys)) - 11, ref, title, full))
         else:
             bottom.append((X(mx_), Y(max(ys)) + 11, ref, title, full))
+    top.sort()
+    for i, (bx, by, ref, title, full) in enumerate(top):
+        ty = Y(0) - 64 + (i % 2) * 34
+        p.append(f'<path d="M{bx} {by} V{ty + 18}" stroke="#64748b" fill="none"/>')
+        p.append(tx(bx, ty, ref + ' ' + title, 13, '#f1f5f9', 'middle', True))
+        p.append(tx(bx, ty + 15, ' · '.join(full), 10.5, '#94a3b8', 'middle'))
     bottom.sort()
     n = len(bottom)
     for i, (bx, by, ref, title, full) in enumerate(bottom):
@@ -502,7 +521,7 @@ def main():
             .replace('__DATA__', json.dumps(sigs, ensure_ascii=False)))
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(page)
-    miss = [k for k, s in sigs.items() if not s['mid'] and k not in ('DRO_TX', 'AUDIO_RESET')]
+    miss = [k for k, s in sigs.items() if not s['mid'] and k != 'AUDIO_RESET']
     print('docs/wiring.html готов; сигналов', len(sigs), '; без модуля:', miss or 'нет')
 
 

@@ -22,7 +22,8 @@
 
 // ============================================================
 // USART2 через STM32duino HardwareSerial
-// PA3 = RX, PA2 = TX (TX не используется, но нужен для объекта)
+// PA3 = RX, PA2 = TX (TX не используется, но нужен для объекта; после begin() PA2 возвращается во вход —
+// на шилде это разъём датчика J25)
 // ============================================================
 static HardwareSerial DROSerial(PA3, PA2);
 
@@ -110,6 +111,7 @@ static void parse_packet(const uint8_t* p) {
 // ============================================================
 void DRV_DRO_Init(void) {
     DROSerial.begin(DRO_UART_BAUD);
+    pinMode(PA2, INPUT);             // TX блоку DRO не нужен: PA2 — вход датчика (E2_PIN_PROBE), не выход «1»
     s_rxlen  = 0;
     s_synced = 0;
     s_new    = 0;

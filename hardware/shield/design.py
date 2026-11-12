@@ -81,8 +81,10 @@ def sock_pins(table):
             pins[n] = '+5V_DISCO'        # 5V Discovery — через диод D1 от +5V шилда (UM1472 п. 4.3: не больше 100 мА наружу)
         elif name == '3V':
             pins[n] = '+3V'
-        elif name in PIN_TO_NET and PIN_TO_NET[name] not in ('AUDIO_RESET', 'DRO_TX'):
-            pins[n] = PIN_TO_NET[name]   # PD4 (сброс аудиочипа) и PA2 (TX к блоку DRO) наружу не выводятся
+        elif name == 'NRST':
+            pins[n] = 'NRST'             # сброс — на разъём J24 (кнопка на панель, параллельно RESET Discovery)
+        elif name in PIN_TO_NET and PIN_TO_NET[name] != 'AUDIO_RESET':
+            pins[n] = PIN_TO_NET[name]   # PD4 (сброс аудиочипа) наружу не выводится
     return pins
 
 
@@ -133,6 +135,17 @@ part(f'R{r}', 'Device:R', FP_R, '100', {1: 'TACHO', 2: 'TACHO_OUT'}, 'тахом
 for sig in ('SCALE_Z_A', 'SCALE_Z_B', 'SCALE_Z_REQ', 'SCALE_X_A', 'SCALE_X_B', 'SCALE_X_REQ'):
     part(f'R{r}', 'Device:R', FP_R, '470', {1: sig, 2: sig + '_T'}, 'линейка'); r += 1
 
+# Резерв (2026-11-12): датчик/щуп — подтяжка и 10 нФ, как у остальных входов; резервные выходы — 220 Ом
+# (защита вывода при замыкании, модулю реле хватает), резервные вход/выход — 470 Ом, как у линеек
+part('R134', 'Device:R', FP_R, '1k', {1: '+3V', 2: 'PROBE'}, 'подтяжка PROBE')
+part('C9', 'Device:C', FP_C, '10nF', {1: 'PROBE', 2: 'GND'}, 'датчик')
+# PD12 и PD14 (внутренний ряд P1) не выведены: на разведённой плате к ним только путь ~150 мм с 9–10 переходами
+# через плотную середину — R27 и R29 пропущены
+for ref, sig in (('R28', 'RES_OUT2'), ('R30', 'RES_OUT4')):
+    part(ref, 'Device:R', FP_R, '220', {1: sig, 2: sig + '_T'}, 'резервный выход')
+for ref, sig in (('R31', 'RES_IO1'), ('R32', 'RES_IO2')):
+    part(ref, 'Device:R', FP_R, '470', {1: sig, 2: sig + '_T'}, 'резервный вход/выход')
+
 # ── Клеммники (подписи — на шелкографии) ─────────────────────────────────────
 TERMINALS = [
     ('J3', 'ПИТАНИЕ 5В', ['+5V', 'GND'], ['+5V', 'GND']),
@@ -158,6 +171,11 @@ TERMINALS = [
     ('J21', 'ОТЛАДКА', ['GND', 'DBG_TX', 'DBG_RX'], ['GND', 'TX', 'RX']),
     ('J22', 'ЛИНЕЙКА Z', ['+5V', 'GND', 'SCALE_Z_A_T', 'SCALE_Z_B_T', 'SCALE_Z_REQ_T'], ['+5V', 'GND', 'A', 'B', 'REQ']),
     ('J23', 'ЛИНЕЙКА X', ['+5V', 'GND', 'SCALE_X_A_T', 'SCALE_X_B_T', 'SCALE_X_REQ_T'], ['+5V', 'GND', 'A', 'B', 'REQ']),
+    # верхний край (2026-11-12): сброс и резервные разъёмы на будущее
+    ('J24', 'СБРОС', ['NRST', 'GND'], ['RST', 'GND']),
+    ('J25', 'ДАТЧИК (РЕЗЕРВ)', ['+5V', 'GND', 'PROBE'], ['+5V', 'GND', 'ВХ']),
+    ('J26', 'РЕЗЕРВ ВЫХОДЫ PD13 PD15', ['+5V', 'GND', 'RES_OUT2_T', 'RES_OUT4_T'], ['+5V', 'GND', 'D13', 'D15']),
+    ('J27', 'РЕЗЕРВ PA5 PA7', ['+3V', 'GND', 'RES_IO1_T', 'RES_IO2_T'], ['+3V', 'GND', 'A5', 'A7']),
 ]
 for ref, title, nets, labels in TERMINALS:
     n = len(nets)

@@ -40,6 +40,7 @@ GROUPS = [
     ('out',    '#9c6644', 'Зуммер, тахометр, переменник'),
     ('link',   '#444444', 'Дисплей, LCD, DRO, отладка'),
     ('scale',  '#e76f51', 'Линейки напрямую'),
+    ('res',    '#8d99ae', 'Резерв: датчик, выходы, вход/выход'),
 ]
 GCOLOR = {g: c for g, c, _ in GROUPS}
 
@@ -53,6 +54,7 @@ def group_of(name):
     if name.startswith('JOY'): return 'joy'
     if name.startswith(('LIM', 'LED')): return 'lim'
     if name in ('TACHO', 'BEEPER', 'FEED_POT'): return 'out'
+    if name == 'PROBE' or name.startswith('RES_'): return 'res'
     return 'link'
 
 
@@ -78,7 +80,10 @@ TITLES = {
     'FEED_POT': 'Переменный резистор подачи (средний вывод)',
     'LCD_SCL': 'LCD2004 (I2C): SCL', 'LCD_SDA': 'LCD2004 (I2C): SDA',
     'DISP_TX': 'Дисплей ESP32: TX STM32 → RX дисплея', 'DISP_RX': 'Дисплей ESP32: RX STM32 ← TX дисплея',
-    'DRO_RX': 'Блок DRO HS800-2: его TX → сюда', 'DRO_TX': 'Блок DRO: не подключается',
+    'DRO_RX': 'Блок DRO HS800-2: его TX → сюда',
+    'PROBE': 'Датчик / щуп (резерв)', 'RES_OUT2': 'Резервный выход PD13 (на Discovery — LD3)',
+    'RES_OUT4': 'Резервный выход PD15 (на Discovery — LD6)',
+    'RES_IO1': 'Резервный вход/выход 1 (АЦП, ЦАП)', 'RES_IO2': 'Резервный вход/выход 2 (АЦП)',
     'DBG_TX': 'Отладочный порт (USB-UART): TX', 'DBG_RX': 'Отладочный порт (USB-UART): RX',
     'AUDIO_RESET': '— (служебный: держит аудиочип платы выключенным)',
 }
@@ -98,9 +103,10 @@ SHORT = {
     'LIM_RIGHT': 'Упор П', 'LIM_FRONT': 'Упор Перед.', 'LIM_REAR': 'Упор Задн.', 'LED_LEFT': 'Светод. Л',
     'LED_RIGHT': 'Светод. П', 'LED_FRONT': 'Светод. Перед.', 'LED_REAR': 'Светод. Задн.', 'FEED_POT': 'Переменник',
     'LCD_SCL': 'LCD SCL', 'LCD_SDA': 'LCD SDA', 'DISP_TX': 'Дисплей ← TX', 'DISP_RX': 'Дисплей → RX',
-    'DRO_RX': 'DRO (вход)', 'DRO_TX': '—', 'DBG_TX': 'Отладка TX', 'DBG_RX': 'Отладка RX', 'AUDIO_RESET': 'служебный',
+    'DRO_RX': 'DRO (вход)', 'DBG_TX': 'Отладка TX', 'DBG_RX': 'Отладка RX', 'AUDIO_RESET': 'служебный',
     'SCALE_Z_PIN_A': 'Линейка Z A', 'SCALE_Z_PIN_B': 'Линейка Z B', 'SCALE_Z_PIN_REQ': 'Линейка Z REQ',
     'SCALE_X_PIN_A': 'Линейка X A', 'SCALE_X_PIN_B': 'Линейка X B', 'SCALE_X_PIN_REQ': 'Линейка X REQ',
+    'PROBE': 'Датчик (рез.)', 'RES_OUT2': 'Резерв PD13', 'RES_OUT4': 'Резерв PD15', 'RES_IO1': 'Резерв в/в 1', 'RES_IO2': 'Резерв в/в 2',
 }
 
 # Как подключать (короткая подсказка в таблице)
@@ -110,6 +116,7 @@ HOW = {
     'btn': 'кнопка на GND, подтяжка 1k к 3V', 'joy': 'контакт на GND, подтяжка 1k к 3V',
     'lim': 'кнопка на GND / светодиод от 3V через 220 Ом', 'out': 'см. схему', 'link': 'см. схему связи',
     'scale': 'см. docs/scales',
+    'res': 'резерв: датчик — подтяжка 1k и 10 нФ, выходы — 220 Ом, вход/выход — 470 Ом',
 }
 
 
