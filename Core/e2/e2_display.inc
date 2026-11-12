@@ -205,6 +205,41 @@ static int _Display_GetSubMode()
   }
 }
 
+// [STM32] Положение галетников (BACKLOG-038): режим 1..8 / подрежим 1..3, 0 — не подключён или между
+// положениями. Галетник у автора срабатывает по повороту, экран тоже меняет режим — «кто последний, тот
+// и прав». Дисплей сравнивает положение с текущим режимом и подсказывает, что галетник стоит иначе.
+static int _Display_SelMode()
+{
+  switch (Mode_Read)
+  {
+    case B01111111: return Mode_Feed;
+    case B10111111: return Mode_aFeed;
+    case B11011111: return Mode_Cone_L;
+    case B11101111: return Mode_Cone_R;
+    case B11110111: return Mode_Thread;
+    case B11111011: return Mode_Sphere;
+    case B11111101: return Mode_Divider;
+    case B11111110: return Mode_Reserve;
+    default:        return 0;
+  }
+}
+
+static int _Display_SelSub()
+{
+  switch (Submode_Read)
+  {
+    case B11000000: return 1;
+    case B10100000: return 2;
+    case B01100000: return 3;
+    default:        return 0;
+  }
+}
+
+static void _Display_SendSel()
+{
+  Display_Send_Int2("SEL", _Display_SelMode(), _Display_SelSub());
+}
+
 // Рассчитать TOTAL Циклов для M3 (всего, не остаток).
 // Остаток вычисляется на ESP32 из pass_nr: remaining = total - pass_nr + 1
 static int _Display_GetThreadCycles()
@@ -327,6 +362,9 @@ void Display_Send_All()
       limit_Rear_flag  ? 1 : 0);
     Display_Send_CMD("LIMITS", buf);
   }
+
+  // 22. Положение галетников (BACKLOG-038)
+  _Display_SendSel();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,7 +376,7 @@ void Display_Send_All()
 void Display_Watch()
 {
   struct W { int32_t last; };
-  static W w[24];
+  static W w[28];
   static bool s_init = false;
   int i = 0;
   auto chg = [&](int32_t v) {
@@ -378,6 +416,7 @@ void Display_Watch()
              limit_Front_flag ? 1 : 0, limit_Rear_flag ? 1 : 0);
     Display_Send_CMD("LIMITS", buf);
   }
+  if (chg((_Display_SelMode() << 4) | _Display_SelSub())) _Display_SendSel();
   // Угол шпинделя (делилка) — меняется непрерывно при вращении: не чаще 10 раз в секунду
   static uint32_t s_ang_t = 0;
   int32_t ang = Spindle_Angle / 100;

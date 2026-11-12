@@ -134,6 +134,9 @@ void UartProtocol::parseCommand(const char* cmd)
     else if (strcmp(command, "LIMITS") == 0) {
         parseLimits(params);
     }
+    else if (strcmp(command, "SEL") == 0) {
+        parseSel(params);
+    }
     else if (strcmp(command, "SCREEN") == 0) {
         parseScreen(params);
     }
@@ -356,6 +359,15 @@ void UartProtocol::parseLimits(const char* params)
     data_.limits.front = values[2];
     data_.limits.rear = values[3];
 
+    data_dirty_ = true;
+}
+
+void UartProtocol::parseSel(const char* params)
+{
+    int m = 0, sub = 0;
+    sscanf(params, "%d,%d", &m, &sub);
+    data_.sel_mode = (m >= 1 && m <= 8) ? m : 0;
+    data_.sel_sub  = (sub >= 1 && sub <= 3) ? sub : 0;
     data_dirty_ = true;
 }
 

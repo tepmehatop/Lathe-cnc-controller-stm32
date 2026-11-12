@@ -50,7 +50,7 @@ typedef struct {
     LatheSubMode submode;    // Текущий подрежим
 
     int16_t feed_mm;         // Подача (мм/об * 100, т.е. 25 = 0.25 мм/об)
-    int16_t afeed_mm;        // Асинхронная подача (мм/об * 100)
+    int32_t afeed_mm;        // Асинхронная подача, мм/мин (int32: на STM32 uint16 до 65535)
     int16_t thread_mm;       // Резьба (мм * 100, т.е. 150 = 1.50 мм)
     int16_t cone_angle;      // Угол конуса (градусы * 10)
     int16_t sphere_radius;   // Радиус шара (мм * 100)
@@ -103,6 +103,8 @@ typedef struct {
     int16_t  thread_travel;  // Резьба: Ход = Шаг × Заходы (мм × 100)
 
     LimitStatus limits;      // Статус концевиков
+    uint8_t  sel_mode;       // <SEL:m,s> положение галетника режима 1..8, 0 — не подключён/между (BACKLOG-038)
+    uint8_t  sel_sub;        // положение галетника подрежима 1..3, 0 — не подключён/между
 
     bool motor_z_enabled;    // Двигатель Z включен
     bool motor_x_enabled;    // Двигатель X включен
@@ -175,7 +177,7 @@ public:
 
     // Оптимистичные обновления параметров до подтверждения от STM32
     void setFeedOptimistic(int16_t v) { data_.feed_mm = v; }
-    void setAfeedOptimistic(int16_t v) { data_.afeed_mm = v; }
+    void setAfeedOptimistic(int32_t v) { data_.afeed_mm = v; }
     void setApOptimistic(int16_t v) { data_.ap = v; }
     void setBarOptimistic(int16_t v) { data_.bar_r = v; }
     void setSphereOptimistic(int16_t v) { data_.sphere_radius = v; }
@@ -270,6 +272,7 @@ private:
     void parsePosX(const char* params);
     void parseRPM(const char* params);
     void parseLimits(const char* params);
+    void parseSel(const char* params);          // <SEL:3,2>          → sel_mode=3, sel_sub=2
     void parseScreen(const char* params);
     void parsePass(const char* params);    // <PASS:nr,total>
     void parseAp(const char* params);     // <AP:50>  → 0.50мм

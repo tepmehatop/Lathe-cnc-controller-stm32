@@ -446,6 +446,7 @@ struct UIHandles {
     // Statusbar
     lv_obj_t* mode_lbl;           // "M3 - РЕЗЬБА"
     lv_obj_t* submode_lbl;        // "Наружная" / "Внутренняя" / "Ручная"
+    lv_obj_t* sel_lbl;            // «галетник: РЕЗЬБА» — галетник стоит не там, где режим (BACKLOG-038)
     lv_obj_t* thr_cat_lbl;        // Индикатор категории резьбы ("ДЮЙМ"/"G-ТРУБ") вверху
 
     // Правая панель — 3 строки (title + value)
@@ -2603,6 +2604,17 @@ lv_obj_t* create_dark_pro_ui()
         lv_obj_set_style_text_font(submode_label, &font_dejavu_16, 0);
         lv_label_set_text(submode_label, "");  // обновится по UART
         g_ui.submode_lbl = submode_label;
+
+        // Галетник стоит не в том положении, что выбранный режим/подрежим (выбран с экрана) — две строки
+        // на месте подрежима; подрежим при этом виден в кружке S1/S2/S3 (BACKLOG-038)
+        lv_obj_t* sel_label = lv_label_create(statusbar);
+        lv_obj_set_pos(sel_label, UX(210), UY(1));
+        lv_obj_set_style_text_color(sel_label, lv_color_hex(0xffaa00), 0);
+        lv_obj_set_style_text_font(sel_label, &font_dejavu_14, 0);
+        lv_obj_set_style_text_line_space(sel_label, 0, 0);
+        lv_label_set_text(sel_label, "");
+        lv_obj_add_flag(sel_label, LV_OBJ_FLAG_HIDDEN);
+        g_ui.sel_lbl = sel_label;
     }
 
     // Иконка S2 (зелёная, активная)
@@ -4919,6 +4931,28 @@ static void update_ui_values(const LatheData& data)
             lv_obj_set_style_text_color(g_ui.submode_lbl, lv_color_hex(0x4a7a8a), 0);
         }
 
+        // Галетник не совпадает с режимом (режим выбран с экрана): «кто последний, тот и прав» — режим
+        // сменится при повороте галетника. Подрежим сравниваем только в режимах, где он есть (M1–M6).
+        if (g_ui.sel_lbl) {
+            static char sel_txt[64];
+            sel_txt[0] = '\0';
+            if (data.sel_mode && data.sel_mode != data.mode)
+                snprintf(sel_txt, sizeof(sel_txt), "\xD0\xB3\xD0\xB0\xD0\xBB\xD0\xB5\xD1\x82\xD0\xBD\xD0\xB8\xD0\xBA:\n%s",   // галетник:
+                         MODE_STRS[data.sel_mode]);
+            else if (data.sel_sub && data.mode >= MODE_FEED && data.mode <= MODE_SPHERE && data.sel_sub != data.submode)
+                snprintf(sel_txt, sizeof(sel_txt), "\xD0\xB3\xD0\xB0\xD0\xBB\xD0\xB5\xD1\x82\xD0\xBD\xD0\xB8\xD0\xBA:\n%s",
+                         SUBMODE_STRS[data.sel_sub]);
+            if (sel_txt[0]) {
+                if (strcmp(lv_label_get_text(g_ui.sel_lbl), sel_txt) != 0) lv_label_set_text(g_ui.sel_lbl, sel_txt);
+                lv_obj_clear_flag(g_ui.sel_lbl, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(g_ui.submode_lbl, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                if (lv_label_get_text(g_ui.sel_lbl)[0]) lv_label_set_text(g_ui.sel_lbl, "");
+                lv_obj_add_flag(g_ui.sel_lbl, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_clear_flag(g_ui.submode_lbl, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+
         // Кружок подрежима S1/S2/S3
         if (g_ui.s2_bg && g_ui.s2_lbl && si >= 1 && si <= 3) {
             static const char* snames[] = {"S1","S2","S3"};
@@ -4993,7 +5027,7 @@ static void update_ui_values(const LatheData& data)
                     snprintf(buf, sizeof(buf), "%d.%d",
                              data.spindle_angle / 10, abs(data.spindle_angle % 10));
                 } else {
-                    snprintf(buf, sizeof(buf), "%d", data.afeed_mm);
+                    snprintf(buf, sizeof(buf), "%d", (int)data.afeed_mm);
                 }
                 break;
             case MODE_SPHERE:
@@ -5958,7 +5992,7 @@ void onDataUpdate(const LatheData& data)
 static void ui_dump()
 {
     const struct { const char* key; lv_obj_t* obj; } labels[] = {
-        {"mode_lbl", g_ui.mode_lbl},         {"submode_lbl", g_ui.submode_lbl},
+        {"mode_lbl", g_ui.mode_lbl},         {"submode_lbl", g_ui.submode_lbl}, {"sel_lbl", g_ui.sel_lbl},
         {"primary_unit", g_ui.primary_unit}, {"primary_val", g_ui.primary_val},
         {"thread_tag", g_ui.thread_tag},
         {"secondary_unit", g_ui.secondary_unit}, {"secondary_val", g_ui.secondary_val},
