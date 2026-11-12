@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+<rect x="0" y="0" width="1000" height="560" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="1000" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">ELS — Visual Studio Code</text>
+<text x="880" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="920" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="960" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="1000" height="528" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="506" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="0" y="44" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⊞</text>
+<text x="24" y="311" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">👽</text>
+<rect x="0" y="538" width="1000" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="250" y="40" width="520" height="330" rx="6" fill="#252526" stroke="#454545" stroke-width="1"/>
+<text x="266" y="64" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Select Project Environment</text>
+<text x="266" y="92" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">Default (stm32f407_discovery)</text>
+<text x="756" y="92" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve"></text>
+<text x="266" y="119" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:stm32f407_discovery</text>
+<text x="756" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">STM32, без линеек</text>
+<rect x="252" y="128" width="516" height="26" rx="0" fill="#04395e" stroke="none" stroke-width="1"/>
+<circle cx="790" cy="141" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="790" y="146" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<text x="266" y="146" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:stm32f407_dro</text>
+<text x="756" y="146" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">STM32, блок DRO</text>
+<text x="266" y="173" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:stm32f407_scales</text>
+<text x="756" y="173" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">STM32, линейки напрямую</text>
+<text x="266" y="200" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:jc4827w543</text>
+<text x="756" y="200" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">дисплей 4.3&quot;</text>
+<text x="266" y="227" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:jc8012p4a1c</text>
+<text x="756" y="227" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">дисплей 10.1&quot;</text>
+<text x="266" y="254" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:jc1060p470</text>
+<text x="756" y="254" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">дисплей 7&quot; (без «V2»)</text>
+<text x="266" y="281" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:jc1060p470_v2</text>
+<text x="756" y="281" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">дисплей 7&quot; «V2»</text>
+<text x="266" y="308" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:jc1060p470_v3</text>
+<text x="756" y="308" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">дисплей 7&quot; «V2», ESP32-P4 rev 3</text>
+<text x="266" y="335" font-family="Consolas, Menlo, monospace" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">env:dro_simulator</text>
+<text x="756" y="335" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">стенд, не нужен</text>
+<rect x="48" y="538" width="952" height="22" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="60" y="553" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">⌂   ✓   →   🗑   ⚗   🔌   ▭</text>
+<text x="300" y="553" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="start" xml:space="preserve">⚙ env:stm32f407_discovery (ELS)</text>
+<rect x="293" y="535" width="256" height="26" rx="4" fill="none" stroke="#e0242b" stroke-width="2"/>
+<circle cx="566" cy="548" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="566" y="553" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<text x="992" y="554" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

@@ -118,12 +118,14 @@ ol.steps > li { margin-bottom: 10px; }
 <p>Макетная плата, провода «папа–мама», Arduino Mega 2560 — она изображает блок DRO и линейки, если станка рядом нет (раздел 8). USB-UART переходник (CP2102/CH340) — читать сообщения платы.</p>
 
 <h2 id="flash">3. Что куда прошить</h2>
+<p><b><a href="windows/README.md">Под Windows с нуля, с картинками →</a></b> готовая прошивка с GitHub (браузер + STM32CubeProgrammer) или своя сборка в VS Code + PlatformIO и примеры настроек.</p>
 <p>Нужен компьютер с <b>VS Code</b> и расширением <b>PlatformIO</b>. Откройте папку проекта — PlatformIO сам скачает всё нужное.</p>
 <table>
 <tr><th>Устройство</th><th>Как подключить к компьютеру</th><th>Команда (или кнопка в PlatformIO)</th></tr>
 <tr><td>Плата STM32 (контроллер)</td><td>mini-USB в разъём ST-Link (вверху платы)</td><td>без линеек: <code>pio run -e stm32f407_discovery -t upload</code><br>с блоком DRO: <code>pio run -e stm32f407_dro -t upload</code><br>линейки напрямую: <code>pio run -e stm32f407_scales -t upload</code></td></tr>
 <tr><td>Дисплей 4.3" JC4827W543</td><td>USB-C дисплея</td><td><code>pio run -e jc4827w543 -t upload</code></td></tr>
 <tr><td>Дисплей 10.1" JC8012P4A1C</td><td>USB-C дисплея</td><td><code>pio run -e jc8012p4a1c -t upload</code></td></tr>
+<tr><td>Дисплей 7" JC1060P470 (не проверен на железе)</td><td>USB-C дисплея</td><td><code>pio run -e jc1060p470 -t upload</code> (метка «V2» — <code>jc1060p470_v2</code>, ESP32-P4 rev 3 — <code>jc1060p470_v3</code>)</td></tr>
 <tr><td>Arduino Mega — эмулятор (по желанию)</td><td>USB Mega</td><td>в папке <code>Simulator/dro_simulator</code>: <code>pio run -t upload</code></td></tr>
 </table>
 <div class="box warn">Перед прошивкой STM32 выберите в <code>Core/els_config.h</code> свой дисплей и источник координат (раздел 4). Если тип дисплея в настройках и реально подключённый не совпадут — на экране появится предупреждение.</div>

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+<rect x="0" y="0" width="1000" height="560" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="1000" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">Extensions — Visual Studio Code</text>
+<text x="880" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="920" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="960" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="1000" height="528" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="506" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<rect x="0" y="236" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">⊞</text>
+<rect x="0" y="538" width="1000" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<circle cx="70" cy="258" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="70" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<rect x="1" y="233" width="46" height="46" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<rect x="48" y="32" width="330" height="506" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="64" y="58" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#cccccc" text-anchor="start" xml:space="preserve">РАСШИРЕНИЯ: МАГАЗИН</text>
+<rect x="64" y="72" width="298" height="26" rx="0" fill="#313131" stroke="#0078d4" stroke-width="1"/>
+<text x="72" y="90" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="start" xml:space="preserve">platformio</text>
+<rect x="61" y="69" width="304" height="32" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="392" cy="85" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="392" y="90" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<rect x="56" y="112" width="314" height="70" rx="0" fill="#04395e" stroke="none" stroke-width="1"/>
+<rect x="66" y="122" width="46" height="46" rx="6" fill="#f5821f" stroke="none" stroke-width="1"/>
+<text x="89" y="153" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="24" fill="#ffffff" text-anchor="middle" xml:space="preserve">👽</text>
+<text x="122" y="138" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="start" font-weight="bold" xml:space="preserve">PlatformIO IDE</text>
+<text x="122" y="157" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#cccccc" text-anchor="start" xml:space="preserve">Professional development environment…</text>
+<text x="122" y="175" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#3794ff" text-anchor="start" xml:space="preserve">PlatformIO   ✓</text>
+<text x="122" y="214" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" font-weight="bold" xml:space="preserve">C/C++</text>
+<text x="122" y="233" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#9d9d9d" text-anchor="start" xml:space="preserve">C/C++ IntelliSense, debugging…</text>
+<text x="122" y="278" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" font-weight="bold" xml:space="preserve">Python</text>
+<text x="122" y="297" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#9d9d9d" text-anchor="start" xml:space="preserve">Python language support…</text>
+<text x="400" y="80" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="26" fill="#ffffff" text-anchor="start" font-weight="bold" xml:space="preserve">PlatformIO IDE</text>
+<text x="400" y="106" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#9d9d9d" text-anchor="start" xml:space="preserve">PlatformIO  |  ⇩ 4 000 000+  |  ★★★★★</text>
+<text x="400" y="132" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Your Gateway to Embedded Software Development Excellence</text>
+<rect x="400" y="150" width="90" height="28" rx="2" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="445.0" y="168.68" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle" xml:space="preserve">Install</text>
+<rect x="397" y="147" width="96" height="34" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="512" cy="164" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="512" y="169" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">3</text>
+<text x="400" y="220" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#9d9d9d" text-anchor="start" xml:space="preserve">Установка — 1–2 минуты. Затем PlatformIO сам скачает свой Python и инструменты</text>
+<text x="400" y="240" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#9d9d9d" text-anchor="start" xml:space="preserve">(справа внизу — «Installing PlatformIO IDE Core…»), это ещё 5–10 минут.</text>
+<text x="992" y="554" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

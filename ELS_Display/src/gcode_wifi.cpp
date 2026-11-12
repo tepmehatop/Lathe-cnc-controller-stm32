@@ -11,8 +11,9 @@
 
 #include "gcode_wifi.h"
 #include "gcode_exec.h"
-#ifdef ELS_RELEASE
-#include "wifi_config.example.h"   // релиз (tools/make_release.sh): только шаблон, без чужих сетей и паролей
+#if defined(ELS_RELEASE) || !__has_include("wifi_config.h")
+#include "wifi_config.example.h"   // релиз (tools/make_release.sh) и свежая копия исходников: только шаблон,
+                                   // сеть — на экране (⚠ → НАСТРОЙКИ → WI-FI)
 #else
 #include "wifi_config.h"
 #endif

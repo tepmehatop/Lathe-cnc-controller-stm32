@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="640" viewBox="0 0 900 640">
+<rect x="0" y="0" width="900" height="640" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="900" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">Releases — Google Chrome</text>
+<text x="780" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="820" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="860" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="900" height="40" rx="0" fill="#f8f8f8" stroke="none" stroke-width="1"/>
+<rect x="110" y="40" width="680" height="26" rx="13" fill="#ffffff" stroke="#d0d0d0" stroke-width="1"/>
+<text x="126" y="58" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#505050" text-anchor="start" xml:space="preserve">github.com/&lt;автор&gt;/Lathe-cnc-controller-stm32/releases/latest</text>
+<text x="20" y="58" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#606060" text-anchor="start" xml:space="preserve">←   →   ⟳</text>
+<line x1="0" y1="72" x2="900" y2="72" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="112" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="16" fill="#0969da" text-anchor="start" xml:space="preserve">&lt;автор&gt; / Lathe-cnc-controller-stm32</text>
+<text x="40" y="150" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="26" fill="#1f2328" text-anchor="start" font-weight="bold" xml:space="preserve">v0.3.0</text>
+<rect x="150" y="128" width="56" height="22" rx="11" fill="#ffffff" stroke="#1a7f37" stroke-width="1"/>
+<text x="178.0" y="143.32" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#1a7f37" text-anchor="middle" xml:space="preserve">Latest</text>
+<text x="40" y="178" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="start" xml:space="preserve">Что нового … Файлы … Как прошить (то же, что docs/RELEASE.md)</text>
+<rect x="40" y="196" width="820" height="400" rx="6" fill="#ffffff" stroke="#d1d9e0" stroke-width="1"/>
+<text x="56" y="224" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="15" fill="#1f2328" text-anchor="start" font-weight="bold" xml:space="preserve">▾ Assets  9</text>
+<line x1="40" y1="236" x2="860" y2="236" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="258" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-display-jc1060p470.bin</text>
+<text x="840" y="258" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">2.08 MB</text>
+<line x1="40" y1="274" x2="860" y2="274" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="296" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-display-jc1060p470_v2.bin</text>
+<text x="840" y="296" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">2.08 MB</text>
+<line x1="40" y1="312" x2="860" y2="312" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="334" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-display-jc1060p470_v3.bin</text>
+<text x="840" y="334" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">2.08 MB</text>
+<line x1="40" y1="350" x2="860" y2="350" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="372" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-display-jc4827w543.bin</text>
+<text x="840" y="372" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">1.61 MB</text>
+<line x1="40" y1="388" x2="860" y2="388" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="410" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-display-jc8012p4a1c.bin</text>
+<text x="840" y="410" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">2.51 MB</text>
+<rect x="53" y="389" width="279" height="32" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="353" cy="405" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="353" y="410" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<line x1="40" y1="426" x2="860" y2="426" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="448" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  els-stm32-dro.bin</text>
+<text x="840" y="448" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">153 KB</text>
+<rect x="53" y="427" width="189" height="32" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="263" cy="443" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="263" y="448" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<line x1="40" y1="464" x2="860" y2="464" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="486" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  SHA256SUMS.txt</text>
+<text x="840" y="486" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve">0.5 KB</text>
+<line x1="40" y1="502" x2="860" y2="502" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="524" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  Source code (zip)</text>
+<text x="840" y="524" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve"></text>
+<line x1="40" y1="540" x2="860" y2="540" stroke="#d1d9e0" stroke-width="1"/>
+<text x="60" y="562" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#0969da" text-anchor="start" xml:space="preserve">◫  Source code (tar.gz)</text>
+<text x="840" y="562" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#59636e" text-anchor="end" xml:space="preserve"></text>
+<text x="892" y="634" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

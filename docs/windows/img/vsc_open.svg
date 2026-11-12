@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+<rect x="0" y="0" width="1000" height="560" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="1000" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">Visual Studio Code</text>
+<text x="880" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="920" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="960" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="1000" height="528" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="506" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="0" y="44" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⊞</text>
+<text x="24" y="311" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">👽</text>
+<rect x="0" y="538" width="1000" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="48" y="32" width="952" height="24" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<text x="60" y="49" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">Файл    Правка    Выделение    Вид    …</text>
+<rect x="54" y="56" width="330" height="190" rx="0" fill="#252526" stroke="#454545" stroke-width="1"/>
+<text x="70" y="82" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Новый текстовый файл</text>
+<text x="372" y="82" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">Ctrl+N</text>
+<text x="70" y="109" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Новое окно</text>
+<text x="372" y="109" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">Ctrl+Shift+N</text>
+<line x1="64" y1="130" x2="374" y2="130" stroke="#454545" stroke-width="1"/>
+<text x="70" y="163" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Открыть файл…</text>
+<text x="372" y="163" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">Ctrl+O</text>
+<text x="70" y="190" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Открыть папку…</text>
+<text x="372" y="190" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">Ctrl+K Ctrl+O</text>
+<rect x="57" y="170" width="324" height="30" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="398" cy="185" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="398" y="190" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<text x="70" y="217" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">Открыть последние</text>
+<text x="372" y="217" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#9d9d9d" text-anchor="end" xml:space="preserve">▸</text>
+<rect x="48" y="270" width="300" height="268" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="60" y="292" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#cccccc" text-anchor="start" xml:space="preserve">ПРОВОДНИК</text>
+<text x="60" y="316" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" font-weight="bold" xml:space="preserve">▾ ELS</text>
+<text x="72" y="340" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ Core</text>
+<text x="72" y="361" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ Drivers</text>
+<text x="72" y="382" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ ELS_Display</text>
+<text x="72" y="403" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ ELS_Display_P4</text>
+<text x="72" y="424" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ ELS_Display_P7</text>
+<text x="72" y="445" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ docs</text>
+<text x="72" y="466" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">▸ tools</text>
+<text x="72" y="487" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">  platformio.ini</text>
+<text x="72" y="508" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">  README.md</text>
+<rect x="63" y="319" width="276" height="202" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="360" cy="420" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="360" y="425" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<text x="420" y="340" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" xml:space="preserve">Папка C:\els — та, где лежит platformio.ini.</text>
+<text x="420" y="364" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" xml:space="preserve">При первом открытии PlatformIO скачивает компиляторы</text>
+<text x="420" y="388" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" xml:space="preserve">для STM32 и ESP32 (около 2 ГБ, 10–30 минут) — внизу</text>
+<text x="420" y="412" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" xml:space="preserve">бежит строка «Configuring project…». Дождитесь конца.</text>
+<text x="992" y="554" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

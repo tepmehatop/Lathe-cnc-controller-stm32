@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+<rect x="0" y="0" width="1000" height="560" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="1000" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">Visual Studio Code</text>
+<text x="880" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="920" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="960" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="1000" height="528" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="506" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⊞</text>
+<rect x="0" y="284" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="311" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">👽</text>
+<rect x="0" y="538" width="1000" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="1" y="281" width="46" height="46" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="70" cy="304" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="70" y="309" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<text x="300" y="200" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#cccccc" text-anchor="start" xml:space="preserve">После установки слева появляется значок PlatformIO (голова пришельца)</text>
+<rect x="560" y="420" width="420" height="100" rx="4" fill="#252526" stroke="#454545" stroke-width="1"/>
+<text x="576" y="448" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#cccccc" text-anchor="start" xml:space="preserve">ⓘ  PlatformIO: Please restart VSCode to apply the changes.</text>
+<rect x="820" y="476" width="140" height="28" rx="2" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="890.0" y="494.68" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle" xml:space="preserve">Reload Now</text>
+<rect x="817" y="473" width="146" height="34" rx="4" fill="none" stroke="#e0242b" stroke-width="3"/>
+<circle cx="800" cy="490" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="800" y="495" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<text x="992" y="554" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

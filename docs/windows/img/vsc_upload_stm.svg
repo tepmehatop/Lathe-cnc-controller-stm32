@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="330" viewBox="0 0 1000 330">
+<rect x="0" y="0" width="1000" height="330" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="1000" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">Сборка и прошивка STM32 — Visual Studio Code</text>
+<text x="880" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="920" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="960" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="1000" height="298" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="276" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⊞</text>
+<rect x="0" y="284" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="311" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">👽</text>
+<rect x="0" y="308" width="1000" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="48" y="52" width="952" height="230" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<text x="60" y="70" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#e7e7e7" text-anchor="start" xml:space="preserve">ТЕРМИНАЛ</text>
+<text x="64" y="96" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve"> *  Executing task: platformio run --target upload --environment stm32f407_dro</text>
+<text x="64" y="117" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">Processing stm32f407_dro (platform: ststm32@19.5.0; board: disco_f407vg; framework: arduino)</text>
+<text x="64" y="138" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">RAM:   [=         ]  10.0% (used 13052 bytes from 131072 bytes)</text>
+<text x="64" y="159" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">Flash: [=         ]  14.9% (used 155900 bytes from 1048576 bytes)</text>
+<text x="64" y="180" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">Configuring upload protocol...</text>
+<text x="64" y="201" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">Uploading .pio\build\stm32f407_dro\firmware.elf</text>
+<text x="64" y="222" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">** Programming Started **</text>
+<text x="64" y="243" font-family="Consolas, Menlo, monospace" font-size="12" fill="#cccccc" text-anchor="start" xml:space="preserve">** Programming Finished **</text>
+<text x="64" y="264" font-family="Consolas, Menlo, monospace" font-size="12" fill="#23d18b" text-anchor="start" xml:space="preserve">** Verified OK **</text>
+<rect x="57" y="246" width="150" height="26" rx="4" fill="none" stroke="#e0242b" stroke-width="2"/>
+<circle cx="232" cy="259" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="232" y="264" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">1</text>
+<text x="64" y="285" font-family="Consolas, Menlo, monospace" font-size="12" fill="#23d18b" text-anchor="start" xml:space="preserve">========================= [SUCCESS] Took 13.00 seconds =========================</text>
+<rect x="57" y="267" width="654" height="26" rx="4" fill="none" stroke="#e0242b" stroke-width="2"/>
+<circle cx="736" cy="280" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="736" y="285" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">2</text>
+<text x="992" y="324" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#9aa0a6" text-anchor="end" xml:space="preserve">схема окна (рисунок), не снимок экрана</text>
+</svg>

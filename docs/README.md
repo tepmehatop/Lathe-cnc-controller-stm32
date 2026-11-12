@@ -22,6 +22,8 @@ STM32F4DISCOVERY, кабель mini-USB, дисплей JC4827W543 или JC8012
 
 ## 3. Что куда прошить
 
+Под Windows с нуля, с картинками — [windows/README.md](windows/README.md) (готовая прошивка или своя сборка).
+
 | Устройство | Команда |
 |---|---|
 | Плата STM32 без линеек (USB в разъём ST-Link) | `pio run -e stm32f407_discovery -t upload` |
@@ -29,6 +31,7 @@ STM32F4DISCOVERY, кабель mini-USB, дисплей JC4827W543 или JC8012
 | Плата STM32 с линейками напрямую | `pio run -e stm32f407_scales -t upload` |
 | Дисплей 4.3" | `pio run -e jc4827w543 -t upload` |
 | Дисплей 10.1" | `pio run -e jc8012p4a1c -t upload` |
+| Дисплей 7" (не проверен на железе) | `pio run -e jc1060p470 -t upload` (метка «V2» — `jc1060p470_v2`, ESP32-P4 rev 3 — `jc1060p470_v3`) |
 | Arduino Mega — эмулятор | в `Simulator/dro_simulator`: `pio run -t upload` |
 
 ## 4. Настройка

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="296" viewBox="0 0 760 296">
+<rect x="0" y="0" width="760" height="296" rx="0" fill="#ffffff" stroke="#9aa0a6" stroke-width="1"/>
+<rect x="0" y="0" width="760" height="32" rx="0" fill="#f3f3f3" stroke="none" stroke-width="1"/>
+<text x="14" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#202020" text-anchor="start" xml:space="preserve">wifi_config.h — Visual Studio Code</text>
+<text x="640" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">—</text>
+<text x="680" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">☐</text>
+<text x="720" y="21" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#404040" text-anchor="middle" xml:space="preserve">✕</text>
+<rect x="0" y="32" width="760" height="264" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<rect x="0" y="32" width="48" height="242" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="0" y="44" width="3" height="40" rx="0" fill="#0078d4" stroke="none" stroke-width="1"/>
+<text x="24" y="71" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" xml:space="preserve">⧉</text>
+<text x="24" y="119" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⌕</text>
+<text x="24" y="167" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⑂</text>
+<text x="24" y="215" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">▷</text>
+<text x="24" y="263" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">⊞</text>
+<text x="24" y="311" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="20" fill="#858585" text-anchor="middle" xml:space="preserve">👽</text>
+<rect x="0" y="274" width="760" height="22" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="48" y="32" width="712" height="30" rx="0" fill="#181818" stroke="none" stroke-width="1"/>
+<rect x="48" y="32" width="129.5" height="30" rx="0" fill="#1f1f1f" stroke="none" stroke-width="1"/>
+<text x="60" y="52" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="start" xml:space="preserve">wifi_config.h ●</text>
+<text x="60" y="80" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="11" fill="#9d9d9d" text-anchor="start" xml:space="preserve">ELS_Display › include › wifi_config.h</text>
+<text x="92" y="106" font-family="Consolas, Menlo, monospace" font-size="12" fill="#6e7681" text-anchor="end" xml:space="preserve">8</text>
+<text x="104" y="106" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#6a9955" text-anchor="start" xml:space="preserve">// Пусто — сразу точка доступа. Сеть роутера можно задать и на экране: ⚠ → НАСТРОЙКИ → WI-FI</text>
+<text x="92" y="127" font-family="Consolas, Menlo, monospace" font-size="12" fill="#6e7681" text-anchor="end" xml:space="preserve">9</text>
+<text x="104" y="127" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#6a9955" text-anchor="start" xml:space="preserve">// (хранится в памяти дисплея и главнее этих строк).</text>
+<rect x="48" y="133" width="712" height="21" rx="0" fill="#264f78" stroke="none" stroke-width="1"/>
+<text x="92" y="148" font-family="Consolas, Menlo, monospace" font-size="12" fill="#6e7681" text-anchor="end" xml:space="preserve">10</text>
+<text x="104" y="148" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#c586c0" text-anchor="start" xml:space="preserve">#define WIFI_STA_SSID  &quot;MyHomeWiFi&quot;</text>
+<circle cx="736" cy="143" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="736" y="148" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">✎</text>
+<rect x="48" y="154" width="712" height="21" rx="0" fill="#264f78" stroke="none" stroke-width="1"/>
+<text x="92" y="169" font-family="Consolas, Menlo, monospace" font-size="12" fill="#6e7681" text-anchor="end" xml:space="preserve">11</text>
+<text x="104" y="169" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#c586c0" text-anchor="start" xml:space="preserve">#define WIFI_STA_PASS  &quot;пароль_роутера&quot;</text>
+<circle cx="736" cy="164" r="13" fill="#e0242b" stroke="#ffffff" stroke-width="2"/>
+<text x="736" y="169" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold" xml:space="preserve">✎</text>
+<text x="60" y="198" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#ffcc66" text-anchor="start" xml:space="preserve">✎ строка 10: #define WIFI_STA_SSID &quot;&quot;  →  #define WIFI_STA_SSID &quot;MyHomeWiFi&quot;   — сеть роутера</text>
+<text x="60" y="219" font-family="Consolas, Menlo, monospace" font-size="12.5" fill="#ffcc66" text-anchor="start" xml:space="preserve">✎ строка 11: #define WIFI_STA_PASS &quot;&quot;  →  #define WIFI_STA_PASS &quot;пароль_роутера&quot;   — пароль</text>
+<text x="60" y="248" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="13" fill="#ffcc66" text-anchor="start" font-weight="bold" xml:space="preserve">Пример 9: Wi-Fi в прошивке дисплея — копия шаблона под именем wifi_config.h (проще — на экране)</text>
+<text x="752" y="268" font-family="Segoe UI, Tahoma, Arial, sans-serif" font-size="10" fill="#6e7681" text-anchor="end" xml:space="preserve">вид в редакторе; строки — из файла проекта</text>
+</svg>
