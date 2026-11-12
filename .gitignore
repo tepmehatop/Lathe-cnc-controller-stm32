@@ -56,3 +56,7 @@ hardware/shield/els_shield_drc_violations.json
 hardware/shield/gerbers/
 # исходные снимки руководства (могут содержать имя сети Wi-Fi) — в git только размеченные
 docs/manual/raw/
+
+# KiCad: локальная история и блокировка открытого файла
+hardware/shield/.history/
+*.lck

@@ -8,7 +8,7 @@ import html, os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 
-for script in ('scales_svg.py', 'wiring_svg.py', 'shield_docs.py'):
+for script in ('scales_svg.py', 'wiring_svg.py', 'shield_docs.py', 'wiring_html.py'):
     subprocess.run([sys.executable, os.path.join(HERE, script)], check=True)
 
 # Таблица выводов: markdown → HTML
