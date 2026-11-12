@@ -16,10 +16,13 @@
 // Управление сборкой: установить нужный флаг в platformio.ini build_flags:
 //   -DJC4827W543_DISPLAY=1   → 4.3" ESP32-S3 (env:jc4827w543)
 //   -DJC8012P4A1C_DISPLAY=1  → 10.1" ESP32-P4 (env:jc8012p4a1c)
+//   -DJC1060P470_DISPLAY=1   → 7" ESP32-P4 (env:jc1060p470, jc1060p470_v2, jc1060p470_v3)
 // ============================================================================
 
 #ifdef JC8012P4A1C_DISPLAY
     #define DISPLAY_JC8012P4A1C
+#elif defined(JC1060P470_DISPLAY)
+    #define DISPLAY_JC1060P470
 #elif defined(JC4827W543_DISPLAY)
     #define DISPLAY_JC4827W543
 #else
@@ -70,6 +73,18 @@
     // Масштаб 480×272 → 1280×800
     #define SCALE_FACTOR_X 2.667f  // 1280/480
     #define SCALE_FACTOR_Y 2.941f  // 800/272
+
+#elif defined(DISPLAY_JC1060P470)
+    // JC1060P470: 7" ESP32-P4, панель 1024×600 (ландшафт), LVGL 1024×600 нативно
+    #define SCREEN_WIDTH  1024
+    #define SCREEN_HEIGHT 600
+
+    #define DISPLAY_NAME "JC1060P470"
+    #define DISPLAY_SIZE "7\""
+    #define DISPLAY_TYPE_CODE 70   // = DISPLAY_TYPE_7_0 в els_config.h STM32
+
+    #define SCALE_FACTOR_X 2.133f  // 1024/480
+    #define SCALE_FACTOR_Y 2.206f  // 600/272
 
 #else
     #error "No display selected! Set -DJC4827W543_DISPLAY=1 or -DJC8012P4A1C_DISPLAY=1 in platformio.ini"
@@ -177,6 +192,10 @@ extern ColorScheme current_color_scheme;
     // ESP32-P4: разъём CN2 "INPUT" (MX1.25 4P: VIN, TXD, RXD, GND) = UART0_TXD/RXD
     // по схеме docs/JC8012P4A1C_I_W_Y/5-Schematic/3_ESP32-P4.png и 4_CONN.png.
     // GPIO14..19 заняты SDIO до ESP32-C6 (WiFi) — их использовать нельзя.
+    #define UART_RX_PIN     38
+    #define UART_TX_PIN     37
+#elif defined(DISPLAY_JC1060P470)
+    // 7" ESP32-P4: UART0 (как у 10.1") — см. ELS_Display_P7/include/display_config_p7.h
     #define UART_RX_PIN     38
     #define UART_TX_PIN     37
 #else

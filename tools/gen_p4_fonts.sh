@@ -9,16 +9,18 @@
 # Требуется: lv_font_conv (npm i -g lv_font_conv), Tahoma Bold (macOS),
 #            собранный хотя бы раз env jc8012p4a1c (для TTF из библиотеки LVGL).
 # Запуск из корня проекта: bash tools/gen_p4_fonts.sh
+# 7" JC1060P470 (1024×600, ×32/15):  OUT=ELS_Display_P7/fonts NUM=32 DEN=15 bash tools/gen_p4_fonts.sh
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-OUT=ELS_Display_P4/fonts
+OUT=${OUT:-ELS_Display_P4/fonts}
+NUM=${NUM:-8}; DEN=${DEN:-3}            # масштаб от 4.3": 10.1" — 8/3, 7" — 32/15
 LVF=.pio/libdeps/jc8012p4a1c/lvgl/scripts/built_in_font
 TAHOMA="/System/Library/Fonts/Supplemental/Tahoma Bold.ttf"
 mkdir -p "$OUT"
 
-scale() { echo $(( ($1 * 8 + 1) / 3 )); }   # округление 4.3"-размера ×8/3
+scale() { echo $(( ($1 * NUM + DEN / 2) / DEN )); }   # округление 4.3"-размера ×NUM/DEN
 
 gen() {  # gen <имя> <4.3-размер> <ttf> <диапазоны> [доп. аргументы lv_font_conv]
     local name=$1 base=$2 size; size=$(scale "$2"); local ttf=$3 ranges=$4; shift 4

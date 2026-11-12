@@ -42,20 +42,16 @@
 
 // ── Сенсорный дисплей ESP32 (по UART) ────────────────────────────────────────
 // Прошивка дисплея собирается отдельно под свой размер: env jc4827w543 (4.3")
-// или jc8012p4a1c (10.1") — см. DISPLAYS.md. При старте дисплей сообщает свой
+// jc8012p4a1c (10.1") или jc1060p470* (7") — см. DISPLAYS.md. Протокол у всех одинаковый. При старте дисплей сообщает свой
 // тип; если он не совпадает с выбранным здесь, STM32 пишет предупреждение
 // в отладочный порт и показывает его на дисплее.
 #define DISPLAY_TYPE_NONE       0   // без ESP32-дисплея (только LCD2004)
 #define DISPLAY_TYPE_4_3        43  // JC4827W543, 4.3" 480×272
-#define DISPLAY_TYPE_7_0        70  // 7" — зарезервировано, пока не поддерживается
+#define DISPLAY_TYPE_7_0        70  // JC1060P470, 7" 1024×600 (на железе не проверялся)
 #define DISPLAY_TYPE_10_1       101 // JC8012P4A1C, 10.1" 1280×800
 
 #ifndef ELS_DISPLAY_TYPE   // можно переопределить флагом -D при сборке
 #define ELS_DISPLAY_TYPE        DISPLAY_TYPE_10_1
-#endif
-
-#if ELS_DISPLAY_TYPE == DISPLAY_TYPE_7_0
-    #error "Дисплей 7\" пока не поддерживается — выберите DISPLAY_TYPE_4_3 или DISPLAY_TYPE_10_1"
 #endif
 
 #define USE_ESP32_DISPLAY       (ELS_DISPLAY_TYPE != DISPLAY_TYPE_NONE)

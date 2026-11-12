@@ -6,6 +6,7 @@
  * - ESP32-2432S024 (2.4" 320x240)   - ILI9341 via TFT_eSPI
  * - JC4827W543     (4.3" 480x272)   - NV3041A via Arduino_GFX, ESP32-S3
  * - JC8012P4A1C    (10.1" 800x1280) - JD9365 via MIPI-DSI, ESP32-P4
+ * - JC1060P470     (7" 1024x600)    - JD9165 via MIPI-DSI + GT911, ESP32-P4 (ELS_Display_P7)
  *
  * Выбор дисплея: -DJC4827W543_DISPLAY=1 или -DJC8012P4A1C_DISPLAY=1 в platformio.ini
  */
@@ -20,7 +21,10 @@
 // ============================================================================
 // USB CDC Screenshot — общий код для jc4827w543 и jc8012p4a1c
 // ============================================================================
-#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C)
+#ifdef DISPLAY_JC1060P470
+#include "display_config_p7.h"
+#endif
+#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
 
 // stb JPEG encoder (single-header)
 #define STBI_WRITE_NO_STDIO
@@ -52,6 +56,8 @@ static void do_capture() {
 #ifdef DISPLAY_JC8012P4A1C
     const int W = 800;   // физ. ширина (flush после sw_rotate даёт физ. координаты 800×1280)
     const int H = 1280;  // физ. высота
+#elif defined(DISPLAY_JC1060P470)
+    const int W = P7_LCD_H_RES, H = P7_LCD_V_RES;   // 1024×600; при P7_ROT180 кадр в fb перевёрнут
 #else
     const int W = SCREEN_WIDTH, H = SCREEN_HEIGHT;
 #endif
@@ -61,7 +67,12 @@ static void do_capture() {
         const uint16_t* src = screen_fb + y * W;
         uint8_t*        dst = rgb + y * W * 3;
         for (int x = 0; x < W; x++) {
+#if defined(DISPLAY_JC1060P470) && P7_ROT180
+            uint16_t px = screen_fb[(uint32_t)(H - 1 - y) * W + (W - 1 - x)];   // скриншот — как видно на экране
+            (void)src;
+#else
             uint16_t px = src[x];
+#endif
             dst[x*3+0] = (uint8_t)(((px >> 11) & 0x1F) << 3);
             dst[x*3+1] = (uint8_t)(((px >>  5) & 0x3F) << 2);
             dst[x*3+2] = (uint8_t)( (px        & 0x1F) << 3);
@@ -179,6 +190,17 @@ LV_FONT_DECLARE(font_din_cond_56);
     // Буфер частичной отрисовки LVGL (P4_DRAW_BUF_LINES строк, внутренняя SRAM)
     static lv_color_t* p4_buf0 = nullptr;
 
+#elif defined(DISPLAY_JC1060P470)
+    // JC1060P470: ESP32-P4 + JD9165 (MIPI-DSI 2-lane) 1024×600 + GT911 Touch — логика как у 10.1",
+    // но панель уже ландшафтная (только переворот на 180°, P7_ROT180)
+    #include "display_config_p7.h"
+    #include "jd9165_lcd.h"
+    #include "gt911_touch.h"
+
+    static jd9165_lcd  p7_lcd(P7_LCD_RST, P7_LCD_BL);
+    static gt911_touch p7_touch(P7_TP_SDA, P7_TP_SCL, P7_TP_RST, P7_TP_INT);
+    static lv_color_t* p4_buf0 = nullptr;   // буфер частичной отрисовки (имя общее с 10.1")
+
 #else
     // ESP32-2432S024: ESP32 + ILI9341 (SPI) + XPT2046 Touch
     #include <TFT_eSPI.h>
@@ -231,6 +253,26 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
         int row1 = P4_LCD_V_RES - 1 - area->x1;
         p4_lcd.lcd_draw_bitmap(0, row0, P4_LCD_H_RES, row1 + 1,
                                screen_fb + (uint32_t)row0 * P4_LCD_H_RES);
+    }
+#elif defined(DISPLAY_JC1060P470)
+    // 7": область LVGL → framebuffer панели (1024×600), при P7_ROT180 — с переворотом на 180°
+    if (screen_fb) {
+        const uint16_t* src = (const uint16_t*)&color_p->full;
+#if P7_ROT180
+        for (uint32_t j = 0; j < h; j++) {
+            uint16_t* dst = screen_fb + (uint32_t)(P7_LCD_V_RES - 1 - (area->y1 + j)) * P7_LCD_H_RES
+                          + (P7_LCD_H_RES - 1 - area->x1);
+            const uint16_t* s = src + j * w;
+            for (uint32_t i = 0; i < w; i++) *(dst - i) = s[i];
+        }
+        int row0 = P7_LCD_V_RES - 1 - area->y2;
+        int row1 = P7_LCD_V_RES - 1 - area->y1;
+#else
+        for (uint32_t j = 0; j < h; j++)
+            memcpy(screen_fb + (uint32_t)(area->y1 + j) * P7_LCD_H_RES + area->x1, src + j * w, w * 2);
+        int row0 = area->y1, row1 = area->y2;
+#endif
+        p7_lcd.lcd_draw_bitmap(0, row0, P7_LCD_H_RES, row1 + 1, screen_fb + (uint32_t)row0 * P7_LCD_H_RES);
     }
 #else
     tft.startWrite();
@@ -292,6 +334,20 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     } else {
         data->state = LV_INDEV_STATE_REL;
     }
+#elif defined(DISPLAY_JC1060P470)
+    uint16_t tx = 0, ty = 0;
+    if (p7_touch.getTouch(&tx, &ty)) {
+        data->state = LV_INDEV_STATE_PR;
+#if P7_ROT180
+        data->point.x = (lv_coord_t)(P7_LCD_H_RES - 1 - tx);
+        data->point.y = (lv_coord_t)(P7_LCD_V_RES - 1 - ty);
+#else
+        data->point.x = (lv_coord_t)tx;
+        data->point.y = (lv_coord_t)ty;
+#endif
+    } else {
+        data->state = LV_INDEV_STATE_REL;
+    }
 #else
     data->state = LV_INDEV_STATE_REL;
 #endif
@@ -302,7 +358,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 // Строки: 1=Arial Bold, 2=DIN Alternate, 3=DIN Condensed, 4=Tahoma Bold
 // ============================================================================
 
-#ifndef DISPLAY_JC8012P4A1C  // демо-шрифты (Arial/DIN/Tahoma 56) для 10.1" не генерируются
+#if !defined(DISPLAY_JC8012P4A1C) && !defined(DISPLAY_JC1060P470)  // демо-шрифты (Arial/DIN/Tahoma 56) для 10.1" не генерируются
 lv_obj_t* create_font_demo_screen()
 {
     struct FontRow { const char* name; const lv_font_t* font56; const lv_font_t* font40; };
@@ -6056,6 +6112,26 @@ void setup()
     xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
     Serial.println("P4 JPEG capture task started");
 
+#elif defined(DISPLAY_JC1060P470)
+    // === JC1060P470 Initialization (ESP32-P4, MIPI-DSI, 7") ===
+    Serial.printf("Initializing JC1060P470 (JD9165 DSI, панель %s + GT911)...\n", P7_PANEL_V2 ? "V2" : "V1");
+    p7_lcd.begin();
+    Serial.println("JD9165 LCD init OK");
+    p7_touch.begin();
+    screen_fb = p7_lcd.frame_buffer();
+    if (screen_fb) {
+        memset(screen_fb, 0, (uint32_t)P7_LCD_H_RES * P7_LCD_V_RES * 2);
+        p7_lcd.lcd_draw_bitmap(0, 0, P7_LCD_H_RES, P7_LCD_V_RES, screen_fb);
+        Serial.println("P7 panel framebuffer OK");
+    } else {
+        Serial.println("P7 panel framebuffer FAILED");
+    }
+    sem_requested = xSemaphoreCreateBinary();
+    sem_done      = xSemaphoreCreateBinary();
+    jpeg_cap = (uint32_t)P7_LCD_H_RES * P7_LCD_V_RES * 2;
+    jpeg_buf = (uint8_t*)heap_caps_malloc(jpeg_cap, MALLOC_CAP_SPIRAM);
+    xTaskCreate(capture_task_fn, "jpeg_capture", 32768, nullptr, 1, nullptr);
+
 #else
     // === ESP32-2432S024 Initialization ===
     Serial.println("Initializing ESP32-2432S024 (ILI9341)...");
@@ -6077,8 +6153,11 @@ void setup()
     Serial.println("Initializing LVGL...");
     lv_init();
 
-#ifdef DISPLAY_JC8012P4A1C
-    // P4: LVGL 1280×800, частичная перерисовка (только изменённые области).
+#if defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
+#ifdef DISPLAY_JC1060P470
+    #define P4_DRAW_BUF_LINES P7_DRAW_BUF_LINES
+#endif
+    // P4: LVGL 1280×800 (7" — 1024×600), частичная перерисовка (только изменённые области).
     // Буфер отрисовки во внутренней SRAM — рендер в PSRAM в разы медленнее.
     const uint32_t p4_buf_px = (uint32_t)SCREEN_WIDTH * P4_DRAW_BUF_LINES;
     p4_buf0 = (lv_color_t*)heap_caps_malloc(p4_buf_px * sizeof(lv_color_t),
@@ -6119,7 +6198,7 @@ void setup()
     Serial.println("LVGL initialized OK");
 
     // === UART Initialization ===
-#ifdef DISPLAY_JC8012P4A1C
+#if defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
     // ESP32-P4: явно задаём GPIO пины (см. display_config_p4.h)
     Serial2.begin(UART_BAUD_RATE, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
     uart_protocol.begin(Serial2, UART_BAUD_RATE);
@@ -6226,7 +6305,7 @@ void loop()
         }
     }
 
-#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C)
+#if defined(DISPLAY_JC4827W543) || defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
 #ifdef DISPLAY_JC4827W543
     // Проверяем HTTP screenshot сервер
     handle_screenshot_server();
@@ -6308,7 +6387,7 @@ void loop()
     }
 #endif  // DISPLAY_JC4827W543 || DISPLAY_JC8012P4A1C
 
-#ifndef DISPLAY_JC8012P4A1C
+#if !defined(DISPLAY_JC8012P4A1C) && !defined(DISPLAY_JC1060P470)
     delay(5);
 #endif
 }

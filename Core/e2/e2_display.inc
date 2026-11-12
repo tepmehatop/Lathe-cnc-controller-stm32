@@ -508,7 +508,9 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     if (code != ELS_DISPLAY_TYPE) {
       Serial.print(F("ВНИМАНИЕ: подключён дисплей типа ")); Serial.print(code);
       Serial.print(F(", а в els_config.h ELS_DISPLAY_TYPE = ")); Serial.println((int)ELS_DISPLAY_TYPE);
+#ifndef ELS_RELEASE   // готовая прошивка из релиза работает с любым дисплеем — только строка в порт
       Display_Send_CMD("ALERT", "ДИСПЛЕЙ НЕ СОВПАДАЕТ С КОНФИГОМ STM32");
+#endif
     }
     return;
   }
@@ -536,6 +538,15 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     else if (prm == "KEY:LEFT")  { button_left_flag  = false; Key_Left_Pressed();  Display_Send_All(); }
     else if (prm == "KEY:RIGHT") { button_right_flag = false; Key_Right_Pressed(); Display_Send_All(); }
     else if (prm == "PARAM_OK")  { key_sel_flag = false; Key_Select_Pressed(); }
+    // [STM32] Режим/подрежим с экрана — как с галетника: пока ось едет от джойстика, не переключаем
+    // (у автора в Menu() переключатели читаются только при !Joy_Z_flag && !Joy_X_flag). Дисплей уже
+    // показал новый режим заранее — возвращаем ему текущий. Без алерта: его OK шлёт ALERT_OK → Switch_Man().
+    else if (((prm.length() == 2 && (prm[0] == 'M' || prm[0] == 'S') && isDigit(prm[1]))) && (Joy_Z_flag || Joy_X_flag)) {
+      Serial.print(F("Дисплей: ")); Serial.print(prm); Serial.println(F(" — отказ, ось в движении"));
+      Beep_Error();
+      Display_Send_Int("MODE", (int)Mode);
+      Display_Send_Int("SUBMODE", _Display_GetSubMode());
+    }
     else if (prm == "M1") { Switch_Feed();    Beep(); }
     else if (prm == "M2") { Switch_aFeed();   Beep(); }
     else if (prm == "M3") { Switch_Thread();  Beep(); }

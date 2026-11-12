@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 PIO=${PIO:-$(command -v pio || echo "$HOME/.platformio/penv/bin/pio")}
 STM32_ENVS=${STM32_ENVS:-stm32f407_dro}
-DISPLAY_ENVS=${DISPLAY_ENVS:-"jc4827w543 jc8012p4a1c"}
+DISPLAY_ENVS=${DISPLAY_ENVS:-"jc4827w543 jc8012p4a1c jc1060p470 jc1060p470_v2 jc1060p470_v3"}
 OUT=dist
 # esptool 4.x/5.x — для склейки образов дисплея: Python из PlatformIO (локально) или pip install esptool (CI)
 PIO_PY=$(dirname "$PIO")/python
@@ -31,7 +31,7 @@ for e in $DISPLAY_ENVS; do
 import json, sys
 env = sys.argv[1]
 v = json.load(sys.stdin)[env]
-chip = {"jc4827w543": "esp32s3", "jc8012p4a1c": "esp32p4"}[env]
+chip = "esp32s3" if env == "jc4827w543" else "esp32p4"
 parts = ["--chip", chip, "merge_bin", "-o", "OUT"]
 for i in v["extra"]["flash_images"]:
     parts += [i["offset"], i["path"]]
