@@ -851,17 +851,6 @@ struct RollerState {
 };
 static RollerState g_roller = {};
 
-// ============================================================================
-// Демо-режим — тройное нажатие OK → 30-секундная демонстрация всех режимов
-// ============================================================================
-static bool     g_demo_active       = false;
-static uint32_t g_demo_start_ms     = 0;
-static uint32_t g_demo_last_step_ms = 0;
-static int      g_demo_mode_idx     = -1;  // 0..7 = M1..M8, -1 = не инициализирован
-// Тройной тап OK
-static uint8_t  s_ok_tap_count   = 0;
-static uint32_t s_ok_last_tap_ms = 0;
-
 // Phase-2: тест-режим (5× быстрый DN вне edit → список сценариев)
 static const int TEST_SCENARIO_COUNT = 60;
 static bool     g_test_active    = false;
@@ -905,9 +894,6 @@ static void apply_feed_sm2_layout();
 static void apply_feed_sm3_layout();
 static void apply_thread_sm2_layout();
 static void apply_cone_sm2_layout();
-static void demo_start();
-static void demo_stop();
-static void demo_tick();
 static void test_start();
 static void test_stop();
 static void test_apply(int idx);
@@ -926,7 +912,7 @@ static void handle_up_btn_click()
         return;
     }
     // Idle: 5× подряд → тест-режим
-    if (!g_sub_edit.active && !g_edit_param.active && !g_demo_active) {
+    if (!g_sub_edit.active && !g_edit_param.active) {
         uint32_t now = millis();
         if (now - s_dn_rapid_ms > 2000) s_dn_rapid_cnt = 0;
         s_dn_rapid_ms = now;
@@ -1074,13 +1060,6 @@ static void handle_dn_btn_click()
 static void handle_ok_btn_click()
 {
     if (g_test_active) { test_stop(); return; }
-    if (g_demo_active) { demo_stop(); return; }
-
-    uint32_t now = millis();
-    if (now - s_ok_last_tap_ms < 600) { s_ok_tap_count++; }
-    else                               { s_ok_tap_count = 1; }
-    s_ok_last_tap_ms = now;
-    if (s_ok_tap_count >= 3) { s_ok_tap_count = 0; demo_start(); return; }
 
     if (g_roller.active) {
         RollerTarget tgt = g_roller.cfg.target;
@@ -5466,251 +5445,6 @@ static void update_ui_values(const LatheData& data)
 }
 
 // ============================================================================
-// Демо-режим — 30 сек, 8 режимов × 3.75с, тройной тап OK
-// ============================================================================
-
-static const uint32_t DEMO_TOTAL_MS  = 30000;
-static const uint32_t DEMO_MODE_MS   = 3750;
-static const uint32_t DEMO_UPDATE_MS = 120;
-
-static void demo_start()
-{
-    if (g_edit_param.active) exit_edit_mode();
-    if (g_sub_edit.active)   exit_sub_edit();
-    g_demo_active       = true;
-    g_demo_start_ms     = millis();
-    g_demo_last_step_ms = millis() - DEMO_UPDATE_MS;  // обновить сразу
-    g_demo_mode_idx     = -1;
-    Serial.println("DEMO: start (triple-tap OK to stop)");
-}
-
-static void demo_stop()
-{
-    g_demo_active = false;
-    // Убрать алерт если был показан
-    if (g_alert.active) dismiss_alert();
-    // Восстановить лимиты (все выкл)
-    LimitStatus no_lims = {0,0,0,0};
-    update_limit_indicators(no_lims);
-    // Кружки в дефолтное состояние
-    if (g_ui.s2_bg)  lv_obj_set_style_bg_color(g_ui.s2_bg, lv_color_hex(0x00ff88), 0);
-    if (g_ui.s2_bg)  lv_obj_set_style_shadow_color(g_ui.s2_bg, lv_color_hex(0x00ff88), 0);
-    if (g_ui.s2_lbl) lv_label_set_text(g_ui.s2_lbl, "S2");
-    if (g_ui.pwr_bg) lv_obj_set_style_bg_color(g_ui.pwr_bg, lv_color_hex(0x00ff88), 0);
-    if (g_ui.pwr_bg) lv_obj_set_style_shadow_color(g_ui.pwr_bg, lv_color_hex(0x00ff88), 0);
-    lv_label_set_text(g_ui.submode_lbl, "");
-    lv_obj_set_style_text_color(g_ui.submode_lbl, lv_color_hex(0x4a7a8a), 0);
-    // Вернуть к начальному состоянию M3 (стартовый)
-    s_last_mode = MODE_THREAD;
-    apply_mode_layout(MODE_THREAD);
-    lv_label_set_text(g_ui.mode_lbl, MODE_STRS[3]);
-    Serial.println("DEMO: stop");
-}
-
-static void demo_tick()
-{
-    uint32_t now     = millis();
-    uint32_t elapsed = now - g_demo_start_ms;
-
-    if (elapsed >= DEMO_TOTAL_MS) { demo_stop(); return; }
-    if (now - g_demo_last_step_ms < DEMO_UPDATE_MS) return;
-    g_demo_last_step_ms = now;
-
-    // Текущий режим (0..7 = M1..M8)
-    int m = (int)(elapsed / DEMO_MODE_MS);
-    if (m > 7) m = 7;
-    // Прогресс внутри режима 0..99
-    int pct = (int)((elapsed % DEMO_MODE_MS) * 100 / DEMO_MODE_MS);
-
-    // Смена режима
-    if (m != g_demo_mode_idx) {
-        g_demo_mode_idx = m;
-        LatheMode nm = (LatheMode)(m + 1);
-        s_last_mode = nm;
-        apply_mode_layout(nm);
-        lv_label_set_text(g_ui.mode_lbl, MODE_STRS[m + 1]);
-        lv_label_set_text(g_ui.submode_lbl,
-            "\xD0\x94\xD0\x95\xD0\x9C\xD0\x9E");  // ДЕМО
-        lv_obj_set_style_text_color(g_ui.submode_lbl, lv_color_hex(0xff8800), 0);
-        pct = 0;
-    }
-
-    char buf[32];
-    LatheMode cm = (LatheMode)(g_demo_mode_idx + 1);
-
-    // Позиции (общие для M1..M6, не ДЕЛИЛКА и не РЕЗЕРВ)
-    if (cm != MODE_DIVIDER && cm != MODE_RESERVE) {
-        snprintf(buf, sizeof(buf), "+%d.%02d", pct * 2, pct);
-        lv_label_set_text(g_ui.row1_val, buf);
-        lv_obj_set_style_text_color(g_ui.row1_val, lv_color_hex(0x00ff88), 0);
-        snprintf(buf, sizeof(buf), "-%d.%02d", pct / 2, (pct * 50) % 100);
-        lv_label_set_text(g_ui.row2_val, buf);
-        lv_obj_set_style_text_color(g_ui.row2_val, lv_color_hex(0xff5555), 0);
-    }
-
-    switch (cm) {
-        case MODE_FEED: {
-            int feed = 5 + pct * 20 / 100;   // 0.05..0.25 mm/ob
-            snprintf(buf, sizeof(buf), "0.%02d", feed);
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            int pass = 1 + pct * 4 / 100;    // 1..5
-            snprintf(buf, sizeof(buf), "%d/5", pass);
-            lv_label_set_text(g_ui.secondary_val, buf);
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, buf);
-            int ap = 5 + pct * 45 / 100;     // 0.05..0.50 мм съём
-            snprintf(buf, sizeof(buf), "0.%02d", ap);
-            lv_label_set_text(g_ui.row3_val, buf);
-            lv_bar_set_value(g_ui.rpm_bar, pct * 20, LV_ANIM_OFF);
-            break;
-        }
-        case MODE_AFEED: {
-            int af = 1000 + pct * 390;  // 10.00..400.00 mm/min
-            snprintf(buf, sizeof(buf), "%d.%02d", af / 100, af % 100);
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            int pass = 1 + pct * 4 / 100;
-            snprintf(buf, sizeof(buf), "%d/5", pass);
-            lv_label_set_text(g_ui.secondary_val, buf);
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, buf);
-            int ap = 5 + pct * 45 / 100;
-            snprintf(buf, sizeof(buf), "0.%02d", ap);
-            lv_label_set_text(g_ui.row3_val, buf);
-            lv_bar_set_value(g_ui.rpm_bar, pct * 25, LV_ANIM_OFF);
-            break;
-        }
-        case MODE_THREAD: {
-            int tbl = pct * 19 / 100;   // 0..19 метрических шагов
-            int16_t mm = s_thread_table[tbl].mm_x100;
-            snprintf(buf, sizeof(buf), "%d.%02d", mm / 100, abs(mm % 100));
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            int pass = 1 + pct * 3 / 100;   // 1..4
-            snprintf(buf, sizeof(buf), "%d/4", pass);
-            lv_label_set_text(g_ui.secondary_val, buf);
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, buf);
-            int ph = 1 + pct * 3 / 100;     // 1..4 захода
-            snprintf(buf, sizeof(buf), "%d", ph);
-            lv_label_set_text(g_ui.row3_val, buf);
-            lv_bar_set_value(g_ui.rpm_bar, 800, LV_ANIM_OFF);
-            break;
-        }
-        case MODE_CONE_L:
-        case MODE_CONE_R: {
-            int cf = 50 + pct * 250 / 100;  // 0.50..3.00 mm/ob
-            snprintf(buf, sizeof(buf), "%d.%02d", cf / 100, cf % 100);
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            int rpm = 600 + pct * 10;        // 600..1600 RPM
-            snprintf(buf, sizeof(buf), "%d", rpm);
-            lv_label_set_text(g_ui.secondary_val, buf);
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, buf);
-            int ci = pct * (CONE_COUNT - 1) / 100;
-            // BUG-07: row1=RPM, row2=cone type, row3=angle
-            snprintf(buf, sizeof(buf), "%d", rpm);
-            lv_label_set_text(g_ui.row1_val, buf);
-            lv_label_set_text(g_ui.row2_val, CONE_NAMES[ci]);
-            snprintf(buf, sizeof(buf), "%.1f\xC2\xB0", (float)(ci < 2 ? (ci == 0 ? 450 : 300) : (ci - 1) * 10) / 10.0f);
-            lv_label_set_text(g_ui.row3_val, buf);
-            lv_bar_set_value(g_ui.rpm_bar, rpm, LV_ANIM_OFF);
-            break;
-        }
-        case MODE_SPHERE: {
-            int sr = 1000 + pct * 7000 / 100;  // radius 10..80mm (*100)
-            int sd = sr * 2;
-            snprintf(buf, sizeof(buf), "%d.%02d", sd / 100, sd % 100);
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            int pass = 1 + pct * 2 / 100;   // 1..3
-            snprintf(buf, sizeof(buf), "%d/3", pass);
-            lv_label_set_text(g_ui.secondary_val, buf);
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, buf);
-            snprintf(buf, sizeof(buf), "%d.%02d", sr / 100, sr % 100);
-            lv_label_set_text(g_ui.row3_val, buf);
-            lv_bar_set_value(g_ui.rpm_bar, 1200, LV_ANIM_OFF);
-            break;
-        }
-        case MODE_DIVIDER: {
-            int cur = 1 + pct * 11 / 100;   // 1..12 (при total=12)
-            float ang = (float)(cur - 1) * 30.0f;
-            snprintf(buf, sizeof(buf), "%.0f", ang);
-            lv_label_set_text(g_ui.primary_val, buf);
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, buf);
-            lv_label_set_text(g_ui.secondary_val, "30.0");
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, "30.0");
-            lv_label_set_text(g_ui.row1_val, "12");
-            lv_obj_set_style_text_color(g_ui.row1_val, lv_color_hex(0xe0e0e0), 0);
-            snprintf(buf, sizeof(buf), "%d", cur);
-            lv_label_set_text(g_ui.row2_val, buf);
-            lv_obj_set_style_text_color(g_ui.row2_val, lv_color_hex(0xe0e0e0), 0);
-            lv_label_set_text(g_ui.row3_val, "30.0\xC2\xB0");
-            lv_bar_set_value(g_ui.rpm_bar, 0, LV_ANIM_OFF);
-            break;
-        }
-        default:
-            lv_label_set_text(g_ui.primary_val, "---");
-            if (g_ui.primary_val_glow) lv_label_set_text(g_ui.primary_val_glow, "---");
-            lv_label_set_text(g_ui.secondary_val, "---");
-            if (g_ui.secondary_val_glow) lv_label_set_text(g_ui.secondary_val_glow, "---");
-            break;
-    }
-
-    // ── Кружок подрежима: меняется с каждым режимом ─────────────────────────
-    {
-        // S1(синий) для чётных режимов, S2(зелёный) для нечётных, S3(голубой) для M5/M7
-        static const uint32_t s_scols[3] = {0x0088ff, 0x00ff88, 0x00d4ff};
-        static const char* s_snames[3] = {"S1","S2","S3"};
-        int si = m % 3;
-        if (g_ui.s2_bg)  lv_obj_set_style_bg_color(g_ui.s2_bg, lv_color_hex(s_scols[si]), 0);
-        if (g_ui.s2_bg)  lv_obj_set_style_shadow_color(g_ui.s2_bg, lv_color_hex(s_scols[si]), 0);
-        if (g_ui.s2_lbl) lv_label_set_text(g_ui.s2_lbl, s_snames[si]);
-    }
-
-    // ── Кружок мотора: мигает при нечётном pct/10 (виден "пульс") ───────────
-    {
-        bool motor_on = (pct / 10) % 2 == 0;
-        if (g_ui.pwr_bg) {
-            lv_obj_set_style_bg_color(g_ui.pwr_bg,
-                lv_color_hex(motor_on ? 0x00ff88 : 0x226644), 0);
-            lv_obj_set_style_shadow_color(g_ui.pwr_bg,
-                lv_color_hex(motor_on ? 0x00ff88 : 0x226644), 0);
-        }
-    }
-
-    // ── Лимиты: вращающийся паттерн (бегущий огонь по 4 стрелкам) ───────────
-    {
-        // Каждый квадрант (0..3) зажигает одну стрелку
-        int lim_phase = (int)(elapsed / 600) % 5; // 0=L, 1=R, 2=F, 3=B, 4=выкл
-        LimitStatus fake = {0,0,0,0};
-        if (lim_phase == 0) fake.left  = 1;
-        if (lim_phase == 1) fake.right = 1;
-        if (lim_phase == 2) fake.front = 1;
-        if (lim_phase == 3) fake.rear  = 1;
-        // lim_phase==4: все выкл (пауза)
-        update_limit_indicators(fake);
-    }
-
-    // ── Алерты: показываем один из 4 сообщений, закрываем через 2с ──────────
-    {
-        // Каждые 7.5 секунд (два режима) — показываем алерт на 2.5с
-        static const char* demo_alerts[] = {
-            "\xD0\xA3\xD0\xA1\xD0\xA2\xD0\x90\xD0\x9D\xD0\x9E\xD0\x92\xD0\x98\xD0\xA2\xD0\x95\n\xD0\xA3\xD0\x9F\xD0\x9E\xD0\xA0\xD0\xAB!",   // УСТАНОВИТЕ УПОРЫ!
-            "\xD0\x9E\xD0\x9F\xD0\x95\xD0\xA0\xD0\x90\xD0\xA6\xD0\x98\xD0\xAF\n\xD0\x97\xD0\x90\xD0\x92\xD0\x95\xD0\xA0\xD0\xA8\xD0\x95\xD0\x9D\xD0\x90!", // ОПЕРАЦИЯ ЗАВЕРШЕНА!
-            "\xD0\x94\xD0\x96\xD0\x9E\xD0\x99\xD0\xA1\xD0\xA2\xD0\x98\xD0\x9A\n\xD0\x92 \xD0\x9D\xD0\x95\xD0\xAC\xD0\xA2\xD0\xA0\xD0\x90\xD0\x9B\xD0\xAC\xD0\x9D\xD0\x9E\xD0\x95", // ДЖОЙСТИК В НЕЙТРАЛЬНОЕ
-            "\xD0\xA3\xD0\xA1\xD0\xA2\xD0\x90\xD0\x9D\xD0\x9E\xD0\x92\xD0\x98\xD0\xA2\xD0\x95\n\xD0\xA1\xD0\xA3\xD0\x9F\xD0\x9F\xD0\x9E\xD0\xA0\xD0\xA2 \xD0\x92\n\xD0\x98\xD0\xA1\xD0\x9F\xD0\x9E\xD0\x94\xD0\x9D\xD0\x9E\xD0\x95",  // УСТАНОВИТЕ СУППОРТ В ИСХОДНОЕ
-        };
-        // Показываем алерт когда pct входит в диапазон 60..85
-        bool want_alert = (pct >= 60 && pct < 85);
-        if (want_alert && !g_alert.active) {
-            int ai = m % 4;
-            show_alert(demo_alerts[ai]);
-        } else if (!want_alert && g_alert.active) {
-            dismiss_alert();
-        }
-    }
-}
-
-// ============================================================================
 // Phase-2: тест-режим — 23 предустановленных сценария всех режимов/подрежимов
 // Вход: 5× быстрый DN вне edit-режима
 // Навигация: UP/DN меняют сценарий, OK выходит
@@ -6020,7 +5754,6 @@ static void test_start()
 {
     if (g_edit_param.active) exit_edit_mode();
     if (g_sub_edit.active)   exit_sub_edit();
-    if (g_demo_active)       demo_stop();
     g_test_active = true;
     g_test_idx    = 0;
     Serial.println("TEST MODE: start. UP/DN = сценарий, OK = выход");
@@ -6461,9 +6194,6 @@ void loop()
     if (g_joystick.active && (millis() - g_joystick.last_ms > 30000)) {
         hide_joystick_overlay();
     }
-
-    // Демо-режим (тройное нажатие OK)
-    if (g_demo_active) demo_tick();
 
     // Update LVGL tick — use actual elapsed time so LVGL refresh runs at real-time rate.
     // Fixed lv_tick_inc(5) caused ~1-2 sec display lag: if lv_timer_handler() takes
