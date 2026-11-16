@@ -1027,7 +1027,7 @@
 
 ---
 
-## PT Preset Tests (ESP32 internal test mode: 5× fast DN)
+## PT Preset Tests (сценарии командами; внутренний тест-режим дисплея 5×▲ убран 2026-11-16)
 
 ### TC-192: PT-01 M1/S1 scenario
 **Input**: `<MODE:1>` `<SUBMODE:1>` `<FEED:10>` `<PASS:1,6>` `<AP:10>` `<POS_Z:56780>` `<POS_X:-8500>`
@@ -1151,15 +1151,15 @@
 **Expected**: row3 highlighted; STM32 receives SUBSEL:CONE
 **Field**: row3 border, STM32 rx
 
-### TC-214: M1/M2 SM=1 sub-edit row3 AP selection
-**Input**: In M1 SM=1, tap row3 → ESP32 sends `<TOUCH:SUBSEL:AP>`
-**Expected**: row3 highlighted yellow border; STM32 receives SUBSEL:AP
-**Field**: row3 border
+### TC-214: M1/M2 SM=1 тап по «Съём» — клавиатура (BACKLOG-040)
+**Input**: `<MODE:1>` `<SUBMODE:1>` `<AP:20>` `<TAP:70,230>`
+**Expected**: axis_kb = "1"; sub_edit = "0"; roller = "0" (съём вводится клавиатурой, барабана нет)
+**Field**: axis_kb, sub_edit, roller
 
-### TC-215: Sub-edit timeout (5 seconds auto-exit)
-**Input**: `<MODE:1>` `<SUBMODE:1>` `<AP:20>` `<TAP:70,230>` `<WAIT:6000>` (тап по «Съём» — правка с барабаном, 6 с без касаний)
-**Expected**: sub_edit = "1"; roller = "1" (пока открыт барабан, правка по таймауту не выходит — иначе барабан оставался висеть)
-**Field**: sub_edit, roller
+### TC-215: Клавиатура съёма не закрывается сама
+**Input**: `<MODE:1>` `<SUBMODE:1>` `<AP:20>` `<TAP:70,230>` `<WAIT:6000>` (тап по «Съём», 6 с без касаний)
+**Expected**: axis_kb = "1"; sub_edit = "0" (окно ввода ждёт ВВОД или ОТМЕНА, тайм-аута правки нет)
+**Field**: axis_kb, sub_edit
 
 ---
 

@@ -1,0 +1,44 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 960 400' width='960' height='400' role='img' aria-label='Калибровка по индикатору: что делает ось и что вводить'>
+<title>Калибровка по индикатору: что делает ось и что вводить</title>
+<defs><marker id='a1b1b1a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1b1b1a'/></marker><marker id='s1b1b1a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1b1b1a'/></marker><marker id='a2a78d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#2a78d6'/></marker><marker id='s2a78d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#2a78d6'/></marker><marker id='aeb6834' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#eb6834'/></marker><marker id='seb6834' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#eb6834'/></marker><marker id='a1baf7a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1baf7a'/></marker><marker id='s1baf7a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1baf7a'/></marker><marker id='a6250d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#6250d6'/></marker><marker id='s6250d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#6250d6'/></marker><marker id='ad03b3b' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#d03b3b'/></marker><marker id='sd03b3b' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#d03b3b'/></marker><marker id='a52514e' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#52514e'/></marker><marker id='s52514e' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#52514e'/></marker></defs>
+<rect width='100%' height='100%' fill='#fcfcfb' rx='10'/>
+<text x='24' y='34' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='19' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='24' dy='0.0'>Калибровка по индикатору — по шагам (пример: ход 8 мм)</tspan></text>
+<rect x='30' y='70' width='170' height='300' rx='8' fill='#ffffff' stroke='#e4e3df' stroke-width='1.5' />
+<circle cx='52' cy='92' r='13' fill='#2a78d6'/>
+<text x='52' y='97' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='52' dy='0.0'>1</tspan></text>
+<text x='74' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='74' dy='0.0'>ПУСК</tspan></text>
+<line x1='70' y1='200' x2='160' y2='200' stroke='#eb6834' stroke-width='3' marker-end='url(#aeb6834)' marker-start='url(#seb6834)'/>
+<text x='44' y='280' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='44' dy='0.0'>ось отходит на 1 мм</tspan><tspan x='44' dy='16.2'>и возвращается —</tspan><tspan x='44' dy='16.2'>люфт выбран</tspan></text>
+<line x1='202' y1='220' x2='214' y2='220' stroke='#8a8984' stroke-width='2' marker-end='url(#a8a8984)'/>
+<rect x='216' y='70' width='170' height='300' rx='8' fill='#ffffff' stroke='#e4e3df' stroke-width='1.5' />
+<circle cx='238' cy='92' r='13' fill='#2a78d6'/>
+<text x='238' y='97' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='238' dy='0.0'>2</tspan></text>
+<text x='260' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='260' dy='0.0'>Обнулите</tspan><tspan x='260' dy='17.5'>индикатор</tspan></text>
+<circle cx='301' cy='200' r='40' fill='#ffffff' stroke='#333' stroke-width='3'/>
+<text x='301' y='207' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='18' fill='#d03b3b' text-anchor='middle' font-weight='bold'><tspan x='301' dy='0.0'>0.00</tspan></text>
+<text x='230' y='280' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='230' dy='0.0'>поверните шкалу</tspan><tspan x='230' dy='16.2'>на 0 → ДАЛЕЕ</tspan></text>
+<line x1='388' y1='220' x2='400' y2='220' stroke='#8a8984' stroke-width='2' marker-end='url(#a8a8984)'/>
+<rect x='402' y='70' width='170' height='300' rx='8' fill='#ffffff' stroke='#e4e3df' stroke-width='1.5' />
+<circle cx='424' cy='92' r='13' fill='#2a78d6'/>
+<text x='424' y='97' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='424' dy='0.0'>3</tspan></text>
+<text x='446' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='446' dy='0.0'>Ось едет вперёд</tspan><tspan x='446' dy='17.5'>на 8 мм</tspan></text>
+<circle cx='487' cy='200' r='40' fill='#ffffff' stroke='#333' stroke-width='3'/>
+<text x='487' y='207' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='18' fill='#d03b3b' text-anchor='middle' font-weight='bold'><tspan x='487' dy='0.0'>8.04</tspan></text>
+<text x='416' y='280' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='416' dy='0.0'>введите показание:</tspan><tspan x='416' dy='16.2'>8.04 → ВВОД</tspan></text>
+<line x1='574' y1='220' x2='586' y2='220' stroke='#8a8984' stroke-width='2' marker-end='url(#a8a8984)'/>
+<rect x='588' y='70' width='170' height='300' rx='8' fill='#ffffff' stroke='#e4e3df' stroke-width='1.5' />
+<circle cx='610' cy='92' r='13' fill='#2a78d6'/>
+<text x='610' y='97' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='610' dy='0.0'>4</tspan></text>
+<text x='632' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='632' dy='0.0'>Ось едет назад</tspan><tspan x='632' dy='17.5'>на 8 мм</tspan></text>
+<circle cx='673' cy='200' r='40' fill='#ffffff' stroke='#333' stroke-width='3'/>
+<text x='673' y='207' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='18' fill='#d03b3b' text-anchor='middle' font-weight='bold'><tspan x='673' dy='0.0'>0.06</tspan></text>
+<text x='602' y='280' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='602' dy='0.0'>введите показание:</tspan><tspan x='602' dy='16.2'>0.06 → ВВОД</tspan><tspan x='602' dy='16.2'>(это люфт)</tspan></text>
+<line x1='760' y1='220' x2='772' y2='220' stroke='#8a8984' stroke-width='2' marker-end='url(#a8a8984)'/>
+<rect x='774' y='70' width='170' height='300' rx='8' fill='#ffffff' stroke='#e4e3df' stroke-width='1.5' />
+<circle cx='796' cy='92' r='13' fill='#2a78d6'/>
+<text x='796' y='97' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='796' dy='0.0'>5</tspan></text>
+<text x='818' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='818' dy='0.0'>Итог</tspan></text>
+<line x1='814' y1='200' x2='904' y2='200' stroke='#1baf7a' stroke-width='3'/>
+<text x='859' y='192' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='34' fill='#1baf7a' text-anchor='middle' font-weight='bold'><tspan x='859' dy='0.0'>✓</tspan></text>
+<text x='788' y='280' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='788' dy='0.0'>винт = 2.00×8.04/8</tspan><tspan x='788' dy='16.2'>= 2.01 мм,</tspan><tspan x='788' dy='16.2'>люфт 60 мкм</tspan><tspan x='788' dy='16.2'>→ ПРИМЕНИТЬ</tspan></text>
+</svg>

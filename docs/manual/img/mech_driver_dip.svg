@@ -1,0 +1,59 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 960 420' width='960' height='420' role='img' aria-label='Микрошаг: по переключателям и таблице на драйвере'>
+<title>Микрошаг: по переключателям и таблице на драйвере</title>
+<defs><marker id='a1b1b1a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1b1b1a'/></marker><marker id='s1b1b1a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1b1b1a'/></marker><marker id='a2a78d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#2a78d6'/></marker><marker id='s2a78d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#2a78d6'/></marker><marker id='aeb6834' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#eb6834'/></marker><marker id='seb6834' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#eb6834'/></marker><marker id='a1baf7a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1baf7a'/></marker><marker id='s1baf7a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1baf7a'/></marker><marker id='a6250d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#6250d6'/></marker><marker id='s6250d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#6250d6'/></marker><marker id='ad03b3b' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#d03b3b'/></marker><marker id='sd03b3b' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#d03b3b'/></marker><marker id='a52514e' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#52514e'/></marker><marker id='s52514e' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#52514e'/></marker></defs>
+<rect width='100%' height='100%' fill='#fcfcfb' rx='10'/>
+<text x='24' y='34' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='19' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='24' dy='0.0'>МИКРОШАГ — как выставлено переключателями на драйвере</tspan></text>
+<rect x='40' y='60' width='300' height='330' rx='10' fill='#2b2e33' stroke='#151719' stroke-width='1.5' />
+<text x='190' y='90' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='190' dy='0.0'>DM542 / TB6600</tspan></text>
+<rect x='70' y='110' width='240' height='60' rx='4' fill='#c0392b' stroke='#7a2219' stroke-width='1.5' />
+<rect x='82' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='85' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='92' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='92' dy='0.0'>1</tspan></text>
+<rect x='110' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='113' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='120' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='120' dy='0.0'>2</tspan></text>
+<rect x='138' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='141' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='148' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='148' dy='0.0'>3</tspan></text>
+<rect x='166' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='169' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='176' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='176' dy='0.0'>4</tspan></text>
+<rect x='194' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='197' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='204' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='204' dy='0.0'>5</tspan></text>
+<rect x='222' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='225' y='122' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='232' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='232' dy='0.0'>6</tspan></text>
+<rect x='250' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='253' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='260' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='260' dy='0.0'>7</tspan></text>
+<rect x='278' y='118' width='20' height='44' rx='2' fill='#f5f5f5' stroke='#888' stroke-width='1' />
+<rect x='281' y='140' width='14' height='18' rx='2' fill='#333' stroke='#333' stroke-width='1' />
+<text x='288' y='184' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#ffffff' text-anchor='middle' font-weight='normal'><tspan x='288' dy='0.0'>8</tspan></text>
+<text x='190' y='206' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#cfd3d8' text-anchor='middle' font-weight='normal'><tspan x='190' dy='0.0'>SW1–3 — ток, SW4 — полток,</tspan><tspan x='190' dy='15.0'>SW5–8 — микрошаг</tspan></text>
+<text x='190' y='260' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='11' fill='#cfd3d8' text-anchor='middle' font-weight='normal'><tspan x='190' dy='0.0'>PUL+ PUL− DIR+ DIR− ENA+ ENA−</tspan></text>
+<text x='190' y='290' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='11' fill='#cfd3d8' text-anchor='middle' font-weight='normal'><tspan x='190' dy='0.0'>A+ A− B+ B−   GND +V</tspan></text>
+<text x='400' y='70' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#52514e' text-anchor='start' font-weight='bold'><tspan x='400' dy='0.0'>Таблица на корпусе драйвера (пример)</tspan></text>
+<text x='410' y='109' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='410' dy='0.0'>Pulse/rev</tspan></text>
+<text x='600' y='109' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='600' dy='0.0'>Микрошаг</tspan></text>
+<text x='410' y='139' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>200</tspan></text>
+<text x='600' y='139' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>1</tspan></text>
+<text x='410' y='169' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>400</tspan></text>
+<text x='600' y='169' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>2</tspan></text>
+<text x='410' y='199' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>800</tspan></text>
+<text x='600' y='199' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>4</tspan></text>
+<rect x='394' y='208' width='330' height='30' rx='4' fill='#fff1c9' stroke='#eb6834' stroke-width='2' />
+<text x='410' y='229' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='410' dy='0.0'>1600</tspan></text>
+<text x='600' y='229' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='600' dy='0.0'>8</tspan></text>
+<text x='410' y='259' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>3200</tspan></text>
+<text x='600' y='259' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>16</tspan></text>
+<text x='410' y='289' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>6400</tspan></text>
+<text x='600' y='289' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>32</tspan></text>
+<text x='410' y='319' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>12800</tspan></text>
+<text x='600' y='319' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>64</tspan></text>
+<text x='410' y='349' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='410' dy='0.0'>25600</tspan></text>
+<text x='600' y='349' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='600' dy='0.0'>128</tspan></text>
+<text x='750' y='200' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='17' fill='#eb6834' text-anchor='start' font-weight='bold'><tspan x='750' dy='0.0'>Микрошаг =</tspan><tspan x='750' dy='21.2'>Pulse/rev / 200</tspan></text>
+<text x='750' y='260' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='16' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='750' dy='0.0'>1600 / 200 = 8</tspan></text>
+<text x='750' y='300' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#d03b3b' text-anchor='start' font-weight='normal'><tspan x='750' dy='0.0'>Поменяли переключатели —</tspan><tspan x='750' dy='16.2'>поменяйте и на экране,</tspan><tspan x='750' dy='16.2'>иначе размеры уйдут</tspan><tspan x='750' dy='16.2'>в разы.</tspan></text>
+</svg>

@@ -1,0 +1,60 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 960 316' width='960' height='316' role='img' aria-label='Калибровка по линейкам: ось сама ходит туда-обратно, станок сравнивает линейку и шаги'>
+<title>Калибровка по линейкам: ось сама ходит туда-обратно, станок сравнивает линейку и шаги</title>
+<defs><marker id='a1b1b1a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1b1b1a'/></marker><marker id='s1b1b1a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1b1b1a'/></marker><marker id='a2a78d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#2a78d6'/></marker><marker id='s2a78d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#2a78d6'/></marker><marker id='aeb6834' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#eb6834'/></marker><marker id='seb6834' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#eb6834'/></marker><marker id='a1baf7a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1baf7a'/></marker><marker id='s1baf7a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1baf7a'/></marker><marker id='a6250d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#6250d6'/></marker><marker id='s6250d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#6250d6'/></marker><marker id='ad03b3b' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#d03b3b'/></marker><marker id='sd03b3b' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#d03b3b'/></marker><marker id='a52514e' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#52514e'/></marker><marker id='s52514e' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#52514e'/></marker></defs>
+<rect width='100%' height='100%' fill='#fcfcfb' rx='10'/>
+<text x='24' y='34' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='19' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='24' dy='0.0'>Калибровка по линейкам или блоку DRO — станок меряет сам</tspan></text>
+<rect x='60' y='150' width='820' height='30' rx='4' fill='#d8dbe0' stroke='#8f949b' stroke-width='1.5' />
+<rect x='60' y='190' width='820' height='12' rx='2' fill='#f4e7b5' stroke='#b49a3b' stroke-width='1.5' />
+<line x1='60.0' y1='190' x2='60.0' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='80.5' y1='190' x2='80.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='101.0' y1='190' x2='101.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='121.5' y1='190' x2='121.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='142.0' y1='190' x2='142.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='162.5' y1='190' x2='162.5' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='183.0' y1='190' x2='183.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='203.5' y1='190' x2='203.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='224.0' y1='190' x2='224.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='244.5' y1='190' x2='244.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='265.0' y1='190' x2='265.0' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='285.5' y1='190' x2='285.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='306.0' y1='190' x2='306.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='326.5' y1='190' x2='326.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='347.0' y1='190' x2='347.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='367.5' y1='190' x2='367.5' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='388.0' y1='190' x2='388.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='408.5' y1='190' x2='408.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='429.0' y1='190' x2='429.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='449.5' y1='190' x2='449.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='470.0' y1='190' x2='470.0' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='490.5' y1='190' x2='490.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='511.0' y1='190' x2='511.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='531.5' y1='190' x2='531.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='552.0' y1='190' x2='552.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='572.5' y1='190' x2='572.5' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='593.0' y1='190' x2='593.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='613.5' y1='190' x2='613.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='634.0' y1='190' x2='634.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='654.5' y1='190' x2='654.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='675.0' y1='190' x2='675.0' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='695.5' y1='190' x2='695.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='716.0' y1='190' x2='716.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='736.5' y1='190' x2='736.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='757.0' y1='190' x2='757.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='777.5' y1='190' x2='777.5' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='798.0' y1='190' x2='798.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='818.5' y1='190' x2='818.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='839.0' y1='190' x2='839.0' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='859.5' y1='190' x2='859.5' y2='196' stroke='#6b5a1c' stroke-width='1'/>
+<line x1='880.0' y1='190' x2='880.0' y2='202' stroke='#6b5a1c' stroke-width='1'/>
+<text x='870' y='222' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#6b5a1c' text-anchor='end' font-weight='normal'><tspan x='870' dy='0.0'>линейка</tspan></text>
+<rect x='380' y='90' width='120' height='60' rx='6' fill='#aab0b8' stroke='#8f949b' stroke-width='1.5' />
+<text x='440' y='126' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#1b1b1a' text-anchor='middle' font-weight='normal'><tspan x='440' dy='0.0'>каретка</tspan></text>
+<line x1='450' y1='76' x2='620' y2='76' stroke='#2a78d6' stroke-width='2' marker-end='url(#a2a78d6)' marker-start='url(#s2a78d6)'/>
+<line x1='450' y1='64' x2='620' y2='64' stroke='#2a78d6' stroke-width='2' marker-end='url(#a2a78d6)' marker-start='url(#s2a78d6)'/>
+<line x1='450' y1='52' x2='620' y2='52' stroke='#2a78d6' stroke-width='2' marker-end='url(#a2a78d6)' marker-start='url(#s2a78d6)'/>
+<text x='630' y='62' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#2a78d6' text-anchor='start' font-weight='normal'><tspan x='630' dy='0.0'>3 раза вперёд и назад на ход</tspan><tspan x='630' dy='16.2'>(Z 20 мм, X 10 мм)</tspan></text>
+<line x1='330' y1='120' x2='370' y2='120' stroke='#eb6834' stroke-width='2' marker-end='url(#aeb6834)'/>
+<text x='325' y='116' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#eb6834' text-anchor='end' font-weight='normal'><tspan x='325' dy='0.0'>сначала отход 1 мм — выбрать люфт</tspan></text>
+<text x='60' y='250' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='60' dy='0.0'>Шаг винта = винт × ход по линейке / ход по шагам мотора. Люфт — насколько линейка «не доехала»</tspan><tspan x='60' dy='16.2'>при развороте.</tspan></text>
+<text x='60' y='290' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='60' dy='0.0'>Нужно свободное место: ход + 2–3 мм в обе стороны. Шпиндель стоит, джойстик в середине.</tspan></text>
+</svg>

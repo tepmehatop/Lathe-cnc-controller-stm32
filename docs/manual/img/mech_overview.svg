@@ -1,0 +1,123 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 960 600' width='960' height='600' role='img' aria-label='Что такое настройки механики: энкодер шпинделя, винты и моторы осей Z и X'>
+<title>Что такое настройки механики: энкодер шпинделя, винты и моторы осей Z и X</title>
+<defs><marker id='a1b1b1a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1b1b1a'/></marker><marker id='s1b1b1a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1b1b1a'/></marker><marker id='a2a78d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#2a78d6'/></marker><marker id='s2a78d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#2a78d6'/></marker><marker id='aeb6834' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#eb6834'/></marker><marker id='seb6834' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#eb6834'/></marker><marker id='a1baf7a' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#1baf7a'/></marker><marker id='s1baf7a' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#1baf7a'/></marker><marker id='a6250d6' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#6250d6'/></marker><marker id='s6250d6' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#6250d6'/></marker><marker id='ad03b3b' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#d03b3b'/></marker><marker id='sd03b3b' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#d03b3b'/></marker><marker id='a52514e' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M0,0 L10,5 L0,10 z' fill='#52514e'/></marker><marker id='s52514e' viewBox='0 0 10 10' refX='1' refY='5' markerWidth='7' markerHeight='7' orient='auto'><path d='M10,0 L0,5 L10,10 z' fill='#52514e'/></marker></defs>
+<rect width='100%' height='100%' fill='#fcfcfb' rx='10'/>
+<text x='24' y='34' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='19' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='24' dy='0.0'>Станок сверху: что означает каждая строка экрана «МЕХАНИКА СТАНКА»</tspan></text>
+<circle cx='40' cy='72' r='13' fill='#eb6834'/>
+<text x='40' y='77' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='40' dy='0.0'>5</tspan></text>
+<text x='62' y='68' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='62' dy='0.0'>ЭНКОДЕР — линий на 1 оборот шпинделя</tspan></text>
+<text x='62' y='88' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='62' dy='0.0'>на энкодере написано «1000P/R» — это 1000 линий</tspan></text>
+<rect x='40' y='170' width='170' height='130' rx='8' fill='#b9bec6' stroke='#8f949b' stroke-width='1.5' />
+<text x='125' y='290' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#52514e' text-anchor='middle' font-weight='normal'><tspan x='125' dy='0.0'>передняя бабка</tspan></text>
+<circle cx='125' cy='122' r='20' fill='#2f6fb8' stroke='#1d4f8a' stroke-width='2'/>
+<text x='125' y='127' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='125' dy='0.0'>E</tspan></text>
+<circle cx='125' cy='205' r='13' fill='#c9ccd1' stroke='#8f949b' stroke-width='2'/>
+<line x1='105' y1='122' x2='112' y2='205' stroke='#52514e' stroke-width='2'/>
+<line x1='145' y1='122' x2='138' y2='205' stroke='#52514e' stroke-width='2'/>
+<text x='152' y='128' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#52514e' text-anchor='start' font-weight='normal'><tspan x='152' dy='0.0'>ремень 1:1</tspan></text>
+<rect x='210' y='205' width='40' height='60' rx='6' fill='#c9ccd1' stroke='#8f949b' stroke-width='1.5' />
+<rect x='250' y='227' width='70' height='16' rx='3' fill='#e9e3d6' stroke='#a59a83' stroke-width='1.5' />
+<text x='285' y='262' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#52514e' text-anchor='middle' font-weight='normal'><tspan x='285' dy='0.0'>заготовка</tspan></text>
+<line x1='250' y1='235' x2='930' y2='235' stroke='#52514e' stroke-width='1' stroke-dasharray='6 6'/>
+<text x='440' y='228' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#8a8984' text-anchor='end' font-weight='normal'><tspan x='440' dy='0.0'>ось шпинделя</tspan></text>
+<rect x='40' y='300' width='890' height='36' rx='4' fill='#d8dbe0' stroke='#8f949b' stroke-width='1.5' />
+<text x='920' y='323' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#52514e' text-anchor='end' font-weight='normal'><tspan x='920' dy='0.0'>станина</tspan></text>
+<rect x='450' y='270' width='170' height='80' rx='6' fill='#aab0b8' stroke='#8f949b' stroke-width='1.5' />
+<text x='456' y='344' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='12' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='456' dy='0.0'>каретка</tspan></text>
+<rect x='500' y='200' width='70' height='180' rx='5' fill='#c3c8cf' stroke='#8f949b' stroke-width='1.5' />
+<rect x='518' y='190' width='34' height='26' rx='3' fill='#7d838b' stroke='#55595f' stroke-width='1.5' />
+<polygon points='530,190 522,178 540,190' fill='#55595f'/>
+<rect x='527' y='222' width='16' height='150' fill='#dfe2e6' stroke='#8f949b' rx='3'/>
+<line x1='527' y1='232' x2='543' y2='226' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='242' x2='543' y2='236' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='252' x2='543' y2='246' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='262' x2='543' y2='256' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='272' x2='543' y2='266' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='282' x2='543' y2='276' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='292' x2='543' y2='286' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='302' x2='543' y2='296' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='312' x2='543' y2='306' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='322' x2='543' y2='316' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='332' x2='543' y2='326' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='342' x2='543' y2='336' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='352' x2='543' y2='346' stroke='#8f949b' stroke-width='1.2'/>
+<line x1='527' y1='362' x2='543' y2='356' stroke='#8f949b' stroke-width='1.2'/>
+<rect x='500' y='382' width='70' height='44' rx='6' fill='#3b3f45' stroke='#24272b' stroke-width='1.5' />
+<rect x='506' y='388' width='58' height='32' rx='4' fill='#4a4f56' stroke='#24272b' stroke-width='1' />
+<text x='535.0' y='409.0' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='535.0' dy='0.0'>X</tspan></text>
+<rect x='230' y='444.0' width='606' height='16' rx='3' fill='#dfe2e6' stroke='#8f949b' stroke-width='1.2' />
+<line x1='234' y1='459.0' x2='241.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='246' y1='459.0' x2='253.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='258' y1='459.0' x2='265.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='270' y1='459.0' x2='277.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='282' y1='459.0' x2='289.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='294' y1='459.0' x2='301.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='306' y1='459.0' x2='313.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='318' y1='459.0' x2='325.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='330' y1='459.0' x2='337.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='342' y1='459.0' x2='349.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='354' y1='459.0' x2='361.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='366' y1='459.0' x2='373.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='378' y1='459.0' x2='385.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='390' y1='459.0' x2='397.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='402' y1='459.0' x2='409.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='414' y1='459.0' x2='421.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='426' y1='459.0' x2='433.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='438' y1='459.0' x2='445.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='450' y1='459.0' x2='457.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='462' y1='459.0' x2='469.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='474' y1='459.0' x2='481.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='486' y1='459.0' x2='493.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='498' y1='459.0' x2='505.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='510' y1='459.0' x2='517.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='522' y1='459.0' x2='529.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='534' y1='459.0' x2='541.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='546' y1='459.0' x2='553.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='558' y1='459.0' x2='565.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='570' y1='459.0' x2='577.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='582' y1='459.0' x2='589.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='594' y1='459.0' x2='601.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='606' y1='459.0' x2='613.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='618' y1='459.0' x2='625.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='630' y1='459.0' x2='637.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='642' y1='459.0' x2='649.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='654' y1='459.0' x2='661.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='666' y1='459.0' x2='673.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='678' y1='459.0' x2='685.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='690' y1='459.0' x2='697.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='702' y1='459.0' x2='709.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='714' y1='459.0' x2='721.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='726' y1='459.0' x2='733.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='738' y1='459.0' x2='745.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='750' y1='459.0' x2='757.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='762' y1='459.0' x2='769.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='774' y1='459.0' x2='781.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='786' y1='459.0' x2='793.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='798' y1='459.0' x2='805.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='810' y1='459.0' x2='817.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<line x1='822' y1='459.0' x2='829.2' y2='445.0' stroke='#8f949b' stroke-width='1.4'/>
+<rect x='840' y='424' width='80' height='56' rx='6' fill='#3b3f45' stroke='#24272b' stroke-width='1.5' />
+<rect x='846' y='430' width='68' height='44' rx='4' fill='#4a4f56' stroke='#24272b' stroke-width='1' />
+<text x='880.0' y='457.0' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='880.0' dy='0.0'>Z</tspan></text>
+<circle cx='650' cy='160' r='13' fill='#eb6834'/>
+<text x='650' y='165' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='650' dy='0.0'>1</tspan></text>
+<text x='672' y='156' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='672' dy='0.0'>ШАГ ВИНТА X — винт поперечной</tspan></text>
+<text x='672' y='175' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='672' dy='0.0'>подачи (мотор X спереди суппорта)</tspan></text>
+<circle cx='240' cy='486' r='13' fill='#eb6834'/>
+<text x='240' y='491' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='240' dy='0.0'>1</tspan></text>
+<text x='262' y='491' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='262' dy='0.0'>ШАГ ВИНТА Z — на сколько мм уходит каретка за 1 оборот винта</tspan></text>
+<circle cx='650' cy='386' r='13' fill='#2a78d6'/>
+<text x='650' y='391' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='650' dy='0.0'>2</tspan></text>
+<circle cx='680' cy='386' r='13' fill='#2a78d6'/>
+<text x='680' y='391' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='680' dy='0.0'>3</tspan></text>
+<text x='700' y='382' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='700' dy='0.0'>мотор и драйвер каждой оси:</tspan></text>
+<text x='700' y='400' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#1b1b1a' text-anchor='start' font-weight='bold'><tspan x='700' dy='0.0'>ШАГОВ НА ОБОРОТ, МИКРОШАГ</tspan></text>
+<circle cx='240' cy='524' r='13' fill='#1baf7a'/>
+<text x='240' y='529' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='15' fill='#ffffff' text-anchor='middle' font-weight='bold'><tspan x='240' dy='0.0'>4</tspan></text>
+<text x='262' y='520' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='262' dy='0.0'>ЛЮФТ — на сколько ось «не доезжает», когда меняет направление</tspan></text>
+<text x='262' y='539' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='14' fill='#1b1b1a' text-anchor='start' font-weight='normal'><tspan x='262' dy='0.0'>(зазор в гайке винта). Меряет КАЛИБРОВКА.</tspan></text>
+<line x1='40' y1='578' x2='200' y2='578' stroke='#2a78d6' stroke-width='3' marker-end='url(#a2a78d6)' marker-start='url(#s2a78d6)'/>
+<text x='210' y='583' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#2a78d6' text-anchor='start' font-weight='bold'><tspan x='210' dy='0.0'>Z — вдоль станины (продольная)</tspan></text>
+<line x1='560' y1='562' x2='560' y2='594' stroke='#6250d6' stroke-width='3' marker-end='url(#a6250d6)' marker-start='url(#s6250d6)'/>
+<text x='572' y='583' font-family='DejaVu Sans, Verdana, Arial, sans-serif' font-size='13' fill='#6250d6' text-anchor='start' font-weight='bold'><tspan x='572' dy='0.0'>X — поперёк (поперечная)</tspan></text>
+</svg>
