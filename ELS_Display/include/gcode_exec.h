@@ -15,6 +15,8 @@ enum GcExecSt {
 typedef void (*GcSendFn)(const char* gcode_line);
 
 void        GCodeExec_Init(GcSendFn fn);
+// Режим станка: запуск не в M8 (с веб-страницы) — исполнитель сам включает M8 и ждёт его до 3 с
+void        GCodeExec_SetModeFns(bool (*is_m8)(), void (*go_m8)());
 bool        GCodeExec_Run(const char* filepath);
 void        GCodeExec_Stop();
 void        GCodeExec_TogglePause();

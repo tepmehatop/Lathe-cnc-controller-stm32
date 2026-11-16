@@ -81,6 +81,7 @@ static bool e2_gc_segment(long tz, long tx, float mm_min)
       if (period < 1000000 / E2_GC_MAX_SPS) period = 1000000 / E2_GC_MAX_SPS;
       long ez = n / 2, ex = n / 2;
       uint32_t t = micros();
+      long ramp0 = 0;                                  // после паузы — разгон заново
       for (long i = 0; i < n; i++) {
          bool stz = false, stx = false;
          ez -= az; if (ez < 0) { ez += n; stz = true; }
@@ -94,9 +95,15 @@ static bool e2_gc_segment(long tz, long tx, float mm_min)
             e2_cal_poll();
             if (e2_cal_abort) return false;
             e2_gc_report();
+            if (e2_gc_hold) {                          // ПАУЗА с экрана: стоим посреди кадра, СТОП — по-прежнему
+               while (e2_gc_hold && !e2_cal_abort) { e2_cal_poll(); e2_gc_report(); delay(2); }
+               if (e2_cal_abort) return false;
+               ramp0 = i; t = micros();
+            }
          }
          // разгон и торможение — только выше стартовой скорости: подача и короткие отрезки дуг идут без замедления
          long edge = i < n - i ? i : n - i;
+         if (i - ramp0 < edge) edge = i - ramp0;
          const uint32_t p0 = 1000000 / E2_GC_START_SPS;
          uint32_t p = period >= p0 || edge >= E2_GC_RAMP ? period : p0 - (p0 - period) * edge / E2_GC_RAMP;
          uint32_t el = micros() - t;
@@ -216,7 +223,14 @@ void e2_gcode_line(const char* line)
 {
    const char* err = nullptr;
    while (*line == ' ') line++;
-   if (!strcmp(line, "STOP")) { Display_Send_CMD("OK", nullptr); return; }   // стоп между строками — уже стоим
+   if (!strcmp(line, "STOP")) { e2_gc_hold = false; Display_Send_CMD("OK", nullptr); return; }   // стоп между строками — уже стоим
+   // пауза между кадрами — уже стоим; ответа нет: дисплей ждёт ответ только на кадры
+   if (!strncmp(line, "HOLD:", 5)) { e2_gc_hold = line[5] == '1'; return; }
+   // начало программы: направление линеек проверить сразу — до первого движения, а не на третьей строке
+   if (*line == '%' && Mode == Mode_Reserve && (!e2_gc_sign(0) || !e2_gc_sign(1))) {
+      Display_Send_CMD("ERR", "НАПРАВЛЕНИЕ ЛИНЕЕК ЕЩЁ НЕ ИЗВЕСТНО: ПРОВЕДИТЕ ДЖОЙСТИКОМ КАЖДУЮ ОСЬ НА 3 ММ И ОТПУСТИТЕ");
+      return;
+   }
    if (*line == '%') { e2_gc.known = false; Display_Send_CMD("OK", nullptr); return; }   // начало программы (дисплей
                                                                                        // шлёт перед первой строкой) / ленты
    if (*line == 'O') { Display_Send_CMD("OK", nullptr); return; }                      // номер программы
@@ -224,7 +238,7 @@ void e2_gcode_line(const char* line)
    if (Mode != s_mode) { s_mode = Mode; e2_gc.known = false; }      // вошли в M8 — опорная точка заново
    if (Mode != Mode_Reserve) err = "ВКЛЮЧИТЕ РЕЖИМ M8 (G-КОД)";
    else if (Joy_Z_flag || Joy_X_flag) err = "ОТПУСТИТЕ ДЖОЙСТИК";
-   else if (!e2_gc_sign(0) || !e2_gc_sign(1)) err = "ПРОВЕДИТЕ ОСИ ДЖОЙСТИКОМ НА 2 ММ (НАПРАВЛЕНИЕ ЛИНЕЕК)";
+   else if (!e2_gc_sign(0) || !e2_gc_sign(1)) err = "НАПРАВЛЕНИЕ ЛИНЕЕК ЕЩЁ НЕ ИЗВЕСТНО: ПРОВЕДИТЕ ДЖОЙСТИКОМ КАЖДУЮ ОСЬ НА 3 ММ И ОТПУСТИТЕ";
    if (!err) {
       if (!e2_gc.known) {
          e2_pos_refresh();

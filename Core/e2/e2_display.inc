@@ -619,7 +619,7 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     }
     // SUBSEL: параметры, изменённые через тачскрин — ВСЕГДА вызываем Print() для обновления старого LCD
     else if (prm.startsWith("AP:"))   {
-      Ap = prm.substring(3).toInt();
+      Ap = constrain(prm.substring(3).toInt(), 0, 9900);   // как кнопки пульта: до 99.00 мм
       Print();
       Display_Send_Int("AP", Ap);        // подтвердить новое значение AP новому дисплею
       Display_On_Feed_Change();
@@ -628,7 +628,7 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     else if (prm.startsWith("FEED:")) {
       int new_feed = prm.substring(5).toInt();
       if (new_feed >= 1) {
-        Feed_mm = new_feed;
+        Feed_mm = constrain(new_feed, MIN_FEED, MAX_FEED);   // делители ядра рассчитаны на этот диапазон
         Print();
         Display_On_Feed_Change();
         Serial.print(F("FEED: → Feed_mm=")); Serial.println(Feed_mm);
@@ -638,7 +638,7 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     else if (prm.startsWith("AFEED:")) {
       int new_afeed = prm.substring(6).toInt();
       if (new_afeed >= 1) {
-        aFeed_mm = new_afeed;
+        aFeed_mm = constrain(new_afeed, MIN_aFEED, MAX_aFEED);
         Print();
         Display_On_Feed_Change();
         Serial.print(F("AFEED: → aFeed_mm=")); Serial.println(aFeed_mm);
@@ -723,6 +723,8 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     }
     // JOY:* — управление осями через джойстик-оверлей на тачскрине (US-013)
     // JOY:LEFT/RIGHT = ось Z, JOY:UP/DOWN = ось X, JOY:STOP = стоп, JOY:RAPID_ON/OFF = быстро
+    // JOY:HOLD:биты — экранный джойстик «пока держишь» (L=1 R=2 U=4 D=8, 0 — отпущен): как механический
+    else if (prm.startsWith("JOY:HOLD:")) { e2_joy_virt = prm.substring(9).toInt() & 0x0F; e2_joy_virt_ms = millis(); }
     else if (prm == "JOY:LEFT")      { Joy_LeftPressed();  }
     else if (prm == "JOY:RIGHT")     { Joy_RightPressed(); }
     else if (prm == "JOY:UP")        { Joy_UpPressed();    }

@@ -21,6 +21,8 @@ E2Ocr OCR4A = { &TIM12->ARR };   // Timer4 → TIM12
 volatile uint16_t OCR5A = 0;     // Timer5 — программный, см. _spindle_edge()
 
 volatile uint8_t Spindle_Dir, Motor_Z_Dir, Joy_Z_flag, Step_Z_flag;
+volatile uint8_t  e2_joy_virt = 0;          // экранный джойстик (Joy_Read в e2_hal.h)
+volatile uint32_t e2_joy_virt_ms = 0;
 volatile uint8_t Motor_X_Dir, Joy_X_flag, Step_X_flag, Cone_flag;
 
 volatile uint8_t e2_en_int0, e2_en_int2;

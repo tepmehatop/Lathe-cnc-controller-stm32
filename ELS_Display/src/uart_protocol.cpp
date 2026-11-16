@@ -254,6 +254,10 @@ void UartProtocol::parseCommand(const char* cmd)
         }
         data_.cal_seq++;
     }
+    else if (strcmp(command, "BOOT") == 0) {
+        data_.boot_why = params[0];
+        data_.boot_seq++;
+    }
     else if (strcmp(command, "CFG_RES") == 0) {
         strncpy(data_.cfg_res, params, sizeof(data_.cfg_res) - 1);
         data_.cfg_res[sizeof(data_.cfg_res) - 1] = 0;

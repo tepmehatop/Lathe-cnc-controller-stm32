@@ -716,6 +716,18 @@ void setup()
 
   // ========== НОВЫЙ ДИСПЛЕЙ ESP32-S3 (SoftwareSerial Pin51=TX, Pin52=RX, 57600) =========
   Display_UART_Init();
+  // [STM32] причина запуска — дисплею: если STM32 перезапустилась сама при работающем дисплее (просадка питания
+  // при старте моторов, сторожевой таймер), дисплей покажет сообщение. P — питание, B — просадка, W — сторож,
+  // S — программный (сохранение линеек), R — кнопка сброса / отладчик.
+  {
+    uint32_t csr = RCC->CSR;
+    const char* why = (csr & RCC_CSR_PORRSTF) ? "P" : (csr & RCC_CSR_BORRSTF) ? "B" :
+                      (csr & (RCC_CSR_IWDGRSTF | RCC_CSR_WWDGRSTF)) ? "W" : (csr & RCC_CSR_SFTRSTF) ? "S" :
+                      (csr & RCC_CSR_LPWRRSTF) ? "B" : "R";
+    RCC->CSR |= RCC_CSR_RMVF;
+    Display_Send_CMD("BOOT", why);
+    Serial.print(F("[BOOT] причина запуска: ")); Serial.println(why);
+  }
   // =========================================================================
   // [STM32] источник координат — из настроек (e2_pos, BACKLOG-028)
   if (e2_pos.source == POS_SOURCE_DRO_UART) DRV_DRO_Init();            // вместо DRO_Init() из DRO_HS800.ino
@@ -1959,8 +1971,13 @@ static const char* e2_mech_tables(const E2Mech& m, bool out)
       double p = e2_thread_pitch(Thread_Info[i]);
       double dz = tick / (p * z_spm), dx = tick / (p * x_spm);
       if (dz < 1 || dx < 1 || dz + THRD_ACCEL > 255 || dx + THRD_ACCEL > 255) {
-         snprintf(err, sizeof(err), "РЕЗЬБА %.6s: %s", Thread_Info[i].Thread_Print,
-                  (dz < 1 || dx < 1) ? "МОТОР НЕ УСПЕЕТ" : "ДЕЛИТЕЛЬ > 255");
+         char nm[8]; int k = 0;                       // имя без пробелов по краям: « 6tpi » → «6tpi»
+         for (const char* c = Thread_Info[i].Thread_Print; *c && k < 6; c++) if (*c != ' ' || k) nm[k++] = *c;
+         while (k && nm[k - 1] == ' ') k--;
+         nm[k] = 0;
+         bool fast = dz < 1 || dx < 1;
+         char a = fast ? (dz < 1 ? 'Z' : 'X') : (dz + THRD_ACCEL > 255 ? 'Z' : 'X');
+         snprintf(err, sizeof(err), "РЕЗЬБА %s: %c %s", nm, a, fast ? "НЕ УСПЕЕТ" : "ДЕЛИТЕЛЬ > 255");
          return err;
       }
       if (out) {
@@ -1971,7 +1988,12 @@ static const char* e2_mech_tables(const E2Mech& m, bool out)
    for (unsigned i = 0; i < TOTAL_CONE; i++) {
       double d = 2 * z_spm / (x_spm * e2_cone_slope(Cone_Info[i]));
       if (d < 1 || d >= 256) {
-         snprintf(err, sizeof(err), "КОНУС %.5s: ДЕЛИТЕЛЬ ВНЕ 1-255", Cone_Info[i].Cone_Print);
+         // имя без пробелов и без значка градуса LCD2004 (\5) — экран показывает сообщение как есть
+         char nm[8]; int k = 0;
+         for (const char* c = Cone_Info[i].Cone_Print; *c && k < 5; c++) if (*c != ' ' && *c != 5) nm[k++] = *c;
+         nm[k] = 0;
+         snprintf(err, sizeof(err), "КОНУС %s%s: ДЕЛИТЕЛЬ %s", nm, strchr(nm, ':') || nm[0] == 'K' ? "" : "°",
+                  d < 1 ? "< 1" : "> 255");
          return err;
       }
       if (out) e2_split(d, Cone_Info[i].Cs_Div, Cone_Info[i].Cm_Div);
@@ -1988,15 +2010,17 @@ const char* e2_mech_check(const E2Mech& m)
    if (m.z_screw < 25 || m.z_screw > 1000 || m.x_screw < 25 || m.x_screw > 1000) return "ШАГ ВИНТА: 0.25-10 ММ";
    if (m.bl_z_um < 0 || m.bl_z_um > 2000 || m.bl_x_um < 0 || m.bl_x_um > 2000) return "ЛЮФТ: 0-2000 МКМ";
    // как static_assert автора (CHECK_MIN_FEED_* и др.) — пределы подач укладываются в таймеры
+   // ось — в сообщении: экран объясняет, какой оси не хватает (или много) шагов на мм
    const int ax[2][3] = {{m.z_steps, m.z_mc, m.z_screw}, {m.x_steps, m.x_mc, m.x_screw}};
-   for (auto& a : ax) {
+   for (int i = 0; i < 2; i++) {
+      const int* a = ax[i];
       float spr = (float)a[0] * a[1];
-      if ((uint32_t)(m.enc_lines / (spr * MIN_FEED / a[2]) / 2) > 255) return "MIN_FEED: ДЕЛИТЕЛЬ > 255";
-      if ((uint32_t)(m.enc_lines / (spr * MAX_FEED / a[2]) / 2) <= 1)  return "MAX_FEED: ДЕЛИТЕЛЬ <= 1";
+      if ((uint32_t)(m.enc_lines / (spr * MIN_FEED / a[2]) / 2) > 255) return i ? "MIN_FEED X: ДЕЛИТЕЛЬ > 255" : "MIN_FEED Z: ДЕЛИТЕЛЬ > 255";
+      if ((uint32_t)(m.enc_lines / (spr * MAX_FEED / a[2]) / 2) <= 1)  return i ? "MAX_FEED X: ДЕЛИТЕЛЬ <= 1" : "MAX_FEED Z: ДЕЛИТЕЛЬ <= 1";
       uint32_t k_min = (uint32_t)MIN_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
       uint32_t k_max = (uint32_t)MAX_aFEED * a[0] * a[1] / ((uint32_t)60 * a[2] / 100) * 2;
-      if (k_min == 0 || 250000 / k_min - 1 > 65535) return "MIN_aFEED: ДЕЛИТЕЛЬ > 65535";
-      if (k_max == 0 || 250000 / k_max - 1 <= 1)    return "MAX_aFEED: ДЕЛИТЕЛЬ <= 1";
+      if (k_min == 0 || 250000 / k_min - 1 > 65535) return i ? "MIN_aFEED X: ДЕЛИТЕЛЬ > 65535" : "MIN_aFEED Z: ДЕЛИТЕЛЬ > 65535";
+      if (k_max == 0 || 250000 / k_max - 1 <= 1)    return i ? "MAX_aFEED X: ДЕЛИТЕЛЬ <= 1" : "MAX_aFEED Z: ДЕЛИТЕЛЬ <= 1";
    }
    if (e2_mech_is_stamp(m)) return nullptr;            // таблицы автора
    return e2_mech_tables(m, false);

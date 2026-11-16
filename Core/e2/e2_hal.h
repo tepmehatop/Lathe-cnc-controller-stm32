@@ -199,8 +199,13 @@ void e2_bl_turn_x(int8_t d);
 // подрежим: бит5 Int, бит6 Man, бит7 Ext
 // ============================================================================
 #define Joy_Init()             e2_joy_init()
-#define Joy_Read               ((uint8_t)((E2_RD(E2_PIN_JOY_LEFT) << 0) | (E2_RD(E2_PIN_JOY_RIGHT) << 1) | \
-                                          (E2_RD(E2_PIN_JOY_UP) << 2)   | (E2_RD(E2_PIN_JOY_DOWN) << 3)))
+// Экранный джойстик (BACKLOG-023): дисплей, пока палец на стрелке, шлёт <TOUCH:JOY:HOLD:биты> каждые 100 мс —
+// те же биты «нажаты» (0) поверх механического. Нет обновления дольше 350 мс — отпущен («мёртвая рука»).
+extern volatile uint8_t  e2_joy_virt;      // биты 0..3: L R U D
+extern volatile uint32_t e2_joy_virt_ms;
+#define E2_JOY_VIRT            ((millis() - e2_joy_virt_ms < 350) ? e2_joy_virt : 0)
+#define Joy_Read               ((uint8_t)(((E2_RD(E2_PIN_JOY_LEFT) << 0) | (E2_RD(E2_PIN_JOY_RIGHT) << 1) | \
+                                           (E2_RD(E2_PIN_JOY_UP) << 2)   | (E2_RD(E2_PIN_JOY_DOWN) << 3)) & ~E2_JOY_VIRT))
 #define Button_Rapid           (g_emul_rapid ? 0 : (E2_RD(E2_PIN_JOY_RAPID) << 4))
 #define Submode_Read           ((uint8_t)((E2_RD(E2_PIN_SUB_INT) << 5) | (E2_RD(E2_PIN_SUB_MAN) << 6) | \
                                           (E2_RD(E2_PIN_SUB_EXT) << 7)))

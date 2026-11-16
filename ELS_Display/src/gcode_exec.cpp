@@ -30,6 +30,7 @@ static char      s_filename[64] = {};
 static char      s_error[200]   = {};   // кириллица — 2 байта на букву: 80 обрезали сообщение STM32
 static bool      s_expanded  = false;    // исполняется развёрнутая копия RUN_FILE
 static int       s_step      = 0;        // кадров прочитано (у развёрнутой — номер её кадра; веб-рисунок)
+static bool      s_paused_ack = false;   // пауза пришлась на кадр, ответ на который ещё не пришёл
 
 // Оценка времени: s_cum[k] — расчётное время первых k кадров, с (GCodeTime_Lines). Пусто — файл больше 64 КБ
 static std::vector<float> s_cum;
@@ -166,6 +167,12 @@ void GCodeExec_Init(GcSendFn fn) {
     s_state   = GCE_IDLE;
 }
 
+// Режим станка: запуск с веб-страницы сам включает M8 (иначе STM32 ответит «ВКЛЮЧИТЕ РЕЖИМ M8»)
+static bool (*s_mode_is_m8)() = nullptr;
+static void (*s_mode_go_m8)() = nullptr;
+static uint32_t s_mode_req_t = 0;
+void GCodeExec_SetModeFns(bool (*is_m8)(), void (*go_m8)()) { s_mode_is_m8 = is_m8; s_mode_go_m8 = go_m8; }
+
 bool GCodeExec_Run(const char* filepath) {
     close_file();
     s_state    = GCE_IDLE;
@@ -237,10 +244,16 @@ void GCodeExec_Stop() {
 }
 
 void GCodeExec_TogglePause() {
+    // STM32 держит паузу и посреди кадра (HOLD:1 — оси встают сразу, HOLD:0 — едут дальше с разгоном).
+    // Кадр, ответ на который ещё не пришёл, после паузы ждём дальше (s_paused_ack).
     if (s_state == GCE_PAUSED) {
-        s_state = GCE_RUNNING;
+        if (s_send_fn) s_send_fn("HOLD:0");
+        s_state = s_paused_ack ? GCE_WAITING_ACK : GCE_RUNNING;
+        s_ack_t = millis();                            // время паузы — не в счёт ожидания ответа
         Serial.println("[gce] Resumed");
     } else if (s_state == GCE_RUNNING || s_state == GCE_WAITING_ACK) {
+        s_paused_ack = s_state == GCE_WAITING_ACK;
+        if (s_send_fn) s_send_fn("HOLD:1");
         s_state = GCE_PAUSED;
         Serial.println("[gce] Paused");
     }
@@ -254,6 +267,11 @@ static void step_done() {
 }
 
 void GCodeExec_OnAck(bool ok, const char* err) {
+    if (s_state == GCE_PAUSED && s_paused_ack) {      // кадр закончился, пока стояла пауза
+        s_paused_ack = false;
+        if (ok) { step_done(); return; }               // после ПРОДОЛЖИТЬ — следующий кадр
+        s_state = GCE_WAITING_ACK;                     // ошибка — показать сразу
+    }
     if (s_state != GCE_WAITING_ACK) return;
     if (ok) {
         step_done();
@@ -271,6 +289,16 @@ void GCodeExec_Process() {
 
         case GCE_RUNNING: {
             if (s_need_start) {                  // начало программы: опорная точка — с текущего положения
+                // запуск с веб-страницы, а на станке другой режим — включить M8 и дождаться (до 3 с)
+                if (s_mode_is_m8 && !s_mode_is_m8()) {
+                    if (!s_mode_req_t) { s_mode_req_t = millis() | 1; if (s_mode_go_m8) s_mode_go_m8(); }
+                    else if (millis() - s_mode_req_t > 3000) {
+                        snprintf(s_error, sizeof(s_error), "НЕ ВКЛЮЧИЛСЯ РЕЖИМ M8 (G-КОД)");
+                        close_file(); s_state = GCE_ERROR; s_mode_req_t = 0;
+                    }
+                    return;
+                }
+                s_mode_req_t = 0;
                 s_need_start = false;
                 if (s_send_fn) s_send_fn("%");
                 s_ack_t = millis();

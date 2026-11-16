@@ -12,6 +12,7 @@
 
 static bool e2_cal_abort = false;
 static bool e2_cal_joy = true;           // джойстик прерывает (калибровка); доводка X в цикле — нет
+static bool e2_gc_hold = false;          // G-код: ПАУЗА с экрана посреди кадра (<GCODE:HOLD:1>) — оси стоят
 static char e2_cal_rx[16];
 
 // Линейки/DRO обновить; заодно смотреть, не пришёл ли от экрана СТОП (калибровка, G-код) и не тронут ли джойстик
@@ -29,7 +30,11 @@ static void e2_cal_poll(void)
       memmove(e2_cal_rx, e2_cal_rx + 1, sizeof(e2_cal_rx) - 2);
       e2_cal_rx[sizeof(e2_cal_rx) - 2] = (char)DISPLAY_UART.read();
       e2_cal_rx[sizeof(e2_cal_rx) - 1] = 0;
-      if (strstr(e2_cal_rx, "STOP>")) e2_cal_abort = true;    // <TOUCH:CAL_STOP> / <GCODE:STOP>
+      if (strstr(e2_cal_rx, "STOP>")) { e2_cal_abort = true; e2_gc_hold = false; }   // <TOUCH:CAL_STOP> / <GCODE:STOP>
+      // пауза G-кода: по концу окна — новая команда, старая в окне ещё видна
+      size_t L = strlen(e2_cal_rx);
+      if (L >= 7 && !strcmp(e2_cal_rx + L - 7, "HOLD:1>")) e2_gc_hold = true;
+      if (L >= 7 && !strcmp(e2_cal_rx + L - 7, "HOLD:0>")) e2_gc_hold = false;
    }
    if (e2_cal_joy && (Joy_Read & 0x0F) != 0x0F) e2_cal_abort = true;
 }

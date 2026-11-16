@@ -83,6 +83,8 @@ typedef struct {
     uint8_t  cfg_valid;      // CFG получен
     char     cfg_res[64];    // <CFG_RES:OK> или причина отказа
     uint8_t  cfg_res_seq;    // растёт с каждым CFG_RES
+    char     boot_why;       // причина последнего запуска STM32 (<BOOT:…>): P B W S R
+    uint8_t  boot_seq;       // растёт с каждым <BOOT>: STM32 перезапустилась
     // Источник координат и линейки: <POS:источник,Z тип,нм,инв,инв.сигн,X тип,нм,инв,инв.сигн,доводка X,контроль шагов,допуск мкм>
     int32_t  pos_cfg[12];
     uint8_t  pos_valid;
