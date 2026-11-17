@@ -20,3 +20,10 @@ void           GCodeWiFi_Scan();
 int            GCodeWiFi_ScanCount();              // -1 — поиск идёт / не было
 const char*    GCodeWiFi_ScanSsid(int i);
 httpd_handle_t GCodeWiFi_GetHttpd();
+// Режим Wi-Fi: ВЫКЛ / РОУТЕР / ТОЧКА ДОСТУПА (NVS, по умолчанию ВЫКЛ)
+#define GCW_MODE_OFF    0
+#define GCW_MODE_ROUTER 1
+#define GCW_MODE_AP     2
+int            GCodeWiFi_GetMode();
+void           GCodeWiFi_SetMode(int mode);        // выполняет WiFi-задача, сохраняет в NVS
+bool           GCodeWiFi_IsOff();                  // радио выключено (ВЫКЛ или РОУТЕР без сети)

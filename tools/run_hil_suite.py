@@ -13,6 +13,7 @@
   kb       — tools/ui_kb_test.py: клавиатура подачи и съёма — пределы, отказ, ОТМЕНА
   tapfall  — tools/ui_fallthrough_test.py: медленное нажатие кнопки окна не «проваливается» под него
   pairwise — tools/hil_pairwise.py: режим × подрежим × источник × механика × подача × шпиндель, 18 сочетаний
+  forum    — tools/hil_forum_fixes.py: режим Wi-Fi (ВЫКЛ/РОУТЕР/ТОЧКА), БЫСТРО в джойстике, «ИЗ КОНФИГА»
 Стенд: STM32 (stm32f407_dro) по ST-Link, дисплей 10.1" по USB и Wi-Fi, Mega — эмулятор DRO.
 """
 import argparse, os, subprocess, sys, time
@@ -28,6 +29,7 @@ SUITES = [
     ('tapfall', ['ui_fallthrough_test.py']),
     ('pairwise', ['hil_pairwise.py']),
     ('kb', ['ui_kb_test.py', '--shots', '{out}']),
+    ('forum', ['hil_forum_fixes.py']),
 ]
 
 

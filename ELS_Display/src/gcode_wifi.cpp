@@ -36,8 +36,14 @@ static const uint16_t HTTP_PORT = 80;
 static bool s_mdns_started = false;
 
 // GCW_STACK_WAIT: STA ассоциирован, ждём ~2с пока поднимется TCP/IP (без блокировки loop)
-enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_STACK_WAIT, GCW_CONNECTED, GCW_AP };
+// GCW_OFF: Wi-Fi выключен (режим ВЫКЛ или РОУТЕР без сохранённой сети)
+enum GcWifiSt { GCW_INIT, GCW_CONNECTING, GCW_STACK_WAIT, GCW_CONNECTED, GCW_AP, GCW_OFF };
 static GcWifiSt          s_state      = GCW_INIT;
+// Режим (форум 2026-11-17): 0 — ВЫКЛ (по умолчанию после первой прошивки), 1 — РОУТЕР (без запасной точки
+// доступа, повторяет подключение), 2 — ТОЧКА ДОСТУПА. Хранится в NVS «wifi»/«mode».
+static volatile int      s_mode       = GCW_MODE_OFF;
+static volatile int      s_mode_req   = -1;
+static bool              s_radio_ready = false;  // сопроцессор (C6) поднят
 static uint32_t          s_conn_t     = 0;
 static uint32_t          s_ap_retry_t = 0;   // повторная попытка STA из AP-режима
 static uint32_t          s_srv_start_t  = 0; // когда запустили сервер
@@ -72,8 +78,10 @@ static void sta_load() {
     if (p.begin("wifi", true)) {
         String ss = p.getString("ssid", ""), pw = p.getString("pass", "");
         bool have = p.isKey("ssid");
+        int m = p.getInt("mode", GCW_MODE_OFF);
         p.end();
-        if (have) {                      // сохранено с экрана (пустой — «забыть»: только точка доступа)
+        s_mode = (m >= GCW_MODE_OFF && m <= GCW_MODE_AP) ? m : GCW_MODE_OFF;
+        if (have) {                      // сохранено с экрана (пустой — «забыть»)
             strlcpy(s_sta_ssid, ss.c_str(), sizeof(s_sta_ssid));
             strlcpy(s_sta_pass, pw.c_str(), sizeof(s_sta_pass));
             return;
@@ -845,6 +853,7 @@ static void wait_coprocessor() {
 }
 
 static void sta_connect();
+static void apply_mode();
 static uint32_t s_retry_t = 0;   // последняя попытка begin() — повтор каждые 10 с в окне подключения
 
 static void wifi_init_impl() {
@@ -865,16 +874,60 @@ static void wifi_init_impl() {
     if (!LittleFS.exists(GCODE_DIR)) LittleFS.mkdir(GCODE_DIR);
 
     sta_load();
-    const char* ssid = s_sta_ssid;
-    if (ssid && ssid[0] != '\0') {
-        Serial.printf("[gcode] WiFi STA → %s (пароль: %u симв.)\n", ssid, (unsigned)strlen(s_sta_pass));
-        wait_coprocessor();
-        WiFi.persistent(false);
-        WiFi.setAutoReconnect(false);
-        sta_connect();
-    } else {
-        start_ap();
+    apply_mode();
+}
+
+// Сопроцессор и настройки STA — один раз, перед первым включением радио
+static void radio_up() {
+    if (s_radio_ready) return;
+    wait_coprocessor();
+    WiFi.persistent(false);
+    WiFi.setAutoReconnect(false);
+    s_radio_ready = true;
+}
+
+static void radio_off() {
+    if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
+    if (s_radio_ready) {
+        WiFi.softAPdisconnect(true);
+        WiFi.disconnect(true);
+        delay(100);
+        WiFi.mode(WIFI_OFF);
     }
+    s_state = GCW_OFF;
+    s_ip[0] = 0;
+    s_notified_ip[0] = 0;
+}
+
+// Включить то, что выбрано: ВЫКЛ — ничего; РОУТЕР — сеть роутера (нет сети — выключено); ТОЧКА — только AP
+static void apply_mode() {
+    static const char* const names[3] = { "ВЫКЛ", "РОУТЕР", "ТОЧКА ДОСТУПА" };
+    Serial.printf("[wifi] режим: %s\n", names[s_mode]);
+    if (s_mode == GCW_MODE_ROUTER && s_sta_ssid[0]) {
+        Serial.printf("[gcode] WiFi STA → %s (пароль: %u симв.)\n", s_sta_ssid, (unsigned)strlen(s_sta_pass));
+        radio_up();
+        sta_connect();
+    } else if (s_mode == GCW_MODE_AP) {
+        radio_off();
+        radio_up();
+        start_ap();
+    } else {
+        radio_off();
+    }
+}
+
+// Результат поиска — в список для экрана (без пустых имён и повторов); k — сколько записано
+static volatile int s_scan_k = 0;                 // последний удачный поиск (в т.ч. перед подключением)
+static void scan_store(int n) {
+    int k = 0;
+    for (int i = 0; i < n && k < GCW_SCAN_MAX; i++) {
+        String ss = WiFi.SSID(i);
+        if (!ss.length()) continue;
+        bool dup = false;
+        for (int j = 0; j < k; j++) if (ss == s_scan_list[j]) dup = true;
+        if (!dup) strlcpy(s_scan_list[k++], ss.c_str(), sizeof(s_scan_list[0]));
+    }
+    s_scan_k = k;
 }
 
 // Подключение к роутеру — одна последовательность для старта, повтора из точки доступа и ввода с экрана
@@ -891,6 +944,7 @@ static void sta_connect() {
     // Wi-Fi сначала ищет сети
     int n = WiFi.scanNetworks();
     Serial.printf("[wifi] перед подключением: сетей %d\n", n);
+    if (n > 0) scan_store(n);                                     // этот же список — на экран WI-FI
     WiFi.scanDelete();
     delay(1000);
     WiFi.begin(s_sta_ssid, s_sta_pass);
@@ -909,33 +963,42 @@ static void wifi_screen_requests() {
         memcpy(s_sta_pass, s_new_pass, sizeof(s_sta_pass));
     }
     portEXIT_CRITICAL(&s_cfg_mux);
+    int mreq = s_mode_req;
+    if (mreq >= GCW_MODE_OFF && mreq <= GCW_MODE_AP) {
+        s_mode_req = -1;
+        s_mode = mreq;
+        if (mreq == GCW_MODE_OFF) s_scan_n = 0;                    // старый список сетей не показывать
+        Preferences p;
+        if (p.begin("wifi", false)) { p.putInt("mode", mreq); p.end(); }
+        apply_mode();
+    }
     if (cfg) {
         Preferences p;
-        if (p.begin("wifi", false)) { p.putString("ssid", s_sta_ssid); p.putString("pass", s_sta_pass); p.end(); }
-        Serial.printf("[wifi] сеть роутера с экрана: %s\n", s_sta_ssid[0] ? s_sta_ssid : "(нет — только точка доступа)");
-        if (s_sta_ssid[0]) sta_connect();
-        else {
-            if (s_srv) { s_srv->close(); delete s_srv; s_srv = nullptr; }
-            WiFi.disconnect(true);
-            delay(200);
-            start_ap();
+        if (p.begin("wifi", false)) {
+            p.putString("ssid", s_sta_ssid); p.putString("pass", s_sta_pass);
+            if (s_sta_ssid[0]) p.putInt("mode", GCW_MODE_ROUTER);   // ПОДКЛЮЧИТЬ — значит режим РОУТЕР
+            p.end();
         }
+        Serial.printf("[wifi] сеть роутера с экрана: %s\n", s_sta_ssid[0] ? s_sta_ssid : "(забыта)");
+        if (s_sta_ssid[0]) s_mode = GCW_MODE_ROUTER;
+        apply_mode();
+    }
+    if (s_scan_req && s_mode == GCW_MODE_OFF) {               // ВЫКЛ — радио не включаем, сетей не ищем
+        s_scan_req = false; s_scan_n = 0;
     }
     if (s_scan_req) {
         s_scan_req = false; s_scan_busy = true;
-        if (WiFi.getMode() == WIFI_AP) WiFi.mode(WIFI_AP_STA);   // в режиме точки доступа поиск не работает
+        bool was_off = (s_state == GCW_OFF);                       // РОУТЕР без сети — радио на время поиска
+        radio_up();
+        if (was_off) WiFi.mode(WIFI_STA);                         // выключено — включить на время поиска
+        else if (WiFi.getMode() == WIFI_AP) WiFi.mode(WIFI_AP_STA);   // в режиме точки доступа поиск не работает
         int n = WiFi.scanNetworks();
         Serial.printf("[wifi] поиск сетей: %d\n", n);
-        int k = 0;
-        for (int i = 0; i < n && k < GCW_SCAN_MAX; i++) {
-            String ss = WiFi.SSID(i);
-            if (!ss.length()) continue;
-            bool dup = false;
-            for (int j = 0; j < k; j++) if (ss == s_scan_list[j]) dup = true;
-            if (!dup) strlcpy(s_scan_list[k++], ss.c_str(), sizeof(s_scan_list[0]));
-        }
+        // во время подключения поиск часто не выходит (0 или ошибка) — тогда список из поиска перед подключением
+        if (n > 0 || s_state != GCW_CONNECTING) scan_store(n > 0 ? n : 0);
         WiFi.scanDelete();
-        s_scan_n = k; s_scan_busy = false;
+        if (was_off && s_state == GCW_OFF) WiFi.mode(WIFI_OFF);
+        s_scan_n = s_scan_k; s_scan_busy = false;
     }
 }
 
@@ -971,7 +1034,7 @@ static void wifi_process_impl() {
             ip.toString().toCharArray(s_ip, sizeof(s_ip));
             Serial.printf("[gcode] STA connected: %s\n", s_ip);
         } else if (millis() - s_conn_t > WIFI_STA_TIMEOUT_MS) {
-            Serial.printf("[gcode] STA timeout → AP (status=%d)\n", (int)WiFi.status());
+            Serial.printf("[gcode] STA timeout → повтор (status=%d)\n", (int)WiFi.status());
             {   // диагностика: видна ли сеть роутера (чужие SSID не печатаем)
                 int n = WiFi.scanNetworks();
                 int rssi = 0;
@@ -981,9 +1044,9 @@ static void wifi_process_impl() {
                               rssi ? "видна, RSSI=" : "не найдена", rssi ? String(rssi).c_str() : "");
                 WiFi.scanDelete();
             }
-            WiFi.disconnect(true);
-            delay(100);
-            start_ap();
+            // режим РОУТЕР: точку доступа сами не поднимаем (форум: «при включении появляется точка доступа») —
+            // подключаемся снова; нужна точка — выбрать ТОЧКА ДОСТУПА на экране WI-FI
+            sta_connect();
         }
     } else if (s_state == GCW_STACK_WAIT) {
         // TCP/IP стек на ESP32-S3 требует ~1-2с после ассоциации
@@ -1005,14 +1068,6 @@ static void wifi_process_impl() {
             Serial.println("[gcode] watchdog: restarting server...");
             s_last_client_t = millis();
             start_server(false);  // watchdog — без повторного алерта
-        }
-    } else if (s_state == GCW_AP) {
-        // Повторная попытка STA каждые 60 секунд (если SSID задан)
-        const char* ssid = s_sta_ssid;
-        if (ssid && ssid[0] != '\0' && millis() - s_ap_retry_t > 60000) {
-            Serial.println("[gcode] AP → retrying STA...");
-            log_hosted_versions();
-            sta_connect();
         }
     }
 }
@@ -1066,4 +1121,7 @@ int  GCodeWiFi_ScanCount()         { return (s_scan_req || s_scan_busy) ? -1 : s
 const char* GCodeWiFi_ScanSsid(int i) { return (i >= 0 && i < s_scan_n) ? s_scan_list[i] : ""; }
 bool GCodeWiFi_IsConnected()       { return s_state == GCW_CONNECTED || s_state == GCW_AP; }
 bool GCodeWiFi_IsAP()              { return s_state == GCW_AP; }
+int  GCodeWiFi_GetMode()           { return s_mode_req >= 0 ? s_mode_req : s_mode; }
+void GCodeWiFi_SetMode(int mode)   { if (mode >= GCW_MODE_OFF && mode <= GCW_MODE_AP) s_mode_req = mode; }
+bool GCodeWiFi_IsOff()             { return s_state == GCW_OFF || s_state == GCW_INIT; }
 httpd_handle_t GCodeWiFi_GetHttpd(){ return nullptr; }

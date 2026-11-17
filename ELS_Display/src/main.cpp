@@ -823,6 +823,7 @@ static lv_obj_t* s_joy_z = nullptr;      // экранный джойстик: �
 static lv_obj_t* s_joy_x = nullptr;
 static lv_obj_t* s_joy_feed = nullptr;
 static lv_obj_t* s_joy_feed_t = nullptr;
+static void joy_rapid_style();               // БЫСТРО: вид «вкл» / «выкл»
 static uint8_t   s_joy_bits = 0;          // стрелка, которую держат (L=1 R=2 U=4 D=8)
 static uint32_t  s_joy_sent_ms = 0;
 
@@ -1685,6 +1686,8 @@ static const CfgField CFG_FIELDS[] = {
 struct CfgUi {
     int32_t   edit[9];       // правка до сохранения
     bool      dirty;         // есть несохранённые правки
+    bool      wait_default;  // ИЗ КОНФИГА нажата — поля не трогать, пока STM32 не пришлёт заводские
+    uint32_t  default_ms;    // ответ на ИЗ КОНФИГА пришёл — новые значения следом
     uint8_t   seen_seq;      // последний показанный CFG_RES
     lv_obj_t* val[9];
     lv_obj_t* status;
@@ -1987,13 +1990,31 @@ static void cfg_tick(lv_timer_t*)
     if (d.cfg_res_seq != g_cfg.seen_seq) {
         g_cfg.seen_seq = d.cfg_res_seq;
         bool ok = !strcmp(d.cfg_res, "OK");
+        if (g_cfg.wait_default) {                       // ответ на ИЗ КОНФИГА: заводские значения
+            g_cfg.wait_default = false;
+            g_cfg.default_ms = millis();
+            g_cfg.dirty = false;
+            cfg_set_status(ok ? "\xD0\x97\xD0\x90\xD0\x92\xD0\x9E\xD0\x94\xD0\xA1\xD0\x9A\xD0\x98\xD0\x95 \xD0\x97\xD0\x9D\xD0\x90\xD0\xA7\xD0\x95\xD0\x9D\xD0\x98\xD0\xAF"   // ЗАВОДСКИЕ ЗНАЧЕНИЯ
+                              : d.cfg_res, ok ? 0x00ff88 : 0xff5555);
+            if (ok)
+                info_popup("\xD0\x97\xD0\x90\xD0\x92\xD0\x9E\xD0\x94\xD0\xA1\xD0\x9A\xD0\x98\xD0\x95 \xD0\x97\xD0\x9D\xD0\x90\xD0\xA7\xD0\x95\xD0\x9D\xD0\x98\xD0\xAF", 0x00ff88,   // ЗАВОДСКИЕ ЗНАЧЕНИЯ
+                           "ИЗ КОНФИГА возвращает заводские значения механики - те, с которыми собрана прошивка "
+                           "(els_config.h), и сразу записывает их в память STM32. Ваши сохранённые значения заменены "
+                           "(люфт по умолчанию - 0).\n\nЧтобы просто отменить несохранённые правки, нажмите ЗАКРЫТЬ, "
+                           "не нажимая СОХРАНИТЬ.");
+            cfg_refresh();
+            return;
+        }
         cfg_set_status(ok ? "\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E"   // СОХРАНЕНО
                           : "\xD0\x9D\xD0\x95 \xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E",   // НЕ СОХРАНЕНО
                        ok ? 0x00ff88 : 0xff5555);
         if (ok) g_cfg.dirty = false;
         else mech_error_popup(d.cfg_res);              // полный текст и что поменять — в окне
     }
-    if (!g_cfg.dirty && d.cfg_valid) memcpy(g_cfg.edit, d.cfg, sizeof(g_cfg.edit));
+    // после ИЗ КОНФИГА старые значения не показывать: ждём ответ и ещё 0.4 с (новые CFG идут следом за ответом)
+    bool hold_old = g_cfg.wait_default || (g_cfg.default_ms && millis() - g_cfg.default_ms < 400);
+    if (!g_cfg.dirty && !hold_old && d.cfg_valid) memcpy(g_cfg.edit, d.cfg, sizeof(g_cfg.edit));
+    if (!hold_old) g_cfg.default_ms = 0;
     cfg_refresh();
 }
 
@@ -2290,23 +2311,107 @@ static void cal_show()
 // Wi-Fi: сеть роутера задаётся здесь (хранится в памяти дисплея), поиск сетей, «забыть» — только точка доступа.
 // ============================================================================
 static void cfg_open();
-struct HubUi { lv_obj_t* ov; lv_obj_t* info; lv_obj_t* addr; };
+// ── Диагностика дисплея (BACKLOG-041, вспышки экрана) ───────────────────────────
+// 1) Перезапуски дисплея: причина запуска (esp_reset_reason) — во флеш; «нештатные» (зависание, сторож, просадка
+//    питания) считаются. 2) Вывод на матрицу 10.1"/7" (MIPI-DSI): каждые 20 мс — флаг «недогрузки» моста DSI
+//    (строка кадра не успела из памяти — экран вспыхивает) и ошибки линии DSI. Всё — в USB-лог с временем и
+//    в строку внизу «НАСТРОЙКИ», чтобы пользователь мог прислать цифры.
+#include <Preferences.h>
+#include <esp_system.h>
+static uint32_t s_diag_resets = 0;          // нештатных перезапусков дисплея (всего)
+static char     s_diag_last[24] = "";       // причина последнего нештатного
+static uint32_t s_dsi_underrun = 0, s_dsi_err = 0;
+static uint32_t s_dsi_last_ms = 0;
+
+static void diag_boot()
+{
+    esp_reset_reason_t r = esp_reset_reason();
+    const char* why = nullptr;
+    switch (r) {
+        case ESP_RST_PANIC:    why = "сбой программы"; break;
+        case ESP_RST_INT_WDT:
+        case ESP_RST_TASK_WDT:
+        case ESP_RST_WDT:      why = "зависание (сторож)"; break;
+        case ESP_RST_BROWNOUT: why = "просадка питания"; break;
+        default: break;                         // включение питания, прошивка, USB, кнопка — штатно
+    }
+    Preferences p;
+    if (p.begin("diag", false)) {
+        s_diag_resets = p.getUInt("resets", 0);
+        p.getString("last", s_diag_last, sizeof(s_diag_last));
+        if (why) {
+            s_diag_resets++;
+            p.putUInt("resets", s_diag_resets);
+            p.putString("last", why);
+            snprintf(s_diag_last, sizeof(s_diag_last), "%s", why);
+        }
+        p.end();
+    }
+    Serial.printf("[BOOT] дисплей: причина запуска %d%s%s, нештатных всего %lu\n", (int)r, why ? " — " : "",
+                  why ? why : "", (unsigned long)s_diag_resets);
+}
+
+#if defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
+#include "soc/reg_base.h"
+#include "soc/soc.h"
+#define DIAG_DSI_BRG_INT_CLR   (DR_REG_DSI_BRG_BASE + 0x54)
+#define DIAG_DSI_BRG_INT_RAW   (DR_REG_DSI_BRG_BASE + 0x58)
+#define DIAG_DSI_HOST_INT_ST0  (DR_REG_DSI_HOST_BASE + 0xbc)   // чтение сбрасывает
+#define DIAG_DSI_HOST_INT_ST1  (DR_REG_DSI_HOST_BASE + 0xc0)
+static void diag_dsi_poll(lv_timer_t*)
+{
+    uint32_t raw = REG_READ(DIAG_DSI_BRG_INT_RAW);
+    uint32_t st0 = REG_READ(DIAG_DSI_HOST_INT_ST0), st1 = REG_READ(DIAG_DSI_HOST_INT_ST1);
+    if (raw & 1) {
+        REG_WRITE(DIAG_DSI_BRG_INT_CLR, 1);
+        s_dsi_underrun++;
+        uint32_t now = millis();
+        Serial.printf("[DSI] t=%lu с: недогрузка вывода на экран (№%lu, через %lu с после прошлой)\n",
+                      (unsigned long)(now / 1000), (unsigned long)s_dsi_underrun,
+                      (unsigned long)(s_dsi_last_ms ? (now - s_dsi_last_ms) / 1000 : 0));
+        s_dsi_last_ms = now;
+    }
+    if (st0 || st1) {
+        s_dsi_err++;
+        Serial.printf("[DSI] t=%lu с: ошибка линии DSI st0=%08lX st1=%08lX (№%lu)\n", (unsigned long)(millis() / 1000),
+                      (unsigned long)st0, (unsigned long)st1, (unsigned long)s_dsi_err);
+    }
+}
+#endif
+
+struct HubUi { lv_obj_t* ov; lv_obj_t* info; lv_obj_t* addr; lv_obj_t* diag; };
 static HubUi g_hub = {};
 
 static void hub_refresh()
 {
     char b[96];
     const char* ip = GCodeWiFi_GetIP();
-    if (!GCodeWiFi_IsAP() && !GCodeWiFi_IsConnected() && GCodeWiFi_GetStaSsid()[0]) {
+    int wm = GCodeWiFi_GetMode();
+    bool off = wm == GCW_MODE_OFF || (wm == GCW_MODE_ROUTER && !GCodeWiFi_GetStaSsid()[0]);
+    if (off) {
+        snprintf(b, sizeof(b), "%s", wm == GCW_MODE_OFF
+            ? "Wi-Fi \xD0\xB2\xD1\x8B\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD"                                  // Wi-Fi выключен
+            : "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C \xD1\x80\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80\xD0\xB0 \xD0\xBD\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB4\xD0\xB0\xD0\xBD\xD0\xB0");  // Сеть роутера не задана
+    } else if (!GCodeWiFi_IsAP() && !GCodeWiFi_IsConnected() && GCodeWiFi_GetStaSsid()[0]) {
         snprintf(b, sizeof(b), "%s %s...", "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xB8\xD0\xB5 \xD0\xBA", GCodeWiFi_GetStaSsid());
     } else if (GCodeWiFi_IsAP() || !GCodeWiFi_GetStaSsid()[0]) {
         snprintf(b, sizeof(b), "%s %s   %s %s", "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C:", GCodeWiFi_GetApSsid(), "\xD0\xBF\xD0\xB0\xD1\x80\xD0\xBE\xD0\xBB\xD1\x8C:", GCodeWiFi_GetApPass());
     } else {
         snprintf(b, sizeof(b), "%s %s", "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80:", GCodeWiFi_GetStaSsid());
     }
-    lv_label_set_text(g_hub.info, b);
-    snprintf(b, sizeof(b), "http://%s", (ip && *ip) ? ip : "...");
-    lv_label_set_text(g_hub.addr, b);
+    if (strcmp(lv_label_get_text(g_hub.info), b)) lv_label_set_text(g_hub.info, b);
+    if (off) snprintf(b, sizeof(b), "%s", "\xD0\x92\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB0\xD0\xB5\xD1\x82\xD1\x81\xD1\x8F \xD0\xBA\xD0\xBD\xD0\xBE\xD0\xBF\xD0\xBA\xD0\xBE\xD0\xB9 WI-FI");  // Включается кнопкой WI-FI
+    else snprintf(b, sizeof(b), "http://%s", (ip && *ip) ? ip : "...");
+    if (strcmp(lv_label_get_text(g_hub.addr), b)) lv_label_set_text(g_hub.addr, b);
+    if (g_hub.diag) {
+        char d[128];
+        snprintf(d, sizeof(d), "\xD0\x94\xD0\xB8\xD0\xB0\xD0\xB3\xD0\xBD\xD0\xBE\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB0: "   // Диагностика:
+                 "\xD0\xBF\xD0\xB5\xD1\x80\xD0\xB5\xD0\xB7\xD0\xB0\xD0\xBF\xD1\x83\xD1\x81\xD0\xBA\xD0\xBE\xD0\xB2 %lu%s%s%s, "  // перезапусков N (причина)
+                 "\xD1\x81\xD0\xB1\xD0\xBE\xD0\xB5\xD0\xB2 \xD0\xB2\xD1\x8B\xD0\xB2\xD0\xBE\xD0\xB4\xD0\xB0 %lu/%lu",              // сбоев вывода U/E
+                 (unsigned long)s_diag_resets, s_diag_last[0] ? " (" : "", s_diag_last, s_diag_last[0] ? ")" : "",
+                 (unsigned long)s_dsi_underrun, (unsigned long)s_dsi_err);
+        if (strcmp(lv_label_get_text(g_hub.diag), d)) lv_label_set_text(g_hub.diag, d);
+    }
 }
 
 static void hub_tick(lv_timer_t*)
@@ -2322,7 +2427,8 @@ static void hub_open()
 }
 
 // ── Wi-Fi: сеть роутера ─────────────────────────────────────────────────────
-struct WifiUi { lv_obj_t* back; lv_obj_t* status; lv_obj_t* ssid; lv_obj_t* pass; lv_obj_t* kb; lv_obj_t* list; int shown_scan; };
+struct WifiUi { lv_obj_t* back; lv_obj_t* status; lv_obj_t* ssid; lv_obj_t* pass; lv_obj_t* kb; lv_obj_t* list; int shown_scan;
+                lv_obj_t* mode[3]; int shown_mode; };
 static WifiUi g_wifi = {};
 
 static void wifi_close()
@@ -2335,6 +2441,11 @@ static void wifi_list_fill()
     lv_obj_clean(g_wifi.list);
     int n = GCodeWiFi_ScanCount();
     g_wifi.shown_scan = n;
+    if (GCodeWiFi_GetMode() == GCW_MODE_OFF) {               // выключено — сети не ищем и старый список не показываем
+        lv_list_add_text(g_wifi.list, "Wi-Fi \xD0\xB2\xD1\x8B\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD, "
+                         "\xD1\x81\xD0\xB5\xD1\x82\xD0\xB8 \xD0\xBD\xD0\xB5 \xD0\xB8\xD1\x89\xD1\x83\xD1\x82\xD1\x81\xD1\x8F");  // Wi-Fi выключен, сети не ищутся
+        return;
+    }
     if (n < 0) { lv_list_add_text(g_wifi.list, "\xD0\x9F\xD0\xBE\xD0\xB8\xD1\x81\xD0\xBA \xD1\x81\xD0\xB5\xD1\x82\xD0\xB5\xD0\xB9..."); return; }
     if (n == 0) { lv_list_add_text(g_wifi.list, "\xD0\xA1\xD0\xB5\xD1\x82\xD0\xB8 \xD0\xBD\xD0\xB5 \xD0\xBD\xD0\xB0\xD0\xB9\xD0\xB4\xD0\xB5\xD0\xBD\xD1\x8B"); return; }
     for (int i = 0; i < n; i++) {
@@ -2358,7 +2469,26 @@ static void wifi_tick(lv_timer_t*)
     if (!g_wifi.back) return;
     char b[96];
     const char* sta = GCodeWiFi_GetStaSsid();
-    if (GCodeWiFi_IsConnected() && !GCodeWiFi_IsAP() && sta[0])
+    int wm = GCodeWiFi_GetMode();
+    if (wm != g_wifi.shown_mode) {                          // выбранный режим — зелёным
+        bool was_off = g_wifi.shown_mode == GCW_MODE_OFF;
+        g_wifi.shown_mode = wm;
+        if (was_off && wm == GCW_MODE_ROUTER) GCodeWiFi_Scan();   // включили — сразу найти сети
+        wifi_list_fill();
+        for (int i = 0; i < 3; i++) {
+            bool on = (i == wm);
+            lv_obj_set_style_bg_color(g_wifi.mode[i], lv_color_hex(on ? 0x0a3a2a : 0x10202c), 0);
+            lv_obj_set_style_text_color(lv_obj_get_child(g_wifi.mode[i], 0), lv_color_hex(on ? 0x00ff88 : 0x6a9fb5), 0);
+        }
+    }
+    if (wm == GCW_MODE_OFF)
+        snprintf(b, sizeof(b), "%s", "Wi-Fi \xD0\xB2\xD1\x8B\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD: \xD0\xB2\xD0\xB5\xD0\xB1-\xD1\x81\xD1\x82\xD1\x80\xD0\xB0\xD0\xBD\xD0\xB8\xD1\x86\xD0\xB0 \xD0\xB8 G-\xD0\xBA\xD0\xBE\xD0\xB4 \xD0\xBF\xD0\xBE \xD1\x81\xD0\xB5\xD1\x82\xD0\xB8 \xD0\xBD\xD0\xB5\xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xBD\xD1\x8B");  // Wi-Fi выключен: веб-страница и G-код по сети недоступны
+    else if (wm == GCW_MODE_AP)
+        snprintf(b, sizeof(b), "%s %s, %s %s, http://%s", "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C", GCodeWiFi_GetApSsid(),
+                 "\xD0\xBF\xD0\xB0\xD1\x80\xD0\xBE\xD0\xBB\xD1\x8C", GCodeWiFi_GetApPass(), GCodeWiFi_IsAP() ? GCodeWiFi_GetIP() : "...");  // Сеть SSID, пароль P, http://ip
+    else if (!sta[0])
+        snprintf(b, sizeof(b), "%s", "\xD0\xA1\xD0\xB5\xD1\x82\xD1\x8C \xD1\x80\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80\xD0\xB0 \xD0\xBD\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB4\xD0\xB0\xD0\xBD\xD0\xB0: \xD0\x9F\xD0\x9E\xD0\x98\xD0\xA1\xD0\x9A \xD0\xB8\xD0\xBB\xD0\xB8 \xD0\xB2\xD0\xB2\xD0\xB5\xD0\xB4\xD0\xB8\xD1\x82\xD0\xB5 \xD1\x81\xD0\xB5\xD1\x82\xD1\x8C \xD0\xB8 \xD0\xBF\xD0\xB0\xD1\x80\xD0\xBE\xD0\xBB\xD1\x8C");  // Сеть роутера не задана: ПОИСК или введите сеть и пароль
+    else if (GCodeWiFi_IsConnected() && !GCodeWiFi_IsAP() && sta[0])
         snprintf(b, sizeof(b), "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xBE \xD0\xBA %s: http://%s", sta, GCodeWiFi_GetIP());
     else if (sta[0] && GCodeWiFi_IsAP())
         snprintf(b, sizeof(b), "%s %s %s", "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80", sta, "\xD0\xBD\xD0\xB5\xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB5\xD0\xBD, \xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xB0\xD0\xB5\xD1\x82 \xD1\x82\xD0\xBE\xD1\x87\xD0\xBA\xD0\xB0 \xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB0");
@@ -2366,7 +2496,7 @@ static void wifi_tick(lv_timer_t*)
         snprintf(b, sizeof(b), "\xD0\x9F\xD0\xBE\xD0\xB4\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB5\xD0\xBD\xD0\xB8\xD0\xB5 \xD0\xBA %s...", sta);
     else
         snprintf(b, sizeof(b), "\xD0\xA0\xD0\xBE\xD1\x83\xD1\x82\xD0\xB5\xD1\x80 \xD0\xBD\xD0\xB5 \xD0\xB7\xD0\xB0\xD0\xB4\xD0\xB0\xD0\xBD: \xD1\x80\xD0\xB0\xD0\xB1\xD0\xBE\xD1\x82\xD0\xB0\xD0\xB5\xD1\x82 \xD1\x82\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xBA\xD0\xBE \xD1\x82\xD0\xBE\xD1\x87\xD0\xBA\xD0\xB0 \xD0\xB4\xD0\xBE\xD1\x81\xD1\x82\xD1\x83\xD0\xBF\xD0\xB0");
-    lv_label_set_text(g_wifi.status, b);
+    if (strcmp(lv_label_get_text(g_wifi.status), b)) lv_label_set_text(g_wifi.status, b);
     if (GCodeWiFi_ScanCount() != g_wifi.shown_scan) wifi_list_fill();
 }
 
@@ -2409,15 +2539,30 @@ static void wifi_show()
     lv_obj_set_pos(title, UX(16), UY(6));
     lv_obj_set_style_text_color(title, lv_color_hex(0x00d4ff), 0);
     lv_obj_set_style_text_font(title, &font_tahoma_bold_22, 0);
-    lv_label_set_text(title, "WI-FI: \xD0\xA1\xD0\x95\xD0\xA2\xD0\xAC \xD0\xA0\xD0\x9E\xD0\xA3\xD0\xA2\xD0\x95\xD0\xA0\xD0\x90");
+    lv_label_set_text(title, "WI-FI");
 
     lv_obj_t* close_btn = cfg_button(back, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);
     lv_obj_set_size(close_btn, UX(110), UY(28)); lv_obj_set_pos(close_btn, UX(354), UY(4));
     lv_obj_add_event_cb(close_btn, [](lv_event_t*) { wifi_close(); }, LV_EVENT_CLICKED, nullptr);
 
+    // Режим: ВЫКЛ / РОУТЕР / ТОЧКА ДОСТУПА (форум 2026-11-17: по умолчанию выключено, выбор запоминается)
+    static const char* const MODE_NAMES[3] = {
+        "\xD0\x92\xD0\xAB\xD0\x9A\xD0\x9B",                                                  // ВЫКЛ
+        "\xD0\xA0\xD0\x9E\xD0\xA3\xD0\xA2\xD0\x95\xD0\xA0",                                      // РОУТЕР
+        "\xD0\xA2\xD0\x9E\xD0\xA7\xD0\x9A\xD0\x90 \xD0\x94\xD0\x9E\xD0\xA1\xD0\xA2\xD0\xA3\xD0\x9F\xD0\x90" };  // ТОЧКА ДОСТУПА
+    for (int i = 0; i < 3; i++) {
+        lv_obj_t* mb = cfg_button(back, MODE_NAMES[i], 0x10202c, 0x6a9fb5);
+        lv_obj_set_size(mb, UX(144), UY(28)); lv_obj_set_pos(mb, UX(16) + i * UX(152), UY(36));
+        lv_obj_add_event_cb(mb, [](lv_event_t* e) {
+            GCodeWiFi_SetMode((int)(intptr_t)lv_event_get_user_data(e));
+            wifi_tick(nullptr);
+        }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        g_wifi.mode[i] = mb;
+    }
+
     g_wifi.status = lv_label_create(back);
     lv_obj_set_width(g_wifi.status, UX(448));
-    lv_obj_set_pos(g_wifi.status, UX(16), UY(36));
+    lv_obj_set_pos(g_wifi.status, UX(16), UY(68));
     lv_obj_set_style_text_font(g_wifi.status, &font_dejavu_14, 0);
     lv_obj_set_style_text_color(g_wifi.status, lv_color_hex(0x6a9fb5), 0);
     lv_label_set_long_mode(g_wifi.status, LV_LABEL_LONG_DOT);
@@ -2428,14 +2573,14 @@ static void wifi_show()
         lv_obj_set_style_text_font(n, &font_dejavu_16, 0);
         lv_obj_set_style_text_color(n, lv_color_hex(0x9ab8c8), 0);
         lv_label_set_text(n, names[i]);
-        lv_obj_set_pos(n, UX(16), UY(60) + i * UY(34) + UY(6));
+        lv_obj_set_pos(n, UX(16), UY(88) + i * UY(34) + UY(6));
     }
-    g_wifi.ssid = wifi_ta(back, UY(60), false);
-    g_wifi.pass = wifi_ta(back, UY(94), true);
+    g_wifi.ssid = wifi_ta(back, UY(88), false);
+    g_wifi.pass = wifi_ta(back, UY(122), true);
     lv_textarea_set_text(g_wifi.ssid, GCodeWiFi_GetStaSsid());
 
     lv_obj_t* scan = cfg_button(back, "\xD0\x9F\xD0\x9E\xD0\x98\xD0\xA1\xD0\x9A", 0x1a2a3a, 0x00d4ff);
-    lv_obj_set_size(scan, UX(124), UY(30)); lv_obj_set_pos(scan, UX(340), UY(60));
+    lv_obj_set_size(scan, UX(124), UY(30)); lv_obj_set_pos(scan, UX(340), UY(88));
     lv_obj_add_event_cb(scan, [](lv_event_t*) {
         GCodeWiFi_Scan();
         lv_obj_add_flag(g_wifi.kb, LV_OBJ_FLAG_HIDDEN);
@@ -2444,7 +2589,7 @@ static void wifi_show()
     }, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t* conn = cfg_button(back, "\xD0\x9F\xD0\x9E\xD0\x94\xD0\x9A\xD0\x9B\xD0\xAE\xD0\xA7\xD0\x98\xD0\xA2\xD0\xAC", 0x0a3a2a, 0x00ff88);
-    lv_obj_set_size(conn, UX(124), UY(30)); lv_obj_set_pos(conn, UX(340), UY(94));
+    lv_obj_set_size(conn, UX(124), UY(30)); lv_obj_set_pos(conn, UX(340), UY(122));
     lv_obj_set_style_text_font(lv_obj_get_child(conn, 0), &font_dejavu_14, 0);   // ПОДКЛЮЧИТЬ — длинное слово
     lv_obj_add_event_cb(conn, [](lv_event_t*) {
         GCodeWiFi_SetSta(lv_textarea_get_text(g_wifi.ssid), lv_textarea_get_text(g_wifi.pass));
@@ -2462,8 +2607,8 @@ static void wifi_show()
 
     // Нижняя часть: список найденных сетей или клавиатура (пока поле в фокусе)
     g_wifi.list = lv_list_create(back);
-    lv_obj_set_size(g_wifi.list, UX(448), UY(100));
-    lv_obj_set_pos(g_wifi.list, UX(16), UY(132));
+    lv_obj_set_size(g_wifi.list, UX(448), UY(74));
+    lv_obj_set_pos(g_wifi.list, UX(16), UY(158));
     lv_obj_set_style_bg_color(g_wifi.list, lv_color_hex(0x0a1622), 0);
     lv_obj_set_style_text_font(g_wifi.list, &font_dejavu_16, 0);
     g_wifi.kb = lv_keyboard_create(back);
@@ -2482,8 +2627,9 @@ static void wifi_show()
 
 
     g_wifi.shown_scan = -2;
+    g_wifi.shown_mode = -1;
     wifi_tick(nullptr);
-    if (GCodeWiFi_ScanCount() < 0) GCodeWiFi_Scan();   // первый поиск — сразу
+    if (GCodeWiFi_ScanCount() < 0 && GCodeWiFi_GetMode() != GCW_MODE_OFF) GCodeWiFi_Scan();   // первый поиск — сразу
 }
 
 // ── Линейки: источник координат, тип, разрешение, направление (BACKLOG-028) ──
@@ -2744,6 +2890,15 @@ static void create_settings_hub(lv_obj_t* screen)
     lv_obj_set_style_text_color(g_hub.addr, lv_color_hex(0xffcc00), 0);
     lv_label_set_long_mode(g_hub.addr, LV_LABEL_LONG_DOT);
 
+    // диагностика дисплея — мелко внизу (BACKLOG-041)
+    g_hub.diag = lv_label_create(ov);
+    lv_obj_set_width(g_hub.diag, UX(448));
+    lv_obj_set_pos(g_hub.diag, UX(16), UY(244));
+    lv_obj_set_style_text_font(g_hub.diag, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(g_hub.diag, lv_color_hex(0x5a6a7a), 0);
+    lv_label_set_long_mode(g_hub.diag, LV_LABEL_LONG_DOT);
+    lv_label_set_text(g_hub.diag, "");
+
     lv_timer_create(hub_tick, 500, nullptr);
     lv_timer_create(scales_tick, 300, nullptr);
     lv_timer_create(wifi_tick, 300, nullptr);
@@ -2846,8 +3001,8 @@ static void create_settings_menu(lv_obj_t* screen)
         cfg_set_status("\xD0\x94\xD0\x95\xD0\xA0\xD0\x96\xD0\x98\xD0\xA2\xD0\x95 2 \xD0\xA1\xD0\x95\xD0\x9A", 0xffcc00);   // ДЕРЖИТЕ 2 СЕК
     }, [] {
         uart_protocol.sendButtonPress("CFG_DEFAULT");
-        g_cfg.dirty = false;
-        cfg_set_status("\xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\xAF\xD0\x95\xD0\x9C...", 0x6a9fb5);   // СОХРАНЯЕМ...
+        g_cfg.wait_default = true;
+        cfg_set_status("\xD0\x92\xD0\x9E\xD0\x97\xD0\x92\xD0\xA0\xD0\x90\xD0\xA9\xD0\x90\xD0\x95\xD0\x9C...", 0x6a9fb5);   // ВОЗВРАЩАЕМ...
     });
 
     lv_obj_t* close_btn = cfg_button(ov, "\xD0\x97\xD0\x90\xD0\x9A\xD0\xA0\xD0\xAB\xD0\xA2\xD0\xAC", 0x2a1a1a, 0xa08080);   // ЗАКРЫТЬ
@@ -3448,7 +3603,7 @@ lv_obj_t* create_dark_pro_ui()
             }, LV_EVENT_PRESSED, nullptr);
         }
 
-        // БЫСТРО — пока держишь (как кнопка ускоренного хода на пульте)
+        // БЫСТРО — переключатель ускоренного хода (вкл / выкл)
         {
             lv_obj_t* btn = lv_btn_create(ov);
             lv_obj_set_size(btn, TW, bh);
@@ -3468,19 +3623,16 @@ lv_obj_t* create_dark_pro_ui()
             lv_obj_align(sub, LV_ALIGN_BOTTOM_MID, 0, 0);
             lv_obj_set_style_text_font(sub, &font_dejavu_14, 0);
             lv_obj_set_style_text_color(sub, lv_color_hex(0xc8a040), 0);
-            lv_label_set_text(sub, "\xD0\xB4\xD0\xB5\xD1\x80\xD0\xB6\xD0\xB0\xD1\x82\xD1\x8C");   // держать
+            lv_label_set_text(sub, "\xD0\xB2\xD1\x8B\xD0\xBA\xD0\xBB");   // выкл
             g_ui.joy_rapid_btn = btn;
-            g_ui.joy_rapid_lbl = lbl;
-            lv_obj_add_event_cb(btn, [](lv_event_t* e) {
-                lv_event_code_t c = lv_event_get_code(e);
-                if (c == LV_EVENT_PRESSED) {
-                    g_joystick.rapid = true; g_joystick.last_ms = millis();
-                    uart_protocol.sendButtonPress("JOY:RAPID_ON");
-                } else if (c == LV_EVENT_RELEASED || c == LV_EVENT_PRESS_LOST) {
-                    g_joystick.rapid = false;
-                    uart_protocol.sendButtonPress("JOY:RAPID_OFF");
-                }
-            }, LV_EVENT_ALL, nullptr);
+            g_ui.joy_rapid_lbl = sub;
+            // Переключатель, а не «держать»: сенсор однокасательный — держать БЫСТРО и стрелку сразу нельзя
+            // (замечание с форума 2026-11-16). Ядро проверяет кнопку на каждом проходе — можно и посреди хода.
+            lv_obj_add_event_cb(btn, [](lv_event_t*) {
+                g_joystick.rapid = !g_joystick.rapid; g_joystick.last_ms = millis();
+                uart_protocol.sendButtonPress(g_joystick.rapid ? "JOY:RAPID_ON" : "JOY:RAPID_OFF");
+                joy_rapid_style();
+            }, LV_EVENT_CLICKED, nullptr);
         }
 
         // Позиции и подача — 10 раз в секунду; пока стрелку держат — JOY:HOLD каждые 100 мс
@@ -4696,11 +4848,24 @@ static void show_thr_type_menu()
 // Джойстик-оверлей (US-013)
 // ============================================================================
 
+static void joy_rapid_style()
+{
+    if (!g_ui.joy_rapid_btn) return;
+    bool on = g_joystick.rapid;
+    lv_obj_set_style_bg_color(g_ui.joy_rapid_btn, lv_color_hex(on ? 0x8a6010 : 0x2a1c08), 0);
+    lv_obj_set_style_border_width(g_ui.joy_rapid_btn, on ? US(4) : US(2), 0);
+    lv_obj_set_style_border_color(g_ui.joy_rapid_btn, lv_color_hex(on ? 0xffdd55 : 0xffaa44), 0);
+    lv_label_set_text(g_ui.joy_rapid_lbl, on ? "\xD0\x92\xD0\x9A\xD0\x9B" : "\xD0\xB2\xD1\x8B\xD0\xBA\xD0\xBB");   // ВКЛ / выкл
+    lv_obj_set_style_text_color(g_ui.joy_rapid_lbl, lv_color_hex(on ? 0xffffff : 0xc8a040), 0);
+}
+
 static void show_joystick_overlay()
 {
     if (!g_ui.joystick_overlay) return;
     // Сбросить rapid при открытии
+    if (g_joystick.rapid) uart_protocol.sendButtonPress("JOY:RAPID_OFF");
     g_joystick.rapid = false;
+    joy_rapid_style();
     s_joy_bits = 0;
     g_joystick.active  = true;
     g_joystick.last_ms = millis();
@@ -6255,6 +6420,11 @@ void setup()
 
     // === Create UI ===
     create_dark_pro_ui();
+    diag_boot();                                   // причина запуска дисплея, счётчик нештатных (BACKLOG-041)
+#if defined(DISPLAY_JC8012P4A1C) || defined(DISPLAY_JC1060P470)
+    REG_WRITE(DIAG_DSI_BRG_INT_CLR, 1);
+    lv_timer_create(diag_dsi_poll, 20, nullptr);   // недогрузка вывода на матрицу и ошибки DSI
+#endif
 
     // GCode WiFi: AP/STA + LittleFS + HTTP файловый менеджер (порт 80)
     GCodeWiFi_SetConnectedCallback([](const char* ip, bool is_ap) {
@@ -6307,10 +6477,8 @@ void loop()
         dismiss_alert();
     }
 
-    // Авто-закрытие джойстик-оверлея через 30 секунд бездействия (US-013)
-    if (g_joystick.active && (millis() - g_joystick.last_ms > 30000)) {
-        hide_joystick_overlay();
-    }
+    // Джойстик сам не закрывается (решение владельца 2026-11-17; было — через 30 с без касаний, US-013):
+    // пользователь форума видел это как «с морганием переходит в основной экран». Закрыть — ✕ или «⚡».
 
     // Update LVGL tick — use actual elapsed time so LVGL refresh runs at real-time rate.
     // Fixed lv_tick_inc(5) caused ~1-2 sec display lag: if lv_timer_handler() takes
@@ -6393,9 +6561,13 @@ void loop()
                             if (s_info) { lv_obj_del(s_info); s_info = nullptr; }   // окна настроек
                             numpad_close();
                             scales_close();
+                            wifi_close();
                             if (g_ui.settings_menu) lv_obj_add_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
                             if (g_hub.ov) lv_obj_add_flag(g_hub.ov, LV_OBJ_FLAG_HIDDEN);
                             Serial.println("[UIRESET]");
+                        } else if (sscanf(usb_inj_buf, "<WIFIMODE:%d", &tx) == 1) {   // стенд: 0 ВЫКЛ, 1 РОУТЕР, 2 ТОЧКА
+                            GCodeWiFi_SetMode(tx);
+                            Serial.printf("[WIFIMODE] %d\n", tx);
                         } else if (sscanf(usb_inj_buf, "<TOUCHTEST:%d", &tx) == 1) {
                             if (tx) touchtest_open(); else touchtest_close();
                         } else if (sscanf(usb_inj_buf, "<RXMUTE:%d", &tx) == 1) {
