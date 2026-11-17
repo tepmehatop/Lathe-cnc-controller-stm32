@@ -11,6 +11,8 @@
   gcode    — tools/hil_gcode_ui.py: запуск не из M8, блокировка, пауза посреди кадра, продолжить, стопы
   submenu  — tools/ui_submenu_test.py: двойной тап по ⌀ и тапы по плиткам во всех режимах и подэкранах
   kb       — tools/ui_kb_test.py: клавиатура подачи и съёма — пределы, отказ, ОТМЕНА
+  tapfall  — tools/ui_fallthrough_test.py: медленное нажатие кнопки окна не «проваливается» под него
+  pairwise — tools/hil_pairwise.py: режим × подрежим × источник × механика × подача × шпиндель, 18 сочетаний
 Стенд: STM32 (stm32f407_dro) по ST-Link, дисплей 10.1" по USB и Wi-Fi, Mega — эмулятор DRO.
 """
 import argparse, os, subprocess, sys, time
@@ -23,6 +25,8 @@ SUITES = [
     ('alerts', ['hil_alerts.py']),
     ('gcode', ['hil_gcode_ui.py', '--shots', '{out}']),
     ('submenu', ['ui_submenu_test.py']),
+    ('tapfall', ['ui_fallthrough_test.py']),
+    ('pairwise', ['hil_pairwise.py']),
     ('kb', ['ui_kb_test.py', '--shots', '{out}']),
 ]
 
