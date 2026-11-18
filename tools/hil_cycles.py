@@ -171,6 +171,7 @@ def run_cone_case(stm, esp, sp, case, timeout=600):
         if sub == 'S1' and not paused:
             problems.append('внутренний: нет паузы на последнем проходе')
     finally:
+        time.sleep(2.5)                      # «ОПЕРАЦИЯ ЗАВЕРШЕНА» — 3 гудка 1.7 с, программа ядра в это время стоит
         stm.release(joy)
         sp.off(); time.sleep(0.5)
         esp.btn('S2'); time.sleep(0.4); esp.btn('ALERT_OK'); time.sleep(0.3)
@@ -185,6 +186,10 @@ def run_case(stm, esp, dec, sp, case, a, shots_dir):
     name, mode, sub, rpm, prep = case
     if mode in ('M4', 'M5'):
         return run_cone_case(stm, esp, sp, case)
+    if os.environ.get('CYC_DEBUG'):
+        print('    [dbg] перед случаем:', {v: stm.var(v) for v in ('Mode', 'SelectMenu', 'Joy_Z_flag', 'Joy_X_flag', 'limit_button_flag',
+              'err_0_flag', 'err_1_flag', 'Complete_flag', 'Sub_Mode_Sphere', 'Sub_Mode_Cone', 'Step_Z_flag', 'Step_X_flag')},
+              'loss', stm.var('e2_loss_block') if 'e2_loss_block' in stm.sym else '?', flush=True)
     sph = mode == 'M6'
     problems = []
     set_limits(stm, esp, problems)

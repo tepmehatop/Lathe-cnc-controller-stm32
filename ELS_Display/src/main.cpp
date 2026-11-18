@@ -911,7 +911,8 @@ static lv_obj_t* s_up_lbl = nullptr;            // ▲ / «ДАЛЕЕ» в ав�
 static lv_obj_t* s_dn_lbl = nullptr;            // ▼ / «ПАУЗА» в автоцикле
 static lv_obj_t* s_alert_ok_lbl = nullptr;      // OK / «ДАЛЕЕ» на паузе
 static lv_obj_t* s_prof_btn[4] = {};            // окно ТИП/ПРОФИЛЬ: ряд профилей
-static const char* const KZR_NAMES[] = { "", "МЕТРИЧ 60°", "BSW 55°", "UNF 60°", "ТРАПЕЦ 30°" };
+static const char* const KZR_NAMES[] = { "", "МЕТРИЧ\n60°", "BSW\n55°", "UNF\n60°", "ТРАПЕЦ\n30°" };   // кнопки окна
+static const char* const KZR_SHORT[] = { "", "М 60°", "BSW 55°", "UNF 60°", "ТРАП 30°" };            // плитка ТИП/ПРОФИЛЬ
 static const int16_t STAG_MM[] = {10, 25, 50, 75, 100, 125, 150, 175, 200};   // Staggered_Width_array ядра
 // Подэкраны (V3.6): 1 — главный, 2 — параметры (M1 — отскок/натяг), 3 — ввод ⌀, 4 — дистанционные лимиты
 static bool is_auto_sub(const LatheData& d) {
@@ -2483,7 +2484,10 @@ static void diag_dsi_poll(lv_timer_t*)
 }
 #endif
 
-struct HubUi { lv_obj_t* ov; lv_obj_t* info; lv_obj_t* addr; lv_obj_t* diag; };
+struct HubUi { lv_obj_t* ov; lv_obj_t* info; lv_obj_t* addr; lv_obj_t* diag; lv_obj_t* ver; };
+#ifndef ELS_FW_VERSION
+#define ELS_FW_VERSION "нет версии"
+#endif
 static HubUi g_hub = {};
 
 static void hub_refresh()
@@ -2507,6 +2511,16 @@ static void hub_refresh()
     if (off) snprintf(b, sizeof(b), "%s", "\xD0\x92\xD0\xBA\xD0\xBB\xD1\x8E\xD1\x87\xD0\xB0\xD0\xB5\xD1\x82\xD1\x81\xD1\x8F \xD0\xBA\xD0\xBD\xD0\xBE\xD0\xBF\xD0\xBA\xD0\xBE\xD0\xB9 WI-FI");  // Включается кнопкой WI-FI
     else snprintf(b, sizeof(b), "http://%s", (ip && *ip) ? ip : "...");
     if (strcmp(lv_label_get_text(g_hub.addr), b)) lv_label_set_text(g_hub.addr, b);
+    if (g_hub.ver) {                                   // версии прошивок: разные выпуски — сразу видно
+        const char* sf = uart_protocol.getData().stm_fw;
+        char v[112];
+        if (sf[0] && !strcmp(sf, ELS_FW_VERSION))
+            snprintf(v, sizeof(v), "Прошивка %s (дисплей и STM32)", ELS_FW_VERSION);
+        else
+            snprintf(v, sizeof(v), "Прошивка: дисплей %s | STM32 %s", ELS_FW_VERSION, sf[0] ? sf : "нет связи");
+        if (strcmp(lv_label_get_text(g_hub.ver), v)) lv_label_set_text(g_hub.ver, v);
+        lv_obj_set_style_text_color(g_hub.ver, lv_color_hex(sf[0] && strcmp(sf, ELS_FW_VERSION) ? 0xffaa44 : 0x7a9ab0), 0);
+    }
     if (g_hub.diag) {
         char d[128];
         snprintf(d, sizeof(d), "\xD0\x94\xD0\xB8\xD0\xB0\xD0\xB3\xD0\xBD\xD0\xBE\xD1\x81\xD1\x82\xD0\xB8\xD0\xBA\xD0\xB0: "   // Диагностика:
@@ -3003,6 +3017,15 @@ static void create_settings_hub(lv_obj_t* screen)
     lv_label_set_long_mode(g_hub.diag, LV_LABEL_LONG_DOT);
     lv_label_set_text(g_hub.diag, "");
 
+    // версия прошивки дисплея и STM32 (оранжевым — если из разных выпусков)
+    g_hub.ver = lv_label_create(ov);
+    lv_obj_set_width(g_hub.ver, UX(448));
+    lv_obj_set_pos(g_hub.ver, UX(16), UY(228));
+    lv_obj_set_style_text_font(g_hub.ver, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(g_hub.ver, lv_color_hex(0x7a9ab0), 0);
+    lv_label_set_long_mode(g_hub.ver, LV_LABEL_LONG_DOT);
+    lv_label_set_text(g_hub.ver, "");
+
     lv_timer_create(hub_tick, 500, nullptr);
     lv_timer_create(scales_tick, 300, nullptr);
     lv_timer_create(wifi_tick, 300, nullptr);
@@ -3215,6 +3238,7 @@ static void gcode_lock_create(lv_obj_t* screen)
     lv_obj_set_style_border_width(pb, US(2), 0);
     lv_obj_t* pl = lv_label_create(pb);
     lv_obj_set_style_text_font(pl, &font_tahoma_bold_22, 0);
+    lv_obj_set_style_text_align(pl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(pl);
     lv_obj_add_event_cb(pb, [](lv_event_t*) { GCodeExec_TogglePause(); }, LV_EVENT_CLICKED, nullptr);
 
@@ -3245,7 +3269,7 @@ static void gcode_lock_create(lv_obj_t* screen)
         }
         bool paused = st == GCE_PAUSED;
         lv_obj_t* pl = lv_obj_get_child(s_gl_pause, 0);
-        lv_label_set_text(pl, paused ? "\xD0\x9F\xD0\xA0\xD0\x9E\xD0\x94\xD0\x9E\xD0\x9B\xD0\x96\xD0\x98\xD0\xA2\xD0\xAC"   // ПРОДОЛЖИТЬ
+        lv_label_set_text(pl, paused ? "ПРОДОЛ-\nЖИТЬ"   // ПРОДОЛЖИТЬ в две строки — в плитку не помещалось
                                      : "\xD0\x9F\xD0\x90\xD0\xA3\xD0\x97\xD0\x90");                                       // ПАУЗА
         lv_obj_set_style_bg_color(s_gl_pause, lv_color_hex(paused ? 0x0e5a3a : 0x5a4208), 0);
         lv_obj_set_style_border_color(s_gl_pause, lv_color_hex(paused ? 0x00ff88 : 0xffcc00), 0);
@@ -3800,10 +3824,10 @@ lv_obj_t* create_dark_pro_ui()
         // 4 кнопки типов резьбы
         struct ThrTypeEntry { const char* label; int first_idx; };
         static const ThrTypeEntry thr_types[] = {
-            {"\xD0\x9C\xD0\xB5\xD1\x82\xD1\x80\xD0\xB8\xD1\x87\xD0\xB5\xD1\x81\xD0\xBA\xD0\xB0\xD1\x8F", THREAD_IDX_METRIC},  // Метрическая
-            {"\xD0\x94\xD1\x8E\xD0\xB9\xD0\xBC\xD0\xBE\xD0\xB2\xD0\xB0\xD1\x8F",                          THREAD_IDX_INCH},    // Дюймовая
-            {"G-\xD1\x82\xD1\x80\xD1\x83\xD0\xB1",                                                          THREAD_IDX_GPIPE},   // G-труб
-            {"K-\xD1\x82\xD1\x80\xD1\x83\xD0\xB1",                                                          THREAD_IDX_KPIPE},   // K-труб
+            {"МЕТРИЧ",  THREAD_IDX_METRIC},   // в кнопку шириной 98 (база 480) — коротко, как на плитке ТИП
+            {"ДЮЙМ",    THREAD_IDX_INCH},
+            {"G-ТРУБ",  THREAD_IDX_GPIPE},
+            {"K-ТРУБ",  THREAD_IDX_KPIPE},
         };
 
         {   // подписи рядов
@@ -3831,6 +3855,7 @@ lv_obj_t* create_dark_pro_ui()
             lv_obj_center(lbl);
             lv_obj_set_style_text_font(lbl, &font_tahoma_bold_16, 0);
             lv_obj_set_style_text_color(lbl, lv_color_hex(0xc0d0e0), 0);
+            lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
             lv_label_set_text(lbl, KZR_NAMES[i + 1]);
             lv_obj_set_user_data(btn, (void*)(intptr_t)(i + 1));
             lv_obj_add_event_cb(btn, [](lv_event_t* e) {
@@ -5755,7 +5780,7 @@ static void v38_update(const LatheData& d)
         lv_label_set_text(g_ui.thr_type_title, "ТИП/ПРОФИЛЬ");
         if (s_thr_sub_lbl) {
             int k = d.kzr >= 1 && d.kzr <= 4 ? d.kzr : 1;
-            snprintf(b, sizeof(b), "проф. %s", KZR_NAMES[k]);
+            snprintf(b, sizeof(b), "проф. %s", KZR_SHORT[k]);
             lv_label_set_text(s_thr_sub_lbl, b);
             lv_obj_clear_flag(s_thr_sub_lbl, LV_OBJ_FLAG_HIDDEN);
         }

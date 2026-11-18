@@ -374,6 +374,9 @@ void Display_Send_All()
   Display_Send_Int("CUTTING_W", Cutting_Width);
 
   e2_send_v38();   // [V3.8]
+#ifdef ELS_FW_VERSION
+  Display_Send_CMD("FW", ELS_FW_VERSION);   // [STM32] версия прошивки STM32 — на экран «НАСТРОЙКИ»
+#endif
 
   // 21. Состояние лимитов (L,R,F,B)
   {

@@ -452,6 +452,10 @@ static void test_v38_cone() {
             CHECK(pa >= 0, "%s: нет паузы на последнем проходе", c.n);
             CHECK(pa < 0 || z0 - pz >= 30 * zs, "%s: отвод на паузе %.2f мм, ожидалось ≥ 30", c.n, (double)(z0 - pz) / zs);
         }
+        // после автоцикла джойстик отпущен: ни одна ось не «в движении» (иначе ядро «занято»)
+        SET_IN(E2_PIN_JOY_LEFT, 1); SET_IN(E2_PIN_JOY_RIGHT, 1); run_ms(1500);
+        CHECK(!Joy_Z_flag && !Joy_X_flag && !Step_Z_flag && !Step_X_flag, "%s: после цикла и отпускания Joy_Z=%d Joy_X=%d Step_Z=%d Step_X=%d",
+              c.n, Joy_Z_flag, Joy_X_flag, Step_Z_flag, Step_X_flag);
         // экран: длина конуса (подэкран 2) — формула V3.8
         printf("глубина %.3f мм, длина %.2f мм (на экран %ld.%02ld), %.0f с\n", (double)depth / xs, (double)far / zs, len_scr / 100, len_scr % 100, r.secs);
         auto_stop();

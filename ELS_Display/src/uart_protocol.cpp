@@ -218,6 +218,7 @@ void UartProtocol::parseCommand(const char* cmd)
     else if (strcmp(command, "CUTTING_W") == 0) {
         parseCuttingW(params);
     }
+    else if (strcmp(command, "FW") == 0)       { snprintf(data_.stm_fw, sizeof(data_.stm_fw), "%s", params); }
     else if (strcmp(command, "KZR") == 0)      { data_.kzr = (uint8_t)atoi(params); }      // V3.4–V3.8
     else if (strcmp(command, "RAZ") == 0)      { data_.raz = (uint8_t)atoi(params); }
     else if (strcmp(command, "RAZ_R") == 0)    { data_.raz_r = (int16_t)atoi(params); }
