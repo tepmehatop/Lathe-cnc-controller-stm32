@@ -5,6 +5,8 @@
 // ********** Режим "Асинхронная Подача" ********** //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void aFeed_Left(bool & a_flag, bool & b_flag) 
 {
    if (b_flag == true) return;
@@ -192,19 +194,36 @@ void aFeed_Rear(bool & a_flag, bool & b_flag)
 ////////////////************Режим многопроходная асинхронная подача*************/////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-void aFeed_Ext_Left()
-{ if ( Ap !=0 )
+void aFeed_Ext_Left()   //старт с правого лимита, джойстик влево
+{ 
+  if (button_down_flag) { want_pause = true; Beep(); }
+
+  if ( Ap !=0 )
   {
    if ((Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Rear && Step_Z_flag == OFF) ||
        (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Null_X_Pos && Step_Z_flag == OFF))
-   {
+   {  
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }  
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X);
+         Infeed_Value = (int)((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Front = (Null_X_Pos + 1);
@@ -234,9 +253,9 @@ void aFeed_Ext_Left()
          Limit_Rear_LED_Off();
          Limit_Pos_Front = Limit_Pos_Max;
          Limit_Pos_Rear = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
          
@@ -267,6 +286,20 @@ void aFeed_Ext_Left()
 
    else if (Motor_Z_Pos == Limit_Pos_Left && Motor_X_Pos == Limit_Pos_Rear && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
 
@@ -278,8 +311,23 @@ void aFeed_Ext_Left()
    //////////////
   } else 
   {
+    
    if (Motor_Z_Pos == Limit_Pos_Right && Step_Z_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
@@ -301,9 +349,9 @@ void aFeed_Ext_Left()
 
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
          
@@ -312,6 +360,20 @@ void aFeed_Ext_Left()
 
    else if (Motor_Z_Pos == Limit_Pos_Left && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
       cycle_flag = false;
@@ -328,18 +390,34 @@ void aFeed_Ext_Left()
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 void aFeed_Ext_Right()
-{ if ( Ap !=0 )
+{ 
+  if (button_down_flag) { want_pause = true; Beep(); }
+  if ( Ap !=0 )
   {
    if ((Motor_Z_Pos == Limit_Pos_Left && Motor_X_Pos == Limit_Pos_Rear && Step_Z_flag == OFF) ||
        (Motor_Z_Pos == Limit_Pos_Left && Motor_X_Pos == Null_X_Pos && Step_Z_flag == OFF))
    {  
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X);
+         Infeed_Value = (int)((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Front = (Null_X_Pos + 1);
@@ -369,9 +447,9 @@ void aFeed_Ext_Right()
          Limit_Rear_LED_Off();
          Limit_Pos_Front = Limit_Pos_Max;
          Limit_Pos_Rear = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
       }
@@ -401,6 +479,20 @@ void aFeed_Ext_Right()
 
    else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Rear && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
 
@@ -409,10 +501,25 @@ void aFeed_Ext_Right()
       Rapid_Feed_Left(a_flag, b_flag);
    }
 
-     } else 
+     }
+ else 
   {
    if (Motor_Z_Pos == Limit_Pos_Left && Step_Z_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
@@ -434,9 +541,9 @@ void aFeed_Ext_Right()
 
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
          
@@ -445,6 +552,20 @@ void aFeed_Ext_Right()
 
    else if (Motor_Z_Pos == Limit_Pos_Right && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
       cycle_flag = false;
@@ -459,18 +580,34 @@ void aFeed_Ext_Right()
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 void aFeed_Int_Left()
-{ if ( Ap !=0 )
+{ 
+  if (button_down_flag) { want_pause = true; Beep(); }
+  if ( Ap !=0 )
   {
    if ((Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Front && Step_Z_flag == OFF) ||
        (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Null_X_Pos && Step_Z_flag == OFF))
    {  
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X);
+         Infeed_Value = (int)((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Rear = (Null_X_Pos - 1);
@@ -500,9 +637,9 @@ void aFeed_Int_Left()
          Limit_Rear_LED_Off();
          Limit_Pos_Front = Limit_Pos_Max;
          Limit_Pos_Rear = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
       }
@@ -540,10 +677,25 @@ void aFeed_Int_Left()
       Rapid_Feed_Right(a_flag, b_flag);
    }
 
-  } else 
+  } 
+  else 
   {
    if (Motor_Z_Pos == Limit_Pos_Right && Step_Z_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
@@ -565,9 +717,9 @@ void aFeed_Int_Left()
 
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
          
@@ -593,18 +745,34 @@ void aFeed_Int_Left()
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 void aFeed_Int_Right()
-{ if ( Ap !=0 )
+{ 
+  if (button_down_flag) { want_pause = true; Beep(); }
+  if ( Ap !=0 )
   {
    if ((Motor_Z_Pos == Limit_Pos_Left && Motor_X_Pos == Limit_Pos_Front && Step_Z_flag == OFF) ||
        (Motor_Z_Pos == Limit_Pos_Left && Motor_X_Pos == Null_X_Pos && Step_Z_flag == OFF))
    {  
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X);
+         Infeed_Value = (int)((float)MOTOR_X_STEP_PER_REV * Ap / SCREW_X +0.5) * McSTEP_X;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Rear = (Null_X_Pos - 1);
@@ -634,9 +802,9 @@ void aFeed_Int_Right()
          Limit_Rear_LED_Off();
          Limit_Pos_Front = Limit_Pos_Max;
          Limit_Pos_Rear = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
       }
@@ -666,6 +834,20 @@ void aFeed_Int_Right()
 
    else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Front && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
 
@@ -674,10 +856,25 @@ void aFeed_Int_Right()
       Rapid_Feed_Left(a_flag, b_flag);
    }
    
-     } else 
+     } 
+  else 
   {
    if (Motor_Z_Pos == Limit_Pos_Left && Step_Z_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {  
          cycle_flag = true;
@@ -699,9 +896,9 @@ void aFeed_Int_Right()
 
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
          
@@ -710,6 +907,20 @@ void aFeed_Int_Right()
 
    else if (Motor_Z_Pos == Limit_Pos_Right && Step_X_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
       cycle_flag = false;
@@ -724,16 +935,31 @@ void aFeed_Int_Right()
 ///////////////////////////////////////////////////////////////////////////////////////////////
 void aFeed_Ext_Front()
 {
+  if (button_down_flag) { want_pause = true; Beep(); }
    if ((Motor_X_Pos == Limit_Pos_Rear && Motor_Z_Pos == Limit_Pos_Right && Step_X_flag == OFF) ||
        (Motor_X_Pos == Limit_Pos_Rear && Motor_Z_Pos == Null_Z_Pos && Step_X_flag == OFF))
-   {  
+   {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         } 
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_Z_STEP_PER_REV * Ap / SCREW_Z +0.5) * McSTEP_Z);
+         Infeed_Value = (int)((float)MOTOR_Z_STEP_PER_REV * Ap / SCREW_Z +0.5) * McSTEP_Z;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Left = (Null_Z_Pos + 1);
@@ -761,9 +987,9 @@ void aFeed_Ext_Front()
          Limit_Right_LED_Off();
          Limit_Pos_Left = Limit_Pos_Max;
          Limit_Pos_Right = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
       }
@@ -793,6 +1019,20 @@ void aFeed_Ext_Front()
 
    else if (Motor_X_Pos == Limit_Pos_Front && Motor_Z_Pos == Limit_Pos_Right && Step_Z_flag == OFF)
    {
+       if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
 
@@ -805,16 +1045,31 @@ void aFeed_Ext_Front()
 //////////////////////////////////////////////////////////////////////////////
 void aFeed_Ext_Rear()
 {
+  if (button_down_flag) { want_pause = true; Beep(); }
    if ((Motor_X_Pos == Limit_Pos_Front && Motor_Z_Pos == Limit_Pos_Right && Step_X_flag == OFF) ||
        (Motor_X_Pos == Limit_Pos_Front && Motor_Z_Pos == Null_Z_Pos && Step_X_flag == OFF))
-   {  
+   { 
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         } 
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
          cycle_flag = true;
          a_flag = false;
          b_flag = false;
 
-         Infeed_Value = (int)(((float)MOTOR_Z_STEP_PER_REV * Ap / SCREW_Z +0.5) * McSTEP_Z);
+         Infeed_Value = (int)((float)MOTOR_Z_STEP_PER_REV * Ap / SCREW_Z +0.5) * McSTEP_Z;
          if (Infeed_Value == 0)
          {
             if (Pass_Nr == 1) Limit_Pos_Left = (Null_Z_Pos + 1);
@@ -842,9 +1097,9 @@ void aFeed_Ext_Rear()
          Limit_Right_LED_Off();
          Limit_Pos_Left = Limit_Pos_Max;
          Limit_Pos_Right = Limit_Pos_Min;
-         if (SelectMenu != 2){
-         Pass_Total = 1;}
-         Pass_Nr = 1;
+         //if (SelectMenu != 2){
+         //Pass_Total = 1;}
+         //Pass_Nr = 1;
          Print();
          BeepComplete();
       }
@@ -874,6 +1129,20 @@ void aFeed_Ext_Rear()
 
    else if (Motor_X_Pos == Limit_Pos_Rear && Motor_Z_Pos == Limit_Pos_Right && Step_Z_flag == OFF)
    {
+    if (want_pause == true)
+         {
+            isPausedAfterStep = true;
+            if (button_up_flag)
+            {
+               want_pause = false;
+               isPausedAfterStep = false;
+               Beep();
+            }
+            else
+            {
+               return;   
+            }
+         }
       a_flag = false;
       b_flag = false;
 

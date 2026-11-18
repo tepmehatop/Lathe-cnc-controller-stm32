@@ -125,6 +125,7 @@ public:
     String(long v) : s(std::to_string(v)) {}
     unsigned length() const { return (unsigned)s.size(); }
     char charAt(unsigned i) const { return i < s.size() ? s[i] : 0; }
+    char operator[](unsigned i) const { return charAt(i); }
     int indexOf(char c, unsigned from = 0) const { size_t p = s.find(c, from); return p == std::string::npos ? -1 : (int)p; }
     int indexOf(const char* c, unsigned from = 0) const { size_t p = s.find(c, from); return p == std::string::npos ? -1 : (int)p; }
     String substring(unsigned a) const { return a >= s.size() ? String() : String(s.substr(a)); }
@@ -172,3 +173,17 @@ public:
     size_t printf(const char* fmt, ...) { char b[256]; va_list a; va_start(a, fmt); vsnprintf(b, sizeof b, fmt, a); va_end(a); out += b; return strlen(b); }
 };
 extern HardwareSerial Serial;
+
+static inline bool isDigit(char c) { return c >= '0' && c <= '9'; }
+
+// RCC (причина сброса в setup) — на компьютере «по питанию»
+struct E2SimRcc { uint32_t CSR; };
+static E2SimRcc e2_sim_rcc = { 0 };
+#define RCC (&e2_sim_rcc)
+#define RCC_CSR_PORRSTF  (1u << 27)
+#define RCC_CSR_BORRSTF  (1u << 25)
+#define RCC_CSR_IWDGRSTF (1u << 29)
+#define RCC_CSR_WWDGRSTF (1u << 30)
+#define RCC_CSR_SFTRSTF  (1u << 28)
+#define RCC_CSR_LPWRRSTF (1u << 31)
+#define RCC_CSR_RMVF     (1u << 24)

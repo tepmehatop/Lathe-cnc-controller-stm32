@@ -163,6 +163,8 @@ static void sample_steps() {
         printf("      X: спад без счёта t=%.6f en5b=%d en2b=%d en4b=%d en5a=%d jz=%d jx=%d stepX=%d\n", t_ns / 1e9, e2_en_t5b, e2_en_t2b, e2_en_t4b, e2_en_t5a, Joy_Z_flag, Joy_X_flag, Step_X_flag);
     if (s_x.count == xb && Motor_X_Pos != s_xpos_prev && getenv("SIM_XTRACE"))
         printf("      X: счёт без импульса t=%.6f %ld→%ld in_loop=%d ev=%d en3b=%d en4b=%d pin=%u ARR12=%u\n", t_ns / 1e9, s_xpos_prev, Motor_X_Pos, in_loop, s_cur_ev, e2_en_t3b, e2_en_t4b, (unsigned)E2_ODR(E2_PIN_X_STEP), (unsigned)TIM12->ARR);
+    if (s_x.count != xb && getenv("SIM_XSRC") && t_ns > (uint64_t)(atof(getenv("SIM_XSRC")) * 1e9) && t_ns < (uint64_t)((atof(getenv("SIM_XSRC")) + 0.05) * 1e9))
+        printf("      [xsrc] t=%.6f ev=%d in_loop=%d X=%ld Z=%ld stepX=%d t5b=%d t2a=%d Cs=%d CsDiv=%d\n", t_ns / 1e9, s_cur_ev, in_loop, Motor_X_Pos, Motor_Z_Pos, Step_X_flag, e2_en_t5b, e2_en_t2a, Cs_Count, Cs_Divisor);
     s_xpos_prev = Motor_X_Pos;
     if (s_env_on) {                                  // по реальной каретке (модель люфта)
         long cz = lround(car_z()), cx = lround(car_x());
@@ -508,11 +510,10 @@ static void test_axis_set() {
     hand_turn(-25, 20); run_ms(1500);
     SET_IN(E2_PIN_HAND_AXIS_Z, 1); run_ms(100);
   #endif
-    // «Сброс» автора: подрежим «Ввод * Сброс осей» (SelectMenu 2 в синхронной подаче), ▲ — X, ▼ — Z
-    SelectMenu = 2;
-    touch("KEY:UP"); touch("KEY:DN"); run_ms(50);
-    CHECK(shown_z() == 0 && shown_x() == 0, "после «Сброс» Z=%ld X=%ld, ожидалось 0 0", shown_z(), shown_x());
+    // «Сброс» (мод V3.6): на главном экране «ускоренная» + ◀ — Z, «ускоренная» + ▶ — X
     SelectMenu = 1;
+    g_emul_rapid = true; touch("KEY:LEFT"); touch("KEY:RIGHT"); g_emul_rapid = false; run_ms(50);
+    CHECK(shown_z() == 0 && shown_x() == 0, "после «Сброс» Z=%ld X=%ld, ожидалось 0 0", shown_z(), shown_x());
 #endif
 #if ELS_POS_SOURCE == POS_SOURCE_SCALES
     g_stub_scale_present[0] = g_stub_scale_present[1] = 0;
@@ -1020,10 +1021,10 @@ static void test_more_cycles() {
     // Асинхронная подача «Наружный»
     auto r4 = run_cycle("асинхр. подача «Наружный», 2 прохода по 0.20", 2, false, [] { touch("AFEED:200"); touch("AP:20"); Pass_Total = 2; Pass_Nr = 1; }, 0);
     CHECK(r4.passes == 2, "асинхр. автоцикл: проходов %d", r4.passes);
-    // Конус «Наружный»
-    auto r5 = run_cycle("конус 30° «Наружный», 2 прохода", 4, false, [] { touch("CONE:1"); touch("FEED:20"); touch("AP:20"); Pass_Total = 2; Pass_Nr = 1; }, 600);
-    CHECK(r5.passes == 2, "конус автоцикл: проходов %d", r5.passes);
+    // Конус: автоциклы V3.7/V3.8 работают без упоров — проверки в sim_v38.inc ([v38-cone])
 }
+
+#include "sim_v38.inc"
 
 // Ход многозаходной резьбы: Ph × шаг за оборот
 static void test_thread_multistart() {
@@ -1206,7 +1207,7 @@ static std::function<long(int)> feed_infeed(int ap) {
 }
 // Асинхронная подача (aFeed.ino): съём на радиус («Съём R») — Ap целиком, k-й проход на k·Ap от нуля
 static std::function<long(int)> afeed_infeed(int ap) {
-    long v = (int)(((float)MOTOR_X_STEP_PER_REV * ap / SCREW_X + 0.5) * McSTEP_X);
+    long v = (int)((float)MOTOR_X_STEP_PER_REV * ap / SCREW_X + 0.5) * McSTEP_X;   // мод V3.4: округление до микрошага
     return [v](int k) { return k * v; };
 }
 // Резьба: глубина k-го прохода по Thread.ino (√-закон, первый — √0.3); чистовые — на полной глубине.
@@ -1256,12 +1257,7 @@ static void test_cycle_matrix() {
             char nm[96]; snprintf(nm, sizeof nm, "аподача %s, %d прох. × 0.20 мм, 20 мм", in ? "внутр." : "наружн.", n);
             cs.push_back({nm, 2, in, 20, 0, [n] { touch("AFEED:300"); touch("AP:20"); set_passes(n); }, n, afeed_infeed(20)});
         }
-    // ── Конусы ──
-    for (int m : {4, 5})
-        for (bool in : {false, true}) {
-            char nm[96]; snprintf(nm, sizeof nm, "конус %s 30° %s, 3 прохода × 0.20 мм", m == 4 ? "<" : ">", in ? "внутр." : "наружн.");
-            cs.push_back({nm, m, in, 15, 600, [] { touch("CONE:1"); touch("FEED:20"); touch("AP:20"); set_passes(3); }, 3, nullptr});
-        }
+    // ── Конусы: автоциклы V3.7/V3.8 без упоров и с другим порядком движений — sim_v38.inc ([v38-cone]) ──
     // ── Резьба: шаги, длина 70 мм, внутренняя, 2 захода, +1 чистовой, дюймовая ──
     struct T { const char* p; double len; bool in; int ph; int fin; double rpm; };
     for (T t : std::vector<T>{ {"0.50mm", 20, false, 1, 0, 600}, {"1.00mm", 20, false, 1, 0, 500}, {"1.50mm", 70, false, 1, 0, 400},
@@ -1276,7 +1272,8 @@ static void test_cycle_matrix() {
         cs.push_back({nm, 3, t.in, t.len, t.rpm, [idx, fin, ph] {
                           char b[32]; snprintf(b, sizeof b, "THREAD_STEP:%d", idx); touch(b);
                           snprintf(b, sizeof b, "PH:%d", ph); touch(b);
-                          if (fin) { touch("PARAM_OK"); run_ms(100); press_key("KEY:RIGHT", fin); touch("PARAM_OK"); touch("PARAM_OK"); run_ms(100); }
+                          if (fin) { touch("PARAM_OK"); run_ms(100); press_key("KEY:RIGHT", fin);
+                                     for (int i = 0; i < 4 && SelectMenu != 1; i++) { touch("PARAM_OK"); run_ms(100); } }   // V3.6: подэкраны 1..4
                       }, passes, thread_infeed(idx, t.in)});
     }
     const char* only = getenv("SIM_CYC_ONLY");
@@ -1287,6 +1284,7 @@ static void test_cycle_matrix() {
         if (Pass_Fin != fin0) {                     // вернуть число чистовых
             select_mode(3); touch("PARAM_OK"); run_ms(100);
             for (int i = 0; i < 10 && Pass_Fin > fin0; i++) { touch("KEY:LEFT"); run_ms(60); }
+            for (int i = 0; i < 4 && SelectMenu != 1; i++) { touch("PARAM_OK"); run_ms(100); }
             touch("PARAM_OK"); touch("PARAM_OK"); select_mode(1);
         }
     }
@@ -1440,6 +1438,12 @@ int main() {
         test_backlash();
         return 0;
     }
+    if (getenv("SIM_V38")) {                         // только проверки функций V3.4–V3.8
+        controls_neutral(); run_ms(200);
+        test_v38_all();
+        printf("\nИТОГ: %d проверок OK, %d FAIL\n", s_pass, s_fail);
+        return s_fail ? 1 : 0;
+    }
     if (getenv("SIM_CYCLES")) {                      // только матрица автоциклов
         controls_neutral(); run_ms(200);
         test_cycle_matrix();
@@ -1476,12 +1480,15 @@ int main() {
     test_divider();
     test_cone(0, 1.0);                     // 45°
     test_cone(1, tan(30 * M_PI / 180));    // 30°
-    test_cone(55, 1.0 / 20);               // 1:10 (на диаметр)
-    test_cone(45, 1.0 / 2 / 19.212);       // KM0 (Морзе 0: 1:19.212)
+    test_cone(57, 1.0 / 20);               // 1:10 (на диаметр)
+    test_cone(47, 1.0 / 2 / 19.212);       // KM0 (Морзе 0: 1:19.212)
+    test_cone(61, 1.0 / 60);               // 1:30 (оставлена, у автора V3.8 убрана)
+    test_cone(62, 3.0 / 25 / 2);           // 3:25
     test_sphere();
     test_thread_multistart();
     test_tacho();
     test_more_cycles();
+    test_v38_all();
     CHECK(Serial.out.find("[IO] Джойстик Влево: замкнуто на GND") != std::string::npos, "монитор входов не сообщил о джойстике");
     CHECK(Serial.out.find("[IO] Энкодер шпинделя:") != std::string::npos, "монитор входов не сообщил об энкодере");
     CHECK(Serial.out.find("[IO] РГИ:") != std::string::npos, "монитор входов не сообщил о РГИ");

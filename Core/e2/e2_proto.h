@@ -71,6 +71,12 @@ void Key_Up_Pressed();
 void Key_Down_Pressed();
 void Key_Left_Pressed();
 void Key_Right_Pressed();
+void Key_UD_Pressed();   // [V3.6] комбинации кнопок меню
+void Key_UL_Pressed();
+void Key_UR_Pressed();
+void Key_DR_Pressed();
+void Key_DL_Pressed();
+void Key_LR_Pressed();
 void Limit_Left_Pressed();
 void Limit_Right_Pressed();
 void Limit_Front_Pressed();

@@ -75,7 +75,8 @@ cone_info_type Cone_Info[] =   // [STM32] не const: пересчёт под м
      { 2, 503, " 26\5" },		
      { 1, 9626, " 27\5" },		
      { 1, 8807, " 28\5" },		
-     { 1, 8040, " 29\5" },			
+     { 1, 8040, " 29\5" },		
+     { 1, 7321, " 30\5" },		// [V3.8] 30° и 45° — и в общем ряду градусов
      { 1, 6643, " 31\5" },		
      { 1, 6003, " 32\5" },		
      { 1, 5399, " 33\5" },		
@@ -90,6 +91,7 @@ cone_info_type Cone_Info[] =   // [STM32] не const: пересчёт под м
      { 1, 1106, " 42\5" },		
      { 1, 724, " 43\5" },		
      { 1, 355, " 44\5" },		
+     { 1, 0, " 45\5" },		
      { 38, 4240,  " KM0"  },		
      { 40, 940,  " KM1"  },		
      { 40, 400,  " KM2"  },		
@@ -104,10 +106,10 @@ cone_info_type Cone_Info[] =   // [STM32] не const: пересчёт под м
      { 32, 0, "1:16" },		
      { 40, 0, "1:20" },		
      { 48, 0, "1:24" },		
-     { 60, 0, "1:30" },		
+     { 60, 0, "1:30" },		// [STM32] у автора V3.8 убрана — оставлена
+     { 16, 6667, "3:25" },		// [V3.8] перенесена сюда из конца таблицы
      { 100, 0, "1:50" },		
-     { 18, 2857, "7:64" },		
-     { 16, 6667, "3:25" },
+     { 18, 2857, "7:64" },
 
 //****конец таблицы конусов****
 };
@@ -265,6 +267,8 @@ char LCD_Row_4[21];
 char LCD_Row_5[21];
 char LCD_Row_6[21];
 char LCD_Row_7[21];
+char LCD_Row_8[21];   // [V3.8]
+char LCD_Row_9[21];
 byte strelka_vlevo[8] = 
 {
   B00000,
@@ -544,12 +548,21 @@ bool button_up_flag = OFF;
 bool button_down_flag = OFF;
 bool button_left_flag = OFF;
 bool button_right_flag = OFF;
+bool button_ud_flag = OFF;   // [V3.6] комбинации кнопок меню
+bool button_ul_flag = OFF;
+bool button_ur_flag = OFF;
+bool button_dr_flag = OFF;
+bool button_dl_flag = OFF;
+bool button_lr_flag = OFF;
 
 bool a_flag = false;
 bool b_flag = false;
 bool c_flag = false;
 bool d_flag = false;
 bool cycle_flag = false;
+
+bool want_pause = false;          // [V3.8] пауза автоцикла: запрошена (нижняя кнопка меню)
+bool isPausedAfterStep = false;   // [V3.8] стоим на паузе, продолжение — верхняя кнопка меню
 
 bool err_0_flag = true;
 bool err_1_flag = false;
@@ -583,7 +596,7 @@ byte Blinc_Count = 0;
 byte KCs_Divisor = 0;
 float KCm_Divisor = 0;
 float divider = 0;
-int TENSION_Z = 0;
+int TENSION_Z = 1;   // [V3.4] было 0: натяг Z 0.00 = 1 микрошаг
 int Step = 0;
 int Ph = 1;
 int Gewinde_flag = 0;
@@ -631,6 +644,9 @@ int Km_Divisor = 0;
 uint16_t Feed_Divisor = 0;
 uint16_t aFeed_Divisor = 0;
 
+long Distance_mm = 0;   // [V3.6] расстояние до дистанционного лимита, 0.0005 мм
+long Distance = 0;      // [V3.6] оно же в микрошагах
+
 int Cs_Count = 0;
 int Cm_Count = 0;
 int Cs_Divisor = 0;
@@ -672,6 +688,8 @@ long Pass_Nr = 1;
 long Null_X_Pos = 0;
 long Null_Z_Pos = 0;
 int Ap = 0;
+int Kzr = 1;   // [V3.4] профиль резьбы: 1 метрич., 2 дюйм. 55° BSW, 3 дюйм. 60° UNF, 4 трапеция
+int Raz = 1;   // [V3.5] положение «Шар»: 1 — шар, 2 — отрезание вразбежку (у автора V3.8 по умолчанию 2)
 long Pass_Total_Sphr = 1;
 
 int ADC_Feed = 0;
@@ -684,7 +702,7 @@ long Control_Count = 0;
 
 // Sphere
 
-const int Cutter_Width_array[] = {100, 125, 150, 175, 200, 225, 250, 275, 300};
+const int Cutter_Width_array[] = {100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500};   // [V3.8] до 5 мм
 #define TOTAL_CUTTER_WIDTH (sizeof(Cutter_Width_array) / sizeof(Cutter_Width_array[0]))
 byte Cutter_Step = 4;
 int Cutter_Width = Cutter_Width_array[Cutter_Step];
@@ -694,8 +712,15 @@ const int Cutting_Width_array[] = {10, 25, 50, 75, 100, 125, 150, 175, 200};
 byte Cutting_Step = 2;
 int Cutting_Width = Cutting_Width_array[Cutting_Step];
 
+// [V3.5] отрезание вразбежку: смещение резца влево-вправо, 0.01 мм
+const int Staggered_Width_array[] = {10, 25, 50, 75, 100, 125, 150, 175, 200};
+#define TOTAL_Staggered_STEP (sizeof(Staggered_Width_array) / sizeof(Staggered_Width_array[0]))
+byte Staggered_Step = 2;
+int Staggered_Width = Staggered_Width_array[Staggered_Step];
+
 long Sph_R_mm = 1000;
 long Sph_R = 0;
+long Raz_R = 0;   // [V3.5] прорезаемый диаметр отрезания, мм
 long Bar_R_mm = 0;
 long Bar_R = 0;
 long SphBar = 0;
@@ -751,7 +776,7 @@ void setup()
   lcd.setCursor(0, 2);
   lcd.print("  Токарным Станком  ");
   lcd.setCursor(0, 3);
-  lcd.print("         7e2 V3.3");
+  lcd.print("        7e2 V3.8_s");   // [V3.8] база — мод Лях V3.3…V3.8
 
 
   // [STM32] DDRG = B11111111 — порт G Mega не используется
@@ -1040,7 +1065,7 @@ void loop()
  
   e2_pos_refresh();                            // [STM32] позиции для LCD2004 и экрана (шаги / блок DRO / линейки)
   OTSKOK_Z_mm  = OTSKOK_Z  / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры отскок
-  TENSION_Z_mm = TENSION_Z / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры натяг
+  TENSION_Z_mm = (TENSION_Z - 1) / ((float)MOTOR_Z_STEP_PER_REV / SCREW_Z * McSTEP_Z);  //перерасчёт в миллиметры натяг
   
   Spindle_Angle = Enc_Pos * 360000 / ENC_TICK;
   Required_Angle = 360000 * (Current_Tooth - 1) / Total_Tooth;
@@ -1873,7 +1898,7 @@ static void e2_io_monitor(void)
 #endif
 
 // Сообщение, которое сейчас горит на LCD2004 (порядок как в Print.ino): 4 — джойстик в нейтраль,
-// 1 — установите упоры, 2 — суппорт в исходное, 3 — операция завершена, 0 — нет.
+// 1 — установите упоры, 2 — суппорт в исходное, 3 — операция завершена, 5 — пауза автоцикла (V3.8), 0 — нет.
 // -1 — отправить заново (Display_Send_All, в т.ч. по READY дисплея).
 int8_t e2_alert_sent = -1;
 static int8_t e2_alert_now(void)
@@ -1882,7 +1907,19 @@ static int8_t e2_alert_now(void)
    if (err_1_flag)    return 1;
    if (err_2_flag)    return 2;
    if (Complete_flag) return 3;
+   if (isPausedAfterStep) return 5;   // [V3.8] «ПАУЗА — для продолжения нажмите верхнюю кнопку меню»
    return 0;
+}
+
+// [V3.8] «Продолжить» с экрана (<TOUCH:RESUME>): автоциклы автора ждут button_up_flag — держим его, пока
+// пауза не снимется (не дольше 0.5 с), иначе флаг остался бы и следующая пауза снялась бы сама.
+uint32_t e2_resume_ms = 0;
+static void e2_resume_watch(void)
+{
+   if (e2_resume_ms && (!isPausedAfterStep || millis() - e2_resume_ms > 500)) {
+      button_up_flag = false;
+      e2_resume_ms = 0;
+   }
 }
 
 // [STM32] Компенсация люфта (BACKLASH_*_UM в els_config.h, в 7e2 её нет). На первом шаге после смены
@@ -2226,6 +2263,7 @@ void e2_service(void)
    e2_gcode_watch();                             // [STM32] G-код: смена режима — опорная точка заново
    // Значения, которые UartDisplay шлёт только в Display_Send_All, — по изменению (e2_display.inc)
    Display_Watch();
+   e2_resume_watch();   // [V3.8]
    // Сообщения на новом дисплее горят ровно столько же, сколько на LCD2004: ядро ставит и снимает
    // флаги ошибок в разных местах и не везде шлёт ALERT — отправляем по изменению флагов
    int8_t al = e2_alert_now();

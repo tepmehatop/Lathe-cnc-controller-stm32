@@ -265,6 +265,11 @@ void e2_timer_disable(uint8_t timer, uint8_t ch);
 #define Disable_INT_OCR5A()    e2_timer_disable(5, 0)
 #define Enable_INT_OCR5B()     e2_timer_enable(5, 1)
 #define Disable_INT_OCR5B()    e2_timer_disable(5, 1)
+// [STM32] Выключить прерывания движения перед новой командой (Feed_*/Cone_*): функции автора сначала меняют
+// цель Limit_Pos и включают мотор (_delay_ms(100)), а прерывания переключают в конце — всё это время прерывание
+// прошлой подачи видит новую цель и докручивает ось (конус V3.8: первый проход на 21 шаг X мельче, см. sim_v38.inc)
+#define E2_MOTION_IRQ_OFF()   do {Disable_INT0(); Disable_INT_OCR2A(); Disable_INT_OCR2B(); Disable_INT_OCR4A();\
+                                  Disable_INT_OCR4B(); Disable_INT_OCR5A(); Disable_INT_OCR5B();} while(0)
 
 // Опрос клавиатуры: на AVR — флаг Timer1 каждые 40 мс
 uint8_t e2_keyb_timer_flag(void);

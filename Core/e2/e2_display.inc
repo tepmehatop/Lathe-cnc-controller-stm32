@@ -110,73 +110,74 @@ void Display_Send_Int2(const char* cmd, int32_t a, int32_t b)
 // ***** ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ***** ///////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Угол конуса × 10 для каждого из 63 индексов Cone_Info[].
-// Диапазоны: [0]=45°, [1]=30°, [2-30]=1°-29°, [31-44]=31°-44°,
-//            [45-51]=KM0-KM6, [52-62]=1:4..3:25
+// Угол конуса × 10 для каждого из 65 индексов Cone_Info[] (таблица V3.8 + 1:30).
+// [0]=45°, [1]=30°, [2-46]=1°-45°, [47-53]=KM0-KM6, [54-64]=1:4..7:64 (1:30, 3:25 — между 1:24 и 1:50)
 static const int16_t s_cone_angle_x10[] = {
-  450,  // [0]  45.0°
-  300,  // [1]  30.0°
-   10,  // [2]   1.0°
-   20,  // [3]   2.0°
-   30,  // [4]   3.0°
-   40,  // [5]   4.0°
-   50,  // [6]   5.0°
-   60,  // [7]   6.0°
-   70,  // [8]   7.0°
-   80,  // [9]   8.0°
-   90,  // [10]  9.0°
-  100,  // [11] 10.0°
-  110,  // [12] 11.0°
-  120,  // [13] 12.0°
-  130,  // [14] 13.0°
-  140,  // [15] 14.0°
-  150,  // [16] 15.0°
-  160,  // [17] 16.0°
-  170,  // [18] 17.0°
-  180,  // [19] 18.0°
-  190,  // [20] 19.0°
-  200,  // [21] 20.0°
-  210,  // [22] 21.0°
-  220,  // [23] 22.0°
-  230,  // [24] 23.0°
-  240,  // [25] 24.0°
-  250,  // [26] 25.0°
-  260,  // [27] 26.0°
-  270,  // [28] 27.0°
-  280,  // [29] 28.0°
-  290,  // [30] 29.0°
-  310,  // [31] 31.0°
-  320,  // [32] 32.0°
-  330,  // [33] 33.0°
-  340,  // [34] 34.0°
-  350,  // [35] 35.0°
-  360,  // [36] 36.0°
-  370,  // [37] 37.0°
-  380,  // [38] 38.0°
-  390,  // [39] 39.0°
-  400,  // [40] 40.0°
-  410,  // [41] 41.0°
-  420,  // [42] 42.0°
-  430,  // [43] 43.0°
-  440,  // [44] 44.0°
-   30,  // [45] KM0 ~3.0°
-   29,  // [46] KM1 ~2.9°
-   29,  // [47] KM2 ~2.9°
-   29,  // [48] KM3 ~2.9°
-   32,  // [49] KM4 ~3.2°
-   32,  // [50] KM5 ~3.2°
-   30,  // [51] KM6 ~3.0°
-  143,  // [52] 1:4  14.3°
-  114,  // [53] 1:5  11.4°
-   82,  // [54] 1:7   8.2°
-   57,  // [55] 1:10  5.7°
-   36,  // [56] 1:16  3.6°
-   29,  // [57] 1:20  2.9°
-   24,  // [58] 1:24  2.4°
-   19,  // [59] 1:30  1.9°
-   11,  // [60] 1:50  1.1°
-   63,  // [61] 7:64  6.3°
-   69,  // [62] 3:25  6.9°
+  450,  // [0] 45°
+  300,  // [1] 30°
+   10,  // [2] 1°
+   20,  // [3] 2°
+   30,  // [4] 3°
+   40,  // [5] 4°
+   50,  // [6] 5°
+   60,  // [7] 6°
+   70,  // [8] 7°
+   80,  // [9] 8°
+   90,  // [10] 9°
+  100,  // [11] 10°
+  110,  // [12] 11°
+  120,  // [13] 12°
+  130,  // [14] 13°
+  140,  // [15] 14°
+  150,  // [16] 15°
+  160,  // [17] 16°
+  170,  // [18] 17°
+  180,  // [19] 18°
+  190,  // [20] 19°
+  200,  // [21] 20°
+  210,  // [22] 21°
+  220,  // [23] 22°
+  230,  // [24] 23°
+  240,  // [25] 24°
+  250,  // [26] 25°
+  260,  // [27] 26°
+  270,  // [28] 27°
+  280,  // [29] 28°
+  290,  // [30] 29°
+  300,  // [31] 30°
+  310,  // [32] 31°
+  320,  // [33] 32°
+  330,  // [34] 33°
+  340,  // [35] 34°
+  350,  // [36] 35°
+  360,  // [37] 36°
+  370,  // [38] 37°
+  380,  // [39] 38°
+  390,  // [40] 39°
+  400,  // [41] 40°
+  410,  // [42] 41°
+  420,  // [43] 42°
+  430,  // [44] 43°
+  440,  // [45] 44°
+  450,  // [46] 45°
+   30,  // [47] KM0
+   29,  // [48] KM1
+   29,  // [49] KM2
+   29,  // [50] KM3
+   32,  // [51] KM4
+   32,  // [52] KM5
+   30,  // [53] KM6
+  143,  // [54] 1:4
+  114,  // [55] 1:5
+   82,  // [56] 1:7
+   57,  // [57] 1:10
+   36,  // [58] 1:16
+   29,  // [59] 1:20
+   24,  // [60] 1:24
+   19,  // [61] 1:30
+   69,  // [62] 3:25
+   11,  // [63] 1:50
+   63,  // [64] 7:64
 };
 
 // Нормализованный подрежим (1=Внутр, 2=Ручн, 3=Нар)
@@ -266,6 +267,26 @@ static void _Display_SendThread()
   Display_Send_Int("THREAD_CYCL", _Display_GetThreadCycles());
 }
 
+// [V3.8] Длина конусной части за все проходы, 0.01 мм — как «Дл.вн.кон.» на LCD2004 (подэкран 2 конуса)
+static int32_t e2_cone_len(void)
+{
+  long long cs = Cone_Info[Cone_Step].Cs_Div, cm = Cone_Info[Cone_Step].Cm_Div;
+  long long t = (long long)Ap * cs + ((long long)Ap * cm + 5000LL) / 10000LL;
+  return (int32_t)((t * Pass_Total + 1LL) / 2LL);
+}
+
+// [V3.8] Поля V3.4–V3.8, которых не было у автора дисплея: профиль резьбы, шар/отрезание, отрезание,
+// дистанционные лимиты, длина конуса. Отправляются вместе с полным состоянием и при изменении (Display_Watch).
+static void e2_send_v38(void)
+{
+  Display_Send_Int("KZR", Kzr);
+  Display_Send_Int("RAZ", Raz);
+  Display_Send_Int("RAZ_R", Raz_R);
+  Display_Send_Int("STAG", Staggered_Width);
+  Display_Send_Int("DIST", Distance_mm / 2);     // Distance_mm — в 0.0005 мм, экрану — мкм
+  Display_Send_Int("CONE_LEN", e2_cone_len());
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ***** ОТПРАВИТЬ ПОЛНОЕ СОСТОЯНИЕ ***** ////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -352,6 +373,8 @@ void Display_Send_All()
   Display_Send_Int("CUTTER_W", Cutter_Width);
   Display_Send_Int("CUTTING_W", Cutting_Width);
 
+  e2_send_v38();   // [V3.8]
+
   // 21. Состояние лимитов (L,R,F,B)
   {
     char buf[12];
@@ -376,7 +399,7 @@ void Display_Send_All()
 void Display_Watch()
 {
   struct W { int32_t last; };
-  static W w[28];
+  static W w[34];
   static bool s_init = false;
   int i = 0;
   auto chg = [&](int32_t v) {
@@ -410,6 +433,12 @@ void Display_Watch()
   if (chg((ConL_Thr_flag || ConR_Thr_flag) ? 1 : 0)) Display_Send_Int("CONE_THR", (ConL_Thr_flag || ConR_Thr_flag) ? 1 : 0);
   if (chg(Cutter_Width))                Display_Send_Int("CUTTER_W", Cutter_Width);
   if (chg(Cutting_Width))               Display_Send_Int("CUTTING_W", Cutting_Width);
+  if (chg(Kzr))                         Display_Send_Int("KZR", Kzr);                 // [V3.8]
+  if (chg(Raz))                         Display_Send_Int("RAZ", Raz);
+  if (chg(Raz_R))                       Display_Send_Int("RAZ_R", Raz_R);
+  if (chg(Staggered_Width))             Display_Send_Int("STAG", Staggered_Width);
+  if (chg(Distance_mm))                 Display_Send_Int("DIST", Distance_mm / 2);
+  if (chg(e2_cone_len()))               Display_Send_Int("CONE_LEN", e2_cone_len());
   if (chg((limit_Left_flag ? 8 : 0) | (limit_Right_flag ? 4 : 0) | (limit_Front_flag ? 2 : 0) | (limit_Rear_flag ? 1 : 0))) {
     char buf[12];
     snprintf(buf, sizeof(buf), "%d,%d,%d,%d", limit_Left_flag ? 1 : 0, limit_Right_flag ? 1 : 0,
@@ -569,13 +598,68 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
   else if (cmd == "TOUCH") {
     if (prm == "KEY:UP" || prm == "KEY:DN") {
       // Сброс флагов перед вызовом (как SerialEmulation.ino)
-      if (prm == "KEY:UP") { button_up_flag = false; Key_Up_Pressed(); }
-      else                  { button_down_flag = false; Key_Down_Pressed(); }
+      if (prm == "KEY:UP") { button_up_flag = false; Key_Up_Pressed(); button_up_flag = false; }
+      else                  { button_down_flag = false; Key_Down_Pressed(); button_down_flag = false; }
+      // [STM32] флаг «кнопка нажата» сбрасывает только Menu() при смене физических кнопок — после касания он
+      // оставался true, и пауза V3.8 (опрос button_down/up_flag в автоциклах) срабатывала от старого касания
       // Полное обновление — покрывает SM1 и SM2/SM3 (Ph, Total_Tooth, CThr, Cutter_Step и др.)
       Display_Send_All();
     }
-    else if (prm == "KEY:LEFT")  { button_left_flag  = false; Key_Left_Pressed();  Display_Send_All(); }
-    else if (prm == "KEY:RIGHT") { button_right_flag = false; Key_Right_Pressed(); Display_Send_All(); }
+    else if (prm == "KEY:LEFT")  { button_left_flag  = false; Key_Left_Pressed();  button_left_flag  = false; Display_Send_All(); }
+    else if (prm == "KEY:RIGHT") { button_right_flag = false; Key_Right_Pressed(); button_right_flag = false; Display_Send_All(); }
+    // [V3.8] Пауза автоцикла с экрана: как нижняя кнопка меню у автора — встанет на ближайшей безопасной точке.
+    // Принимаем только в автоцикле (подрежим не «Ручной», джойстик не в нейтрали — иначе Joy_NoPressed сбросит).
+    else if (prm == "PAUSE") {
+      if (Joy_Z_flag || Joy_X_flag || Step_Z_flag || Step_X_flag || cycle_flag) { want_pause = true; Beep(); }
+      else Beep_Error();
+    }
+    // Продолжить: у автора — верхняя кнопка меню (опрос button_up_flag). Держим флаг, пока пауза не снимется.
+    else if (prm == "RESUME") {
+      if (isPausedAfterStep || want_pause) { button_up_flag = true; e2_resume_ms = millis(); if (!e2_resume_ms) e2_resume_ms = 1; }
+      else Beep_Error();
+    }
+    // [V3.4] Профиль резьбы 1..4 (у автора — «ускоренная» + «Выбор» на первом подэкране резьбы)
+    else if (prm.startsWith("KZR:")) {
+      int k = prm.substring(4).toInt();
+      if (k >= 1 && k <= 4 && !Joy_Z_flag && !Joy_X_flag) { Kzr = k; Print(); Beep(); }
+      else Beep_Error();
+      Display_Send_Int("KZR", Kzr);
+    }
+    // [V3.5] Шар (1) / отрезание вразбежку (2) в режиме «Шар»
+    else if (prm.startsWith("RAZ:")) {
+      int k = prm.substring(4).toInt();
+      if ((k == 1 || k == 2) && Mode == Mode_Sphere && !Joy_Z_flag && !Joy_X_flag) {
+        Raz = k; SelectMenu = 1; Sphere(); Print(); Beep();
+      } else Beep_Error();
+      Display_Send_Int("RAZ", Raz);
+      Display_Send_Int("SELECTMENU", SelectMenu);
+    }
+    // [V3.5] Отрезание: прорезаемый диаметр, 0.01 мм → число врезаний (Pass_Total) при шаге Ap (у автора — ▲▼)
+    else if (prm.startsWith("CUT_D:")) {
+      long d = prm.substring(6).toInt();
+      if (Ap < 100) Ap = 100;
+      if (d > 0 && !Joy_Z_flag && !Joy_X_flag) {
+        Pass_Total = constrain((d + Ap - 1) / Ap, 1L, 999L);
+        Sphere(); Print(); Beep();
+      } else Beep_Error();
+      Display_Send_Int2("PASS", Pass_Nr, Pass_Total);
+      Display_Send_Int("RAZ_R", Raz_R);
+    }
+    // [V3.5] Отрезание: смещение — индекс в Staggered_Width_array (у автора — «ускоренная» + ◀▶)
+    else if (prm.startsWith("STAG:")) {
+      int i = prm.substring(5).toInt();
+      if (i >= 0 && i < (int)TOTAL_Staggered_STEP && !Joy_Z_flag && !Joy_X_flag) {
+        Staggered_Step = i; Staggered_Width = Staggered_Width_array[i]; Print(); Beep();
+      } else Beep_Error();
+      Display_Send_Int("STAG", Staggered_Width);
+    }
+    // [V3.6] Расстояние до дистанционного лимита, мкм (у автора — ▲▼ и комбинации на подэкране 4)
+    else if (prm.startsWith("DIST:")) {
+      long um = prm.substring(5).toInt();
+      if (um >= 0 && um <= 999999) { Distance_mm = um * 2; Print(); Beep(); }
+      else Beep_Error();
+      Display_Send_Int("DIST", Distance_mm / 2);
+    }
     else if (prm == "PARAM_OK")  { key_sel_flag = false; Key_Select_Pressed(); }
     // [STM32] Режим/подрежим с экрана — как с галетника: пока ось едет от джойстика, не переключаем
     // (у автора в Menu() переключатели читаются только при !Joy_Z_flag && !Joy_X_flag). Дисплей уже
@@ -742,21 +826,25 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     else if (prm == "EMUL:STOP_L") {
       limit_button_flag = false;
       Limit_Left_Pressed();
+      limit_button_flag = false;   // [STM32] касание — нажал и отпустил: иначе кнопка упора на пульте ждала бы смены входов
       Serial.print(F("EMUL:STOP_L — limit_Left_flag=")); Serial.println(limit_Left_flag);
     }
     else if (prm == "EMUL:STOP_R") {
       limit_button_flag = false;
       Limit_Right_Pressed();
+      limit_button_flag = false;   // [STM32] касание — нажал и отпустил: иначе кнопка упора на пульте ждала бы смены входов
       Serial.print(F("EMUL:STOP_R — limit_Right_flag=")); Serial.println(limit_Right_flag);
     }
     else if (prm == "EMUL:STOP_F") {
       limit_button_flag = false;
       Limit_Front_Pressed();
+      limit_button_flag = false;   // [STM32] касание — нажал и отпустил: иначе кнопка упора на пульте ждала бы смены входов
       Serial.print(F("EMUL:STOP_F — limit_Front_flag=")); Serial.println(limit_Front_flag);
     }
     else if (prm == "EMUL:STOP_B") {
       limit_button_flag = false;
       Limit_Rear_Pressed();
+      limit_button_flag = false;   // [STM32] касание — нажал и отпустил: иначе кнопка упора на пульте ждала бы смены входов
       Serial.print(F("EMUL:STOP_B — limit_Rear_flag=")); Serial.println(limit_Rear_flag);
     }
     else if (prm == "EMUL:LIM_L") {

@@ -76,11 +76,24 @@ void Menu()
       else if (Button_New == B00001011) Key_Up_Pressed();
       else if (Button_New == B00001101) Key_Right_Pressed();
       else if (Button_New == B00001110) Key_Left_Pressed();
+      else if (Button_New == B00000011) Key_UD_Pressed(); // B00001011 & B00001110 
+      else if (Button_New == B00001010) Key_UL_Pressed(); // B00001011 & B00001110
+      else if (Button_New == B00001001) Key_UR_Pressed(); // B00001011 & B00001101
+      else if (Button_New == B00000101) Key_DR_Pressed(); // B00000111 & B00001101
+      else if (Button_New == B00000110) Key_DL_Pressed(); // B00000111 & B00001110
+      else if (Button_New == B00001100) Key_LR_Pressed(); // B00001110 & B00001101
       else  {
             button_up_flag = false;
             button_down_flag = false;
             button_left_flag = false;
             button_right_flag = false;
+            button_ud_flag = false;
+            button_ul_flag = false;
+            button_ur_flag = false;
+            button_dr_flag = false;
+            button_dl_flag = false;
+            button_lr_flag = false;
+
             }
       KeyCycle = 0;                                         
    } else {
@@ -106,6 +119,36 @@ void Menu()
         {
           button_left_flag = false;                                   
           Key_Left_Pressed();
+        }
+        else if (Button_New == B00000011)
+        {
+          button_ud_flag = false;  
+          Key_UD_Pressed();
+        }
+        else if (Button_New == B00001010)
+        {
+          button_ul_flag = false;  
+          Key_UL_Pressed();
+        }
+        else if (Button_New == B00001001)
+        {
+          button_ur_flag = false;  
+          Key_UR_Pressed();
+        }
+        else if (Button_New == B00000101)
+        {
+          button_dr_flag = false;  
+          Key_DR_Pressed();
+        }
+        else if (Button_New == B00000110)
+        {
+          button_dl_flag = false;  
+          Key_DL_Pressed();
+        }
+        else if (Button_New == B00001100)
+        {
+          button_lr_flag = false;  
+          Key_LR_Pressed();
         }
         KeyCycle = (DELAY_ENTER_KEYCYCLE - DELAY_INTO_KEYCYCLE);
       }
@@ -304,13 +347,13 @@ void Joy_LeftPressed()
       }
       
    }
-       else if (Sub_Mode_Cone == Sub_Mode_Cone_Ext)
+       else if (Mode == Mode_Cone_R && Sub_Mode_Cone == Sub_Mode_Cone_Ext)
       {
-         Cone_Ext_Left();
+         Cone_Ext_Left(); // это НАРУЖН для ПРАВОГО конуса >, старт справа (джойстик влево)
       }
-      else if (Sub_Mode_Cone == Sub_Mode_Cone_Int)
+      else if (Mode == Mode_Cone_L && Sub_Mode_Cone == Sub_Mode_Cone_Int)
       {
-         Cone_Int_Left();
+         Cone_Int_Left(); // внутренний левый конус <, старт справа (джойстик влево)
       }
    }
 
@@ -494,13 +537,13 @@ void Joy_RightPressed()
          }
       }
    }   
-      else if (Sub_Mode_Cone == Sub_Mode_Cone_Ext)
+      else if (Mode == Mode_Cone_L && Sub_Mode_Cone == Sub_Mode_Cone_Ext)
       {
-         Cone_Ext_Right();
+         Cone_Ext_Right(); // это наружн . для левого конуса <, старт слева (джойстик вправо)
       }
-      else if (Sub_Mode_Cone == Sub_Mode_Cone_Int)
+      else if (Mode == Mode_Cone_R && Sub_Mode_Cone == Sub_Mode_Cone_Int)
       {
-         Cone_Int_Right();
+         Cone_Int_Right(); //режим невозможен
       }
    }
 //////////////////////////////////////////////////////////////////////////
@@ -569,7 +612,7 @@ void Joy_UpPressed()
    }
 
    //////////////////////////
-   else if (Mode == Mode_Feed || Mode == Mode_Sphere)
+   else if (Mode == Mode_Feed || (Mode == Mode_Sphere && Sub_Mode_Sphere == Sub_Mode_Sphere_Man)) //  не выполняется при вкл авт отрезания
    {
       if (Sub_Mode_Feed == Sub_Mode_Feed_Man && err_1_flag == false && err_2_flag == false)
       {
@@ -859,6 +902,8 @@ void Joy_DownPressed()
 void Joy_NoPressed() 
 {  
   Complete_flag = false;
+  isPausedAfterStep = false;   // сброс паузы 
+  want_pause = false; //сброс ожидания паузы
   McStep_Lag = 0;
   Step = 0;
 
@@ -950,6 +995,7 @@ void Joy_NoPressed()
    if (Mode == Mode_Cone_L || Mode == Mode_Cone_R)
    {
       Pass_Nr = 1;
+      cycle_flag = false; 
       if (!Step_Z_flag && !rapid_step_Z_flag)
       {
          rapid_step_X_flag = OFF;
@@ -1009,8 +1055,12 @@ void Switch_Thread()
    SelectMenu = 1;
    Thr_Pass_Summ = 0;
    Pass_Fin = 0;
+   byte Subm = Submode_Read;                 // синхронизация подрежима с положением тумблера
+   if      (Subm == B11000000) Switch_Int();
+   else if (Subm == B10100000) Switch_Man();
+   else if (Subm == B01100000) Switch_Ext();
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Feed()
@@ -1036,7 +1086,7 @@ void Switch_Feed()
    Ap = 0;
    SelectMenu = 1;
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_aFeed()
@@ -1058,9 +1108,9 @@ void Switch_aFeed()
    Pass_Total = 1;
    Enc_Pos = 0;
    Ap = 0;
-   SelectMenu = 1;
+   SelectMenu = 1;   
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Cone_L()
@@ -1085,9 +1135,9 @@ void Switch_Cone_L()
    Pass_Total = 1;
    Step = 0;
    Ap = 0;
-   SelectMenu = 1;
+   SelectMenu = 1;   
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Cone_R()
@@ -1112,9 +1162,9 @@ void Switch_Cone_R()
    Pass_Total = 1;
    Step = 0;
    Ap = 0;
-   SelectMenu = 1;
+   SelectMenu = 1;   
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Devider()
@@ -1136,7 +1186,7 @@ void Switch_Devider()
    Ks_Count = 0;
    Km_Count = 0;
    Repeat_Count = 0;
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Sphere()
@@ -1159,12 +1209,13 @@ void Switch_Sphere()
    Km_Count = 0;
    Repeat_Count = 0;
    Pass_Total_Sphr = 1;
-   Sphere();  // пересчитать Pass_Total_Sphr до отправки на дисплей
-   Ap = 0;
+   Pass_Total = 1;
+   Ap = 100;
+   Sphere();   // [STM32] пересчитать Pass_Total_Sphr / Raz_R до отправки на дисплей
    SelectMenu = 1;
    McStep_Lag= 0;
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 void Switch_Reserve()
@@ -1179,7 +1230,7 @@ void Switch_Reserve()
    
    Mode = Mode_Reserve;
    Print();
-   Display_Send_All();
+   Display_Send_All();   // [STM32]
 }
 
 
@@ -1196,14 +1247,14 @@ void Switch_Int()
       case Mode_Thread:
       case Mode_Feed:
       case Mode_aFeed:
-      case Mode_Cone_L:
-      case Mode_Cone_R:
+      //case Mode_Cone_L:
+      //case Mode_Cone_R:
       if ((limit_Left_flag == ON && limit_Right_flag == ON) || (limit_Front_flag == ON && limit_Rear_flag == ON))
       {
          Sub_Mode_Thread = Sub_Mode_Thread_Int;
          Sub_Mode_Feed = Sub_Mode_Feed_Int;
          Sub_Mode_aFeed = Sub_Mode_aFeed_Int;
-         Sub_Mode_Cone = Sub_Mode_Cone_Int;
+         //Sub_Mode_Cone = Sub_Mode_Cone_Int;
          err_1_flag = false;
          Step_Z_flag = OFF;
          Step_X_flag = OFF;
@@ -1222,10 +1273,9 @@ void Switch_Int()
             Sub_Mode_Thread = Sub_Mode_Thread_Man;
             Sub_Mode_Feed = Sub_Mode_Feed_Man;
             Sub_Mode_aFeed = Sub_Mode_aFeed_Man;
-            Sub_Mode_Cone = Sub_Mode_Cone_Man;
+           // Sub_Mode_Cone = Sub_Mode_Cone_Man;
             err_2_flag = true;
             Beep_Error();
-            Display_Send_Alert(2);  // Установите суппорт в исходное положение
          }
       }
       else
@@ -1233,14 +1283,27 @@ void Switch_Int()
          Sub_Mode_Thread = Sub_Mode_Thread_Man;
          Sub_Mode_Feed = Sub_Mode_Feed_Man;
          Sub_Mode_aFeed = Sub_Mode_aFeed_Man;
-         Sub_Mode_Cone = Sub_Mode_Cone_Man;
+         //Sub_Mode_Cone = Sub_Mode_Cone_Man;
          err_1_flag = true;
          Beep_Error();
-         Display_Send_Alert(1);  // Установите упоры
       }
       Print();
-      Display_Send_All();
       break;
+
+      case Mode_Cone_L:
+      case Mode_Cone_R:
+               
+         Sub_Mode_Cone = Sub_Mode_Cone_Int;
+         err_1_flag = false;
+         Step_Z_flag = OFF;
+         Step_X_flag = OFF;
+         rapid_step_Z_flag = OFF;
+         rapid_step_X_flag = OFF;
+         Ks_Count = 0;
+         Km_Count = 0;
+         Repeat_Count = 0;
+        Print();
+      break; 
 
       case Mode_Sphere:  /////////////////////////////////////////////////////////////////////////////////////
       if ((limit_Right_flag == ON && limit_Rear_flag == ON) || 
@@ -1264,7 +1327,6 @@ void Switch_Int()
             Sub_Mode_Sphere = Sub_Mode_Sphere_Man;
             err_2_flag = true;
             Beep_Error();
-            Display_Send_Alert(2);  // Установите суппорт в исходное положение
          }
       }
       else
@@ -1272,14 +1334,12 @@ void Switch_Int()
          Sub_Mode_Sphere = Sub_Mode_Sphere_Man;
          err_1_flag = true;
          Beep_Error();
-         Display_Send_Alert(1);  // Установите упоры
       }
       Print();
-      Display_Send_All();
       break;
    }
 }
-
+   
 void Switch_Man()
 {  
       switch (Mode) 
@@ -1297,7 +1357,6 @@ void Switch_Man()
          Sub_Mode_Sphere = Sub_Mode_Sphere_Man;
          err_1_flag = false;
          err_2_flag = false;
-         Display_Send_Alert(0);  // Закрыть алерт на новом дисплее
          Step_Z_flag = OFF;
          Step_X_flag = OFF;
          rapid_step_Z_flag = OFF;
@@ -1306,7 +1365,6 @@ void Switch_Man()
          Km_Count = 0;
          Repeat_Count = 0;
          Print();
-         Display_Send_All();
          break;
       }
 }
@@ -1318,8 +1376,8 @@ void Switch_Ext()
       case Mode_Thread:
       case Mode_Feed:
       case Mode_aFeed:
-      case Mode_Cone_L:
-      case Mode_Cone_R:
+      //case Mode_Cone_L:
+      //case Mode_Cone_R:
       if ((limit_Left_flag == ON && limit_Right_flag == ON) || (limit_Front_flag == ON && limit_Rear_flag == ON))
       {
          Sub_Mode_Thread = Sub_Mode_Thread_Ext;
@@ -1347,7 +1405,6 @@ void Switch_Ext()
             Sub_Mode_Cone = Sub_Mode_Cone_Man;
             err_2_flag = true;
             Beep_Error();
-            Display_Send_Alert(2);  // Установите суппорт в исходное положение
          }
       }
       else
@@ -1358,12 +1415,25 @@ void Switch_Ext()
          Sub_Mode_Cone = Sub_Mode_Cone_Man;
          err_1_flag = true;
          Beep_Error();
-         Display_Send_Alert(1);  // Установите упоры
       }
       Print();
-      Display_Send_All();
       break;
 
+      case Mode_Cone_L:
+      case Mode_Cone_R:
+               
+         Sub_Mode_Cone = Sub_Mode_Cone_Ext;
+         err_1_flag = false;
+         Step_Z_flag = OFF;
+         Step_X_flag = OFF;
+         rapid_step_Z_flag = OFF;
+         rapid_step_X_flag = OFF;
+         Ks_Count = 0;
+         Km_Count = 0;
+         Repeat_Count = 0;
+        Print();
+      break; 
+      
       case Mode_Sphere:  /////////////////////////////////////////////////////////////////////////////////////
       if ((limit_Right_flag == ON && limit_Rear_flag == ON) || (limit_Left_flag == ON && limit_Rear_flag == ON))
       {
@@ -1384,7 +1454,6 @@ void Switch_Ext()
             Sub_Mode_Sphere = Sub_Mode_Sphere_Man;
             err_2_flag = true;
             Beep_Error();
-            Display_Send_Alert(2);  // Установите суппорт в исходное положение
          }
       }
       else
@@ -1392,10 +1461,8 @@ void Switch_Ext()
          Sub_Mode_Sphere = Sub_Mode_Sphere_Man;
          err_1_flag = true;
          Beep_Error();
-         Display_Send_Alert(1);  // Установите упоры
       }
       Print();
-      Display_Send_All();
       break;
    }
 }
@@ -1415,64 +1482,112 @@ void Key_Select_Pressed()
       switch (Mode) 
       {
          case Mode_Feed:
-            if (Sub_Mode_Feed == Sub_Mode_Feed_Ext && limit_Front_flag == ON && limit_Rear_flag == ON){
+            if (Sub_Mode_Feed == Sub_Mode_Feed_Ext && limit_Front_flag == ON && limit_Rear_flag == ON)
+            {
             if      (SelectMenu == 1) SelectMenu = 2;
             else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
+            else if (SelectMenu == 3) SelectMenu = 4;
+            else if (SelectMenu == 4) SelectMenu = 1;              
             }
-            else{
-            if      (SelectMenu == 1) SelectMenu = 2;
-            else if (SelectMenu == 2) SelectMenu = 1;
-            if      (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
+            else
+            {
+            if      (SelectMenu == 1) SelectMenu = 3;
+            else if (SelectMenu == 3) SelectMenu = 4;
+            else if (SelectMenu == 4) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) Distance_mm = 0;
+             else SelectMenu = 1; 
+            }           
+            if      (SelectMenu == 2) SelectMenu = 1; 
             }
+            Beep();          
          break;
          
          case Mode_aFeed:
             if      (SelectMenu == 1) SelectMenu = 2;
             else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
+            else if (SelectMenu == 3) SelectMenu = 4; 
+            else if (SelectMenu == 4) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) Distance_mm = 0;
+             else SelectMenu = 1; 
+            }            
+            Beep();   
          break;
         
          case Mode_Cone_L:
             if      (SelectMenu == 1) SelectMenu = 2;
             else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
+            else if (SelectMenu == 3) SelectMenu = 4;  
+            else if (SelectMenu == 4) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid)  Distance_mm = 0;
+             else SelectMenu = 1; 
+            }                   
+            Beep();    
          break;
-
+     
          case Mode_Cone_R:
             if      (SelectMenu == 1) SelectMenu = 2;
             else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
+            else if (SelectMenu == 3) SelectMenu = 4;
+            else if (SelectMenu == 4) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid)  Distance_mm = 0;
+             else SelectMenu = 1; 
+            }                      
+            Beep();   
          break;
-
+    
          case Mode_Thread:
-            if      (SelectMenu == 1) SelectMenu = 2;
-            else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
-            Beep();
-            Display_On_SelectMenu_Change();
-         break;         
+         
+         if (SelectMenu == 1) 
+         {
+          if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) 
+           {
+            if (Kzr == 1)  {Kzr =  2; Beep();} 
+            else if (Kzr == 2) {Kzr = 3;  Beep();} 
+            else if (Kzr == 3) {Kzr = 4;  Beep();}
+            else if (Kzr == 4) {Kzr = 1;  Beep();}
+           }
+          else  {SelectMenu = 2;}
+         }
+        else if (SelectMenu == 2) SelectMenu = 3;
+        else if (SelectMenu == 3) SelectMenu = 4; 
+        else if (SelectMenu == 4) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) Distance_mm = 0;
+             else SelectMenu = 1; 
+            }                   
+             
+        Beep(); 
+        break;  
+        
+          
 
-         case Mode_Sphere:
-            if      (SelectMenu == 1) SelectMenu = 2;
+         case Mode_Sphere: 
+            if      (SelectMenu == 1) 
+            {
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) 
+              {
+              if (Raz == 1)  {Raz =  2; Beep();} 
+              else if (Raz == 2) {Raz = 1;  Beep();} 
+              }  
+            else 
+           {
+            if (Raz == 1)
+            {SelectMenu = 2;}
+            else
+            {SelectMenu = 3;}
+            } 
+            }      
             else if (SelectMenu == 2) SelectMenu = 3;
-            else if (SelectMenu == 3) SelectMenu = 1;
+            else if (SelectMenu == 3) SelectMenu = 1;            
             Beep();
-            Display_On_SelectMenu_Change();
          break;
          
          case Mode_Reserve:
-            //
+            
          break;
          
          case Mode_Divider:
@@ -1488,6 +1603,7 @@ void Key_Select_Pressed()
 // ********** Обработчик нажатия кнопки Up **********
 void Key_Up_Pressed()
 {
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
   if (!button_up_flag)
   {
      switch (Mode)
@@ -1497,22 +1613,30 @@ void Key_Up_Pressed()
         {
          if (!Button_Rapid){
          if         (Ap < 9900)  {Ap = Ap + 2;    Beep();}}
-         else { if  (Ap < 9900)  {Ap = Ap + 10;   Beep();}}
+         else { if  (Ap < 9900)  {Ap = Ap + 10;   Beep();}}          
          }
-        else if (SelectMenu == 2)
-        {
-         X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
-
+        else if (SelectMenu == 2) 
+         {
+          if (TENSION_Z < 100) {TENSION_Z = TENSION_Z + TENS;   Beep();}        
+         }
+        else if (SelectMenu == 3) 
+        {       
+         if (!Button_Rapid){
+         for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos -- ;}}
+         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}} 
          Beep();
         }
-        else if (SelectMenu == 3)
+        else if (SelectMenu == 4) 
          {
-          if (TENSION_Z < 100) {TENSION_Z = TENSION_Z + TENS;   Beep();}
+          if (!Button_Rapid) Distance_mm =  Distance_mm + 20000;
+          else Distance_mm =  Distance_mm + 200; 
+          Beep();        
          }
+        
         Print();
-        if (SelectMenu == 1) Display_Send_Int("AP", Ap);
-        break;
 
+        break;
+        
         case Mode_aFeed:
         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
            {
@@ -1526,17 +1650,25 @@ void Key_Up_Pressed()
            Current_Tooth = 1;
            Beep();
            }
-           else if (SelectMenu == 3)
+           else if (SelectMenu == 3) 
            {
-            X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+            if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos -- ;}}
+            else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}} 
             Beep();
-           }
+           } 
+           else if (SelectMenu == 4) 
+           {
+            if (!Button_Rapid) Distance_mm =  Distance_mm + 20000;
+            else Distance_mm =  Distance_mm + 200; 
+            Beep();        
+           }      
            Print();
-           if (SelectMenu == 1) Display_Send_Int("AP", Ap);
            break;
 
       
         case Mode_Thread:
+      
         if (Thread_Step < TOTAL_THREADS - 1 && SelectMenu == 1)
         {
            if (!Joy_Z_flag && !Joy_X_flag)
@@ -1570,18 +1702,30 @@ void Key_Up_Pressed()
         }
         else if (SelectMenu == 3) 
         {
-          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
-          Beep();
-        }        
+         if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos -- ;}}
+         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}} 
+            Beep();
+        } 
+        else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid) Distance_mm =  Distance_mm + 20000;
+          else Distance_mm =  Distance_mm + 200; 
+          Beep();        
+         }   
         Print();
         break;        
 
         case Mode_Sphere:
            if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
            {
+             if (Raz == 1)
+             {
               if      (Sph_R_mm < 1250) {Sph_R_mm = Sph_R_mm + 25;  Beep();}
               else if (Sph_R_mm < 2500) {Sph_R_mm = Sph_R_mm + 50;  Beep();}
               else if (Sph_R_mm < 4750) {Sph_R_mm = Sph_R_mm + 250; Beep();}
+             }
+             else if (Raz == 2) {Pass_Total++; Beep();}
            }
            else if (SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
            {
@@ -1592,22 +1736,21 @@ void Key_Up_Pressed()
                  Beep();
               }
            }
-           else if (SelectMenu == 3)
+           else if (SelectMenu == 3) 
            {
-            X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+            if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos -- ;}}
+            else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}} 
             Beep();
-           }
+           }           
         Print();
-        if (SelectMenu == 1) Display_Send_Int("SPHERE", Sph_R_mm);
         break;
         
         case Mode_Reserve:
-           //
-        Print();
         break;
 
         case Mode_Cone_L:
-        case Mode_Cone_R:
+        case Mode_Cone_R:        
         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
         {
          if (!Button_Rapid){
@@ -1621,46 +1764,70 @@ void Key_Up_Pressed()
         }
         else if (SelectMenu == 3)
         {
-         X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
-         Beep();
+         if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos -- ;}}
+            else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}} 
+            Beep();         
         }
+        else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid) Distance_mm =  Distance_mm + 20000;
+          else Distance_mm =  Distance_mm + 200; 
+          Beep();        
+         }
         Print();
-        if (SelectMenu == 1) Display_Send_Int("AP", Ap);
         break;
       }
      button_up_flag = true;
   }
+   e2_diam_from_keys(e2_mx0);   // [STM32]
 }
 
 // ********** Обработчик нажатия кнопки Down **********
 void Key_Down_Pressed()
 {
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
    if (!button_down_flag)
    {
       switch (Mode)
       {
          case Mode_Feed:
          if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
-         {
+         {       
          if (!Button_Rapid){
                 if  (Ap > 0)    {Ap = Ap - 2;    Beep();}}
          else { if  (Ap > 10)   {Ap = Ap - 10;   Beep();}
            else if  (Ap > 0)    {Ap = Ap - 2;    Beep();}}
          }
-         else if (SelectMenu == 2)
+         else if (SelectMenu == 3) 
          {
-          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos ++ ;}}
+            else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}} 
+            Beep();
+         }
+         else if (SelectMenu == 2) 
+         {
+          if (TENSION_Z > 1) {TENSION_Z = TENSION_Z - TENS;   Beep();}   //****было TENSION_Z > 0  
+         }
+         else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid)
+          {
+           if (Distance_mm >= 20000)  
+           Distance_mm =  Distance_mm - 20000;
+          }   
+          else
+          {
+            if (Distance_mm >= 200)
+            Distance_mm =  Distance_mm - 200; 
+          }   
+          Beep();        
+         }
 
-          Beep();
-         }
-         else if (SelectMenu == 3)
-         {
-          if (TENSION_Z > 0) {TENSION_Z = TENSION_Z - TENS;   Beep();}
-         }
          Print();
-         if (SelectMenu == 1) Display_Send_Int("AP", Ap);
          break;
-
+         
          case Mode_aFeed:
          if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
             {
@@ -1675,13 +1842,28 @@ void Key_Down_Pressed()
             Current_Tooth = 1;
             Beep();
             }
-         else if (SelectMenu == 3)
+         else if (SelectMenu == 3) 
          {
-          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos ++ ;}}
+          else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}} 
           Beep();
          }
+         else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid)
+          {
+           if (Distance_mm >= 20000)  
+           Distance_mm =  Distance_mm - 20000;
+          }   
+          else
+          {
+            if (Distance_mm >= 200)
+            Distance_mm =  Distance_mm - 200; 
+          }   
+          Beep();        
+         }
          Print();
-         if (SelectMenu == 1) Display_Send_Int("AP", Ap);
          break;
          
          case Mode_Thread:
@@ -1709,19 +1891,42 @@ void Key_Down_Pressed()
         }
          else if (SelectMenu == 3) 
          {
-          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos ++ ;}}
+          else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}} 
           Beep();
-         }          
+         }  
+         else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid)
+          {
+           if (Distance_mm >= 20000)  
+           Distance_mm =  Distance_mm - 20000;
+          }   
+          else
+          {
+            if (Distance_mm >= 200)
+            Distance_mm =  Distance_mm - 200; 
+          }   
+          Beep();        
+         }       
          Print();
          break;        
 
          case Mode_Sphere:
             if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
             {
+             if (Raz == 1)
+             {
                if      (Sph_R_mm > 2500) {Sph_R_mm = Sph_R_mm - 250; Beep();}
                else if (Sph_R_mm > 1250) {Sph_R_mm = Sph_R_mm - 50;  Beep();}
                else if (Sph_R_mm > 50)   {Sph_R_mm = Sph_R_mm - 25;  Beep();}
                if (Sph_R_mm < Bar_R_mm) Bar_R_mm = Sph_R_mm;
+             }
+             else if (Raz == 2)
+             {
+             if (Pass_Total > 1) {Pass_Total--; Beep();}
+             }
             }
             else if (SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
             {
@@ -1731,23 +1936,22 @@ void Key_Down_Pressed()
                   Cutter_Width = Cutter_Width_array[Cutter_Step];
                   Beep();
                }
-            }
-         else if (SelectMenu == 3)
+            }            
+         else if (SelectMenu == 3) 
          {
-          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos ++ ;}}
+          else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}} 
           Beep();
          }
          Print();
-         if (SelectMenu == 1) Display_Send_Int("SPHERE", Sph_R_mm);
          break;
         
          case Mode_Reserve:
-          //
-         Print();
-         break;
+        break;
          
          case Mode_Cone_L:
-         case Mode_Cone_R:
+         case Mode_Cone_R:         
          if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
          {
          if (!Button_Rapid){
@@ -1762,15 +1966,31 @@ void Key_Down_Pressed()
          }
          else if (SelectMenu == 3)
          {
-          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          if (!Button_Rapid){
+            for        (int i = 0; i < LINEIKA *1000 ; i ++)   { MX_pos ++ ;}}
+          else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}} 
           Beep();
          }
+         else if (SelectMenu == 4) 
+         {
+          if (!Button_Rapid)
+          {
+           if (Distance_mm >= 20000)  
+           Distance_mm =  Distance_mm - 20000;
+          }   
+          else
+          {
+            if (Distance_mm >= 200)
+            Distance_mm =  Distance_mm - 200; 
+          }   
+          Beep();        
+         }
          Print();
-         if (SelectMenu == 1) Display_Send_Int("AP", Ap);
-         break;
+         break;                  
       }
       button_down_flag = true;
    }
+   e2_diam_from_keys(e2_mx0);   // [STM32]
 }
 
 // ********** Обработчик нажатия кнопки Left **********
@@ -1782,38 +2002,36 @@ void Key_Left_Pressed()
       switch (Mode)
       {
          case Mode_Feed:
-         if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
             {
                Pass_Total--;
                Beep();
             }
-         else if (SelectMenu == 2)
+         else if (SelectMenu == 2) 
          {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos ++ ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}}}
-         Beep();
+        if (OTSKOK_Z == REBOUND_Z) {OTSKOK_Z = 1;   Beep();}       
          }
-         else if (SelectMenu == 3)
-         {
-        if (OTSKOK_Z == REBOUND_Z) {OTSKOK_Z = 1;   Beep();}
-         }
+
          Print();
-         Display_On_Pass_Change();
          break;
 
          case Mode_aFeed:
-         if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
             {
              Pass_Total--;
              Beep();
             }
-
+            
          else if (SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
          {
          if (Current_Tooth > 1)
@@ -1826,26 +2044,18 @@ void Key_Left_Pressed()
             Current_Tooth = Total_Tooth;
             Beep();
          }
-         }
-         else if (SelectMenu == 3)
-         {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos ++ ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}}}
-         Beep();
-         }
+         }         
          Print();
-         Display_On_Pass_Change();
-         break;
-
+         break; 
+      
          case Mode_Cone_L:
          case Mode_Cone_R:
-         if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && Pass_Total > 1 && !Joy_Z_flag && !Joy_X_flag)
          {
           Pass_Total--;
           Beep();
@@ -1862,30 +2072,48 @@ void Key_Left_Pressed()
                rapid_step_X_flag = OFF;
                Beep();
          }
-         else if (SelectMenu == 3)
-         {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos ++ ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}}}
-         Beep();
-         }
          Print();
-         Display_On_Pass_Change();
          break;
 
          case Mode_Sphere:
-            if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
+          if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid && Raz == 1)   // [STM32] в отрезании уск+◀▶ — смещение (V3.5), обнуление V3.6 его перекрывало
+         {
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+          else if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
             {
+              if (Raz == 1) //режим шара
+              {
                if (Bar_R_mm > 0)
                {
-                  Bar_R_mm = Bar_R_mm - 25;
+                  Bar_R_mm = Bar_R_mm - 25; 
                   Beep();
                }
+              }
+              else // режим отрезания
+              {              
+               if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid) 
+               {
+   
+               if (Staggered_Step > 0)
+               {
+                  Staggered_Step--;
+                  Staggered_Width = Staggered_Width_array[Staggered_Step];
+                  Beep();
+               }
+              }
+              else 
+              {
+
+                if (Ap > 100)
+                {
+                  Ap = Ap - 100
+                  ;
+                  Beep();
+                }
+               }
+              }
             }
             else if (SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
             {
@@ -1895,30 +2123,21 @@ void Key_Left_Pressed()
                   Cutting_Width = Cutting_Width_array[Cutting_Step];
                   Beep();
                }
-            }
-            else if (SelectMenu == 3)
-            {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos ++ ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}}}
-         Beep();
-            }
+            }          
             Print();
-            if (SelectMenu == 1) Display_Send_Int("BAR", Bar_R_mm);
             break;
-     
-         case Mode_Reserve:
-          //
-         Print();
+         
+         case Mode_Reserve: 
          break;  
+   
 
          case Mode_Thread:
-         if (Pass_Fin > 0 && SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          Z_pos = 0; e2_axis_set('Z', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (Pass_Fin > 0 && SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
             {
                Pass_Fin --;
                Beep();
@@ -1927,23 +2146,10 @@ void Key_Left_Pressed()
             {
                Thr_Pass_Summ --;
                Beep();
-            }
-         else if (SelectMenu == 3)
-            {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos ++ ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos ++ ;}}}
-         Beep();
-            }
+            }              
          Print();
-         Display_On_Pass_Change();
-         break;
-
+         break; 
+                  
       }
       button_left_flag = true;
    }
@@ -1959,33 +2165,31 @@ void Key_Right_Pressed()
       switch (Mode)
       {
          case Mode_Feed:
-         if (SelectMenu == 1 && Pass_Total < 99 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && Pass_Total < 99 && !Joy_Z_flag && !Joy_X_flag)
             {
                Pass_Total++;
                Beep();
             }
-         else if (SelectMenu == 2)
+         
+         else if (SelectMenu == 2) 
          {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos -- ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}}}
-         Beep();
-         }
-         else if (SelectMenu == 3)
-         {
-          if (OTSKOK_Z < REBOUND_Z) {OTSKOK_Z = REBOUND_Z;   Beep();}
-         }
+          if (OTSKOK_Z < REBOUND_Z) {OTSKOK_Z = REBOUND_Z;   Beep();}          
+         }    
          Print();
-         Display_On_Pass_Change();
          break;
 
          case Mode_aFeed:
-         if (Pass_Total < 99 && SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (Pass_Total < 99 && SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
          {
                Pass_Total++;
                Beep();
@@ -2002,26 +2206,18 @@ void Key_Right_Pressed()
             Current_Tooth = 1;
             Beep();
          }
-         }
-         else if (SelectMenu == 3)
-         {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos -- ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}}}
-         Beep();
-         }
+         }      
          Print();
-         Display_On_Pass_Change();
          break;
-
+        
          case Mode_Cone_L:
          case Mode_Cone_R:
-         if (SelectMenu == 1 && Pass_Total < 99 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && Pass_Total < 99 && !Joy_Z_flag && !Joy_X_flag)
          {
           Pass_Total++;
           Beep();
@@ -2037,32 +2233,44 @@ void Key_Right_Pressed()
           rapid_step_Z_flag = OFF;
           rapid_step_X_flag = OFF;
           Beep();
-         }
-         else if (SelectMenu == 3)
-         {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos -- ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}}}
-         Beep();
-         }
+         }    
          Print();
-         Display_On_Pass_Change();
          break;
 
          case Mode_Sphere:
-         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
-            {
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid && Raz == 1)   // [STM32] в отрезании уск+◀▶ — смещение (V3.5), обнуление V3.6 его перекрывало
+         {
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag)
+            {if (Raz == 1) //режим шара
+             {
                if (Bar_R_mm < Sph_R_mm)
                {
                   Bar_R_mm = Bar_R_mm + 25;
                   Beep();
                }
+             }
+            else if (Raz == 2)//режим отрезания
+            { 
+             if (!Joy_Z_flag && !Joy_X_flag && !Button_Rapid)  
+             {              
+              if (Staggered_Step < TOTAL_Staggered_STEP-1)
+               {
+                  Staggered_Step++;
+                  Staggered_Width = Staggered_Width_array[Staggered_Step];
+                  Beep();
+               }
+             }
+            else 
+            {
+              Ap = Ap + 100;
+              Beep();
+                         
             }
+            }
+            }                 
             else if (SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
             {
                if (Cutting_Step < TOTAL_CUTTING_STEP-1)
@@ -2071,30 +2279,22 @@ void Key_Right_Pressed()
                   Cutting_Width = Cutting_Width_array[Cutting_Step];
                   Beep();
                }
-            }
-         else if (SelectMenu == 3)
-            {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos -- ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}}}
-         Beep();
-            }
+            }           
          Print();
-         if (SelectMenu == 1) Display_Send_Int("BAR", Bar_R_mm);
          break;
      
-         case Mode_Reserve:
-          //
-         Print();
-         break;
+         
+         case Mode_Reserve: 
+         break; 
+        
 
          case Mode_Thread:
-         if (Pass_Fin < 9 && SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
+         if (SelectMenu == 1 && !Joy_Z_flag && !Joy_X_flag && !Button_Rapid)
+         {
+          X_pos = 0; e2_axis_set('X', 0);   // [STM32] ноль и при линейках напрямую
+          Beep();
+         }
+         else if (Pass_Fin < 9 && SelectMenu == 2 && !Joy_Z_flag && !Joy_X_flag)
             {
                Pass_Fin ++;
                Beep();
@@ -2103,31 +2303,128 @@ void Key_Right_Pressed()
             {
                Thr_Pass_Summ ++;
                Beep();
-            }
-         else if (SelectMenu == 3)
-            {
-         if (flag_Scale_x1 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA ; i ++)        { MX_pos -- ;}}}
-         else if (flag_Scale_x10 == ON){
-         if (!Button_Rapid){
-         for        (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos -- ;}}
-         else { for (int i = 0; i < LINEIKA*BT_X; i ++)    { MX_pos -- ;}}}
-         Beep();
-            }
+            }                            
          Print();
-         Display_On_Pass_Change();
-         break;
+         break; 
                    
       }  
       button_right_flag = true;
    }
    e2_diam_from_keys(e2_mx0);   // [STM32]
 }
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// ********** Обработчик нажатия комбинаций кнопок меню **********
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+void Key_UD_Pressed() 
+{} 
+void Key_UL_Pressed() 
+{
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
+ if (!button_ul_flag)
+  { 
+   if (SelectMenu == 4) 
+    {
+     Distance_mm =  Distance_mm + 10;
+     Beep();        
+    }
+    else if (SelectMenu == 3)
+    {
+     for (int i = 0; i < LINEIKA ; i ++)  { MX_pos -- ;} 
+     Beep();  
+    }
+  }  
+  Print(); 
+  //button_ul_flag = true;    
+   e2_diam_from_keys(e2_mx0);   // [STM32]
+}
+void Key_UR_Pressed() 
+{
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
+ if (!button_ur_flag)
+  { 
+   if (SelectMenu == 4) 
+    {
+     Distance_mm =  Distance_mm + 2000;
+     Beep();        
+    }
+   else if (SelectMenu == 3) 
+   {
+    for (int i = 0; i < LINEIKA * 100 ; i ++)  { MX_pos -- ;} 
+     Beep();  
+   }
+  }  
+  Print(); 
+  //button_ur_flag = true;    
+   e2_diam_from_keys(e2_mx0);   // [STM32]
+}
 
-
+void Key_DR_Pressed() 
+{
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
+ if (!button_dr_flag)
+ { //
+  if (SelectMenu == 4)
+    {
+     if (Distance_mm >= 2000) 
+     {
+      Distance_mm =  Distance_mm - 2000; 
+      Beep(); 
+     }
+     } 
+  else if (SelectMenu == 3) 
+  {
+   for (int i = 0; i < LINEIKA *100 ; i ++)   { MX_pos ++ ;}
+   Beep(); 
+  } 
+ }                
+  Print();
+  //button_dr_flag = true;
+   e2_diam_from_keys(e2_mx0);   // [STM32]
+}
+void Key_DL_Pressed() 
+{
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
+ if (!button_dl_flag)
+ { //
+  if (SelectMenu == 4)
+    {
+     if (Distance_mm >= 10) 
+     {
+      Distance_mm =  Distance_mm - 10; 
+      Beep(); 
+     }
+     } 
+  else if (SelectMenu == 3) 
+  {
+   for (int i = 0; i < LINEIKA  ; i ++)   { MX_pos ++ ;}
+   Beep();  
+  }
+ }                
+  Print();
+  //button_dl_flag = true;
+   e2_diam_from_keys(e2_mx0);   // [STM32]
+}
+void Key_LR_Pressed() 
+{
+   long e2_mx0 = MX_pos;   // [STM32] ввод диаметра кнопками — и при линейках напрямую (BACKLOG-015)
+ if (!button_lr_flag)
+  { 
+   if (SelectMenu == 4) 
+    {
+     Distance_mm = 0;
+     Beep();        
+    }
+   else if (SelectMenu == 3)
+   {
+    MX_pos = 0;
+    Beep();
+   }
+  }  
+  Print(); 
+  //button_ul_flag = true;  
+   e2_diam_from_keys(e2_mx0);   // [STM32]
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ********** Обработка кнопок лимита ********** /////////////////////////////////////////////////////////////////////////////////////
@@ -2146,9 +2443,32 @@ void Limit_Left_Pressed()
          case Mode_aFeed:
          case Mode_Cone_L:
          case Mode_Cone_R:
-         case Mode_Sphere:
          if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
+          if (SelectMenu == 4)  //работа левой кнопки лимита в дистанционном режиме
+          {        
+           Distance = (long)((float)MOTOR_Z_STEP_PER_REV * Distance_mm / 20 / SCREW_Z + 0.5) * McSTEP_Z;
+            if (limit_Left_flag == OFF)
+            {
+              if ((limit_Right_flag == OFF) || 
+                 ((limit_Right_flag == ON) && ((Motor_Z_Pos + Distance) > (Limit_Pos_Right + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))))
+              {            
+                  limit_Left_flag = ON;
+                  Limit_Pos_Left = (((Motor_Z_Pos + McSTEP_Z / 2) & ~(McSTEP_Z - 1)) + Distance);
+                  Limit_Left_LED_On();
+                  Beep();
+              }
+            }
+            else if (limit_Left_flag == ON)
+            {
+               limit_Left_flag = OFF;
+               Limit_Pos_Left = Limit_Pos_Max;
+               Limit_Left_LED_Off();
+               Beep();
+            }    
+           } 
+           else //работа левой кнопки лимита в обычных режимах
+           {
             if (limit_Left_flag == OFF)
             {
                if (Motor_Z_Pos > (Limit_Pos_Right + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))
@@ -2166,9 +2486,34 @@ void Limit_Left_Pressed()
                Limit_Left_LED_Off();
                Beep();
             }
-         }
+           }
+          } 
+         break; 
+
+         case Mode_Sphere:
+          if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
+         {           
+           if (limit_Left_flag == OFF)
+            {
+               if (Motor_Z_Pos > (Limit_Pos_Right + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))
+               {
+                  limit_Left_flag = ON;
+                  Limit_Pos_Left = ((Motor_Z_Pos + McSTEP_Z / 2) & ~(McSTEP_Z - 1));
+                  Limit_Left_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Left_flag = OFF;
+               Limit_Pos_Left = Limit_Pos_Max;
+               Limit_Left_LED_Off();
+               Beep();
+            }
+          }
+         break;
       }
-      Display_On_Limits_Change();
+      Display_On_Limits_Change();   // [STM32]
    }
 }
 
@@ -2185,6 +2530,53 @@ void Limit_Right_Pressed()
          case Mode_aFeed:
          case Mode_Cone_L:
          case Mode_Cone_R:
+        
+         if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
+         {
+          if (SelectMenu == 4)  //работа правой кнопки лимита в дистанционном режиме 
+          {
+          Distance = (long)((float)MOTOR_Z_STEP_PER_REV * Distance_mm / 20 / SCREW_Z + 0.5) * McSTEP_Z;
+          if (limit_Right_flag == OFF)
+          {  
+            if ((limit_Left_flag == OFF) || 
+               ((limit_Left_flag == ON) && ((Motor_Z_Pos - Distance) < (Limit_Pos_Left - ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))))
+             {
+                  limit_Right_flag = ON;
+                  Limit_Pos_Right = (((Motor_Z_Pos + McSTEP_Z / 2) & ~(McSTEP_Z - 1)) - Distance);
+                  Limit_Right_LED_On();
+                  Beep();
+              }
+          }
+            else
+            {
+               limit_Right_flag = OFF;
+               Limit_Pos_Right = Limit_Pos_Min;
+               Limit_Right_LED_Off();
+               Beep();
+            }
+          }
+          else //работа правой кнопки лимита в обычном режиме 
+          {
+            if (limit_Right_flag == OFF)
+            {
+               if (Motor_Z_Pos < (Limit_Pos_Left - ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))
+               {
+                  limit_Right_flag = ON;
+                  Limit_Pos_Right = ((Motor_Z_Pos + McSTEP_Z / 2) & ~(McSTEP_Z - 1));
+                  Limit_Right_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Right_flag = OFF;
+               Limit_Pos_Right = Limit_Pos_Min;
+               Limit_Right_LED_Off();
+               Beep();
+            }
+          }
+         }
+          break;
          case Mode_Sphere:
          if (!Joy_Z_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
@@ -2206,8 +2598,9 @@ void Limit_Right_Pressed()
                Beep();
             }
          }
+          break; 
       }
-      Display_On_Limits_Change();
+      Display_On_Limits_Change();   // [STM32]
    }
 }
 
@@ -2224,6 +2617,52 @@ void Limit_Front_Pressed()
          case Mode_aFeed:
          case Mode_Cone_L:
          case Mode_Cone_R:
+         if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
+         { 
+            if (SelectMenu == 4)  //работа передней кнопки лимита в дистанционном режиме
+            {
+          Distance = (long)((float)MOTOR_X_STEP_PER_REV * Distance_mm /20/ SCREW_X + 0.5) * McSTEP_X;
+            if (limit_Front_flag == OFF)
+            {
+              if ((limit_Rear_flag == OFF) ||
+                 ((limit_Rear_flag == ON) &&((Motor_X_Pos + Distance) > (Limit_Pos_Rear + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))))
+               {
+                  limit_Front_flag = ON;
+                  Limit_Pos_Front = (((Motor_X_Pos + McSTEP_X / 2) & ~(McSTEP_X - 1)) + Distance);
+                  Limit_Front_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Front_flag = OFF;
+               Limit_Pos_Front = Limit_Pos_Max;
+               Limit_Front_LED_Off();
+               Beep();
+            }
+            } 
+            else //работа передней кнопки лимита в обычном режиме
+            {
+            if (limit_Front_flag == OFF)
+            {
+               if (Motor_X_Pos > (Limit_Pos_Rear + ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))
+               {
+                  limit_Front_flag = ON;
+                  Limit_Pos_Front = ((Motor_X_Pos + McSTEP_X / 2) & ~(McSTEP_X - 1));
+                  Limit_Front_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Front_flag = OFF;
+               Limit_Pos_Front = Limit_Pos_Max;
+               Limit_Front_LED_Off();
+               Beep();
+            }
+            }
+         } //if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
+         break;
          case Mode_Sphere:
          if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
@@ -2245,8 +2684,9 @@ void Limit_Front_Pressed()
                Beep();
             }
          }
+         break;  
       }
-      Display_On_Limits_Change();
+      Display_On_Limits_Change();   // [STM32]
    }
 }
 
@@ -2263,6 +2703,52 @@ void Limit_Rear_Pressed()
          case Mode_aFeed:
          case Mode_Cone_L:
          case Mode_Cone_R:
+         if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
+         { 
+          if (SelectMenu == 4)  //работа задней кнопки лимита в дистанционном режиме
+          {
+           Distance = (long)((float)MOTOR_X_STEP_PER_REV * Distance_mm / 20 / SCREW_X + 0.5) * McSTEP_X;
+            if (limit_Rear_flag == OFF)
+            {
+              if ((limit_Front_flag == OFF) || 
+                 ((limit_Front_flag == ON) && ((Motor_X_Pos - Distance) < (Limit_Pos_Front - ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))))
+                  {
+                  limit_Rear_flag = ON;
+                  Limit_Pos_Rear = (((Motor_X_Pos + McSTEP_X / 2) & ~(McSTEP_X - 1)) - Distance);
+                  Limit_Rear_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Rear_flag = OFF;
+               Limit_Pos_Rear = Limit_Pos_Min;
+               Limit_Rear_LED_Off();
+               Beep();
+            }
+          }
+          else   //работа задней кнопки лимита в обычном режиме
+          {
+            if (limit_Rear_flag == OFF)
+            {
+               if (Motor_X_Pos < (Limit_Pos_Front - ((MIN_RAPID_MOTION - MAX_RAPID_MOTION) * REPEAt) * 2))
+               {
+                  limit_Rear_flag = ON;
+                  Limit_Pos_Rear = ((Motor_X_Pos + McSTEP_X / 2) & ~(McSTEP_X - 1));
+                  Limit_Rear_LED_On();
+                  Beep();
+               }
+            }
+            else
+            {
+               limit_Rear_flag = OFF;
+               Limit_Pos_Rear = Limit_Pos_Min;
+               Limit_Rear_LED_Off();
+               Beep();
+            }
+          }
+         }
+         break;
          case Mode_Sphere:
          if (!Joy_X_flag && e2_limit_buttons_allowed())   // [STM32] было Submode_Read == B10100000 (BACKLOG-022)
          { 
@@ -2284,8 +2770,9 @@ void Limit_Rear_Pressed()
                Beep();
             }
          }
+         break;  
       }
-      Display_On_Limits_Change();
+      Display_On_Limits_Change();   // [STM32]
    }
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

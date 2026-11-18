@@ -223,24 +223,59 @@ void Thread_Rear(bool & c_flag, bool & d_flag)
 // ********** Режим "Автоматическая Резьба" ********** /////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void Thread_Ext_Left()
+void Thread_Ext_Left()   //старт справа, джойстик влево (на реверсе шпинделя джойстик вправо)
 {
+   
+  if (button_down_flag) { want_pause = true; Beep(); }
+   
    if ((Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Limit_Pos_Rear && Gewinde_flag == Ph && Step == 4) || (Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Null_X_Pos)||
        (Motor_Z_Pos == Null_Z_Pos && CThr_flag == true && Gewinde_flag == Ph && Step == 4))
    {  
+      if (want_pause == true)         
+      {
+         isPausedAfterStep = true;   
+         if (button_up_flag)          
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                   
+         }
+      }
       Pass_Total = Thread_Info[Thread_Step].Pass + Thr_Pass_Summ;
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
-      if (CThr_flag == true && Pass_Nr > 1)  {Motor_X_Pos = Limit_Pos_Rear;}
+      if (CThr_flag == true && Pass_Nr > 1)  {Motor_X_Pos = Limit_Pos_Rear;} 
         
          cycle_flag = true;
          c_flag = false;
          d_flag = false;
          
          float Step_mm = Thread_Info[Thread_Step].Step;
-         float Pass_Depth;
-         if(Pass_Nr == 1) {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 6) - (Step_mm * 0.866 / 8)) / sqrt(Pass_Total-1) * sqrt(0.3);}
-         else             {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 6) - (Step_mm * 0.866 / 8)) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}
+         float Pass_Depth = 0;
+         if (Kzr == 1) {     //для метрической резьбы
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 2) { //для дюймовой резьбы 55 градусов (BSW)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 3) { // для дюймовой резьбы 60 градусов (UNF)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 4) { // для трапецеидальной резьбы
+          if (Step_mm < 2.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm >= 2.0 && Step_mm <= 5.0 ) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.25 ) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.25 ) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm > 5.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}}
+
          long Infeed_Value = long(Pass_Depth / ((float)SCREW_X/100 / MOTOR_X_STEP_PER_REV) + 0.5) * McSTEP_X + McSTEP_X;
          Infeed_ValueC = Infeed_Value;
 
@@ -353,11 +388,26 @@ void Thread_Ext_Left()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void Thread_Ext_Right()  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void Thread_Ext_Right()  ///////////////////старт слева, джойстик вправо (на реверсе шпинделя джойстик влево)//////////////////////////////////////
 {
+  if (button_down_flag) { want_pause = true; Beep(); }
    if ((Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Limit_Pos_Rear && Gewinde_flag == Ph && Step == 4) || (Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Null_X_Pos)||
        (Motor_Z_Pos == Null_Z_Pos && CThr_flag == true && Gewinde_flag == Ph && Step == 4))
    {  
+      if (want_pause == true) 
+      {
+         isPausedAfterStep = true;   
+         if (button_up_flag)         
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                 
+         }
+      }
       Pass_Total = Thread_Info[Thread_Step].Pass + Thr_Pass_Summ;
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
@@ -369,8 +419,26 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
          
          float Step_mm = Thread_Info[Thread_Step].Step;
          float Pass_Depth = 0;
-         if(Pass_Nr == 1) {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 6) - (Step_mm * 0.866 / 8)) / sqrt(Pass_Total-1) * sqrt(0.3);}
-         else             {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 6) - (Step_mm * 0.866 / 8)) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}
+         if (Kzr == 1) {     //для метрической резьбы
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 2) { //для дюймовой резьбы 55 градусов (BSW)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 3) { // для дюймовой резьбы 60 градусов (UNF)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 4) { // для трапецеидальной резьбы
+          if (Step_mm < 2.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm >= 2.0 && Step_mm <= 5.0 ) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.25 ) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.25 ) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm > 5.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}}
+
          long Infeed_Value = long(Pass_Depth / ((float)SCREW_X/100 / MOTOR_X_STEP_PER_REV) + 0.5) * McSTEP_X + McSTEP_X;
          Infeed_ValueC = Infeed_Value;
          
@@ -432,7 +500,6 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
       Gewinde_flag ++;
       c_flag = false;
       d_flag = false;
-
       Thread_Right(c_flag, d_flag);
       Step = 1;
    }
@@ -454,6 +521,20 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
    }
   else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Rear && Step == 2 && Gewinde_flag < Ph)
    {
+      if (want_pause == true)          
+      {
+         isPausedAfterStep = true;     
+         if (button_up_flag)           
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                   
+         }
+      }
       c_flag = false;
       d_flag = false;
       
@@ -461,9 +542,23 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
       Thread_Left(c_flag, d_flag);
       Step = 3;
    }
-   else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Rear && Step == 2 && Gewinde_flag == Ph)
 
+   else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Rear && Step == 2 && Gewinde_flag == Ph)
    {
+      if (want_pause == true)          
+      {
+         isPausedAfterStep = true;    
+         if (button_up_flag)           
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                   
+         }
+      }
       c_flag = false;
       d_flag = false;
       
@@ -484,11 +579,28 @@ void Thread_Ext_Right()  ///////////////////////////////////////////////////////
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void Thread_Int_Left()  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-{
+void Thread_Int_Left()  ////старт справа, джойстик влево (на реверсе шпинделя джойстик вправо)///////////////////////////////////////////////////
+{  
+  if (button_down_flag) { want_pause = true; Beep(); }
+
    if ((Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Limit_Pos_Front && Gewinde_flag == Ph && Step == 4) || (Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Null_X_Pos)||
        (Motor_Z_Pos == Null_Z_Pos && CThr_flag == true && Gewinde_flag == Ph && Step == 4))
    {  
+      
+      if (want_pause == true)
+      {
+         isPausedAfterStep = true; 
+         if (button_up_flag) 
+         {
+            want_pause = false;         
+            isPausedAfterStep = false;  
+            Beep();
+         }
+         else
+         {
+            return; 
+         }
+      }
       Pass_Total = Thread_Info[Thread_Step].Pass + Thr_Pass_Summ;
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
@@ -500,8 +612,27 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
          
          float Step_mm = Thread_Info[Thread_Step].Step;
          float Pass_Depth = 0;
-         if(Pass_Nr == 1) {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 4) - (Step_mm * 0.866 / 18)) / sqrt(Pass_Total-1) * sqrt(0.3);}
-         else             {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 4) - (Step_mm * 0.866 / 18)) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}
+
+         if (Kzr == 1) {     //для метрической резьбы
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.60139) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.60139) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 2) { //для дюймовой резьбы 55 градусов (BSW)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 3) { // для дюймовой резьбы 60 градусов (UNF)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 4) { // для трапецеидальной резьбы
+          if (Step_mm < 2.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm >= 2.0 && Step_mm <= 5.0 ) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.25) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.25) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm > 5.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}}
+         
          long Infeed_Value = long(Pass_Depth / ((float)SCREW_X/100 / MOTOR_X_STEP_PER_REV) + 0.5) * McSTEP_X + McSTEP_X;
          Infeed_ValueC = Infeed_Value;
          
@@ -526,7 +657,7 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
          Pass_Nr++;
          BeepBeep();
 
-     if (CThr_flag == true){
+        if (CThr_flag == true){
          Motor_X_Pos = Limit_Pos_Front;
          Limit_Pos_Rear = (Limit_Pos_Front - REBOUND_X - Infeed_ValueC);}
          
@@ -540,11 +671,11 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
          c_flag = false;
          d_flag = false;
 
-     if (CThr_flag == true){
-         Motor_X_Pos = Limit_Pos_Front;
-         Limit_Pos_Rear = (Limit_Pos_Front - REBOUND_X);}
-         
-   else {Limit_Pos_Rear = Null_X_Pos;}
+         if (CThr_flag == true){
+          Motor_X_Pos = Limit_Pos_Front;
+          Limit_Pos_Rear = (Limit_Pos_Front - REBOUND_X);}     
+         else {Limit_Pos_Rear = Null_X_Pos;}
+
          Thread_Rear(c_flag, d_flag);
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
@@ -577,7 +708,7 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
       Motor_X_Pos = Limit_Pos_Rear;
       Limit_Pos_Front = (Limit_Pos_Rear + REBOUND_X + Infeed_ValueC);} 
       
-      Limit_Pos_Front = (Null_X_Pos + REBOUND_X);
+      else {Limit_Pos_Front = (Null_X_Pos + REBOUND_X);}
       Limit_Front_LED_On();
       Thread_Front(c_flag, d_flag);
       Step = 2;
@@ -614,11 +745,28 @@ void Thread_Int_Left()  ////////////////////////////////////////////////////////
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void Thread_Int_Right()  //////////////////////////////////////////////////////////////////////////////////////////////////////////
-{
+void Thread_Int_Right()  /////////старт слева, джойстик вправо (на реверсе шпинделя джойстик влево)/////////////////////////////////
+{  
+  if (button_down_flag) { want_pause = true; Beep(); }
+
    if ((Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Limit_Pos_Front && Gewinde_flag == Ph && Step == 4) || (Motor_Z_Pos == Null_Z_Pos && Motor_X_Pos == Null_X_Pos)||
        (Motor_Z_Pos == Null_Z_Pos && CThr_flag == true && Gewinde_flag == Ph && Step == 4))
    {  
+      if (want_pause == true)  
+      {
+         isPausedAfterStep = true;   
+         if (button_up_flag)         
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                  
+         }
+      }
+
       Pass_Total = Thread_Info[Thread_Step].Pass + Thr_Pass_Summ;
       if (cycle_flag == false && Pass_Nr <= Pass_Total)
       {
@@ -630,8 +778,27 @@ void Thread_Int_Right()  ///////////////////////////////////////////////////////
          
          float Step_mm = Thread_Info[Thread_Step].Step;
          float Pass_Depth = 0;
-         if(Pass_Nr == 1) {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 4) - (Step_mm * 0.866 / 18)) / sqrt(Pass_Total-1) * sqrt(0.3);}
-         else             {Pass_Depth = ((Step_mm * 0.866) - (Step_mm * 0.866 / 4) - (Step_mm * 0.866 / 18)) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}
+
+         if (Kzr == 1) {     //для метрической резьбы
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.60139) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.60139) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 2) { //для дюймовой резьбы 55 градусов (BSW)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.640327) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 3) { // для дюймовой резьбы 60 градусов (UNF)
+          if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(0.3);}
+          else             {Pass_Depth = (Step_mm * 0.61342) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+         else if (Kzr == 4) { // для трапецеидальной резьбы
+          if (Step_mm < 2.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.15) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm >= 2.0 && Step_mm <= 5.0 ) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.25) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.25) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}
+          else if (Step_mm > 5.0) {
+            if(Pass_Nr == 1) {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(0.3);}
+            else             {Pass_Depth = (Step_mm * 0.5 + 0.5) / sqrt(Pass_Total-1) * sqrt(Pass_Nr-1);}}}
+
          long Infeed_Value = long(Pass_Depth / ((float)SCREW_X/100 / MOTOR_X_STEP_PER_REV) + 0.5) * McSTEP_X + McSTEP_X;
          Infeed_ValueC = Infeed_Value;
          
@@ -671,21 +838,19 @@ void Thread_Int_Right()  ///////////////////////////////////////////////////////
          c_flag = false;
          d_flag = false;
 
-         if (CThr_flag == true){
-         Motor_X_Pos = Limit_Pos_Front;
-         Limit_Pos_Rear = (Limit_Pos_Front - REBOUND_X);}
-         
-   else {Limit_Pos_Rear = Null_X_Pos;}
-         Limit_Pos_Rear = Null_X_Pos;
+          if (CThr_flag == true){
+                Motor_X_Pos = Limit_Pos_Front;
+                Limit_Pos_Rear = (Limit_Pos_Front - REBOUND_X);}   
+          else {Limit_Pos_Rear = Null_X_Pos;}
+
          Thread_Rear(c_flag, d_flag);
          Limit_Front_LED_Off();
          Limit_Rear_LED_Off();
          Limit_Pos_Front = Limit_Pos_Max;
-         Limit_Pos_Rear = Limit_Pos_Min;
+         Limit_Pos_Rear = Limit_Pos_Min;         
          BeepComplete();
          Gewinde_flag = 0;
          Step = 0;        
-        
       }
    }
 
@@ -710,13 +875,27 @@ void Thread_Int_Right()  ///////////////////////////////////////////////////////
       Motor_X_Pos = Limit_Pos_Rear;
       Limit_Pos_Front = (Limit_Pos_Rear + REBOUND_X + Infeed_ValueC);} 
       
-      Limit_Pos_Front = (Null_X_Pos + REBOUND_X);
+  else    {Limit_Pos_Front = (Null_X_Pos + REBOUND_X);}
       Limit_Front_LED_On();
       Thread_Front(c_flag, d_flag);
       Step = 2;
    }
   else if (Motor_Z_Pos == Limit_Pos_Right &&  Motor_X_Pos == Limit_Pos_Front && Step == 2 && Gewinde_flag < Ph)
    {
+      if (want_pause == true)          
+      {
+         isPausedAfterStep = true;     
+         if (button_up_flag)           
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                    
+         }
+      }
       c_flag = false;
       d_flag = false;
       
@@ -725,7 +904,21 @@ void Thread_Int_Right()  ///////////////////////////////////////////////////////
       Step = 3;
    }
    else if (Motor_Z_Pos == Limit_Pos_Right && Motor_X_Pos == Limit_Pos_Front && Step == 2 && Gewinde_flag == Ph)
-   {
+   {  
+      if (want_pause == true)          
+      {
+         isPausedAfterStep = true;     
+         if (button_up_flag)           
+         {
+            want_pause = false;
+            isPausedAfterStep = false;
+            Beep();
+         }
+         else
+         {
+            return;                    
+         }
+      }
       c_flag = false;
       d_flag = false;
 

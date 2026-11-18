@@ -298,25 +298,25 @@ void Set_Test_Preset(int n)
     // PT:36 M4/S3 Нар KM0 Подача=0.15 Z=+12.00 X=-4.50 Пр=1/3 Съём=0.15
     case 36:
       Mode=Mode_Cone_L; _pt_sub_ext();
-      Feed_mm=15; Size_Z_mm=1200; Size_X_mm=-450; Pass_Nr=1; Pass_Total=3; Ap=15; Cone_Step=45;
+      Feed_mm=15; Size_Z_mm=1200; Size_X_mm=-450; Pass_Nr=1; Pass_Total=3; Ap=15; Cone_Step=47;
       break;
 
     // PT:37 M5/S1 Внутр KM3 Подача=0.20 Z=-35.00 X=-12.00 Пр=2/5 Съём=0.20
     case 37:
       Mode=Mode_Cone_R; _pt_sub_int();
-      Feed_mm=20; Size_Z_mm=-3500; Size_X_mm=-1200; Pass_Nr=2; Pass_Total=5; Ap=20; Cone_Step=48;
+      Feed_mm=20; Size_Z_mm=-3500; Size_X_mm=-1200; Pass_Nr=2; Pass_Total=5; Ap=20; Cone_Step=50;
       break;
 
     // PT:38 M4/S2 Ручной KM5 Подача=0.25 Z=+65.00 X=-25.00 Съём=0.25
     case 38:
       Mode=Mode_Cone_L; _pt_sub_man();
-      Feed_mm=25; Size_Z_mm=6500; Size_X_mm=-2500; Ap=25; Cone_Step=50;
+      Feed_mm=25; Size_Z_mm=6500; Size_X_mm=-2500; Ap=25; Cone_Step=52;
       break;
 
     // PT:39 M5/S3 Нар 1:20 Подача=0.10 Z=-40.00 X=-8.00 Пр=0/4 Съём=0.10
     case 39:
       Mode=Mode_Cone_R; _pt_sub_ext();
-      Feed_mm=10; Size_Z_mm=-4000; Size_X_mm=-800; Pass_Total=4; Ap=10; Cone_Step=57;
+      Feed_mm=10; Size_Z_mm=-4000; Size_X_mm=-800; Pass_Total=4; Ap=10; Cone_Step=59;
       break;
 
     // PT:40 M4/S1 Внутр 3:25 Подача=0.15 Z=+28.00 X=-9.60 Пр=3/6 Съём=0.15
