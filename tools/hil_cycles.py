@@ -96,8 +96,10 @@ CASES = [
     ('резьба 1.50 наружн.', 'M3', 'S3', 400, ['THREAD_STEP:13', 'PH:1']),
     ('резьба 1.00 внутр.', 'M3', 'S1', 500, ['THREAD_STEP:11', 'PH:1']),
     ('резьба 1.50 наружн., 2 захода', 'M3', 'S3', 300, ['THREAD_STEP:13', 'PH:2']),
+    # конусы V3.7/V3.8: без упоров, джойстик — по виду конуса (run_cone_case)
+    ('конус > 30° наружн., 2 прохода', 'M5', 'S3', 600, ['CONE:1', 'FEED:20', 'AP:20', 'PASSES:2']),
     ('конус < 30° наружн., 2 прохода', 'M4', 'S3', 600, ['CONE:1', 'FEED:20', 'AP:20', 'PASSES:2']),
-    ('конус > 45° внутр., 2 прохода', 'M5', 'S1', 600, ['CONE:0', 'FEED:20', 'AP:20', 'PASSES:2']),
+    ('конус < 45° внутр., 2 прохода', 'M4', 'S1', 600, ['CONE:0', 'FEED:20', 'AP:20', 'PASSES:2']),
     ('шар Ø20 наружн.', 'M6', 'S3', 600, []),
 ]
 
@@ -118,8 +120,71 @@ def prepare(stm, esp, mode, prep):
     time.sleep(0.5)
 
 
+# Конус V3.7/V3.8 (мод Ляха): автоцикл без упоров — резец в точке старта, джойстик: > наружн. — влево,
+# < наружн. — вправо, < внутр. — влево (на последнем проходе пауза с отводом 30 мм — ДАЛЕЕ), > внутр. — невозможен.
+CONE_JOY = {('M5', 'S3'): 'JOY_LEFT', ('M4', 'S3'): 'JOY_RIGHT', ('M4', 'S1'): 'JOY_LEFT'}
+
+
+def run_cone_case(stm, esp, sp, case, timeout=600):
+    name, mode, sub, rpm, prep = case
+    problems = []
+    esp.btn('M1'); time.sleep(0.5); esp.btn('S2'); time.sleep(0.4)
+    for pin, flag in LIMS:                                   # упоры не нужны — снять оставшиеся
+        if stm.var(flag):
+            esp.btn('EMUL:STOP_' + {'LIM_LEFT': 'L', 'LIM_RIGHT': 'R', 'LIM_FRONT': 'F', 'LIM_REAR': 'B'}[pin]); time.sleep(0.3)
+    # разминка, как у оператора: короткий ход и отпустить (линейки сверяются со счётом шагов заново)
+    for p in ('JOY_RIGHT', 'JOY_LEFT'):
+        stm.press(p); time.sleep(0.6); stm.release(p); time.sleep(1.5)
+    prepare(stm, esp, mode, prep)
+    esp.btn(sub); time.sleep(1.0)
+    joy = CONE_JOY.get((mode, sub))
+    if joy is None:                                          # конус > «Внутренний»: оси стоят
+        z, x = stm.var('Motor_Z_Pos'), stm.var('Motor_X_Pos')
+        for p in ('JOY_LEFT', 'JOY_RIGHT'):
+            stm.press(p); time.sleep(1.5); stm.release(p); time.sleep(0.5)
+        if (stm.var('Motor_Z_Pos'), stm.var('Motor_X_Pos')) != (z, x):
+            problems.append('«Режим невозможен», а оси двигались')
+        esp.btn('S2'); esp.btn('ALERT_OK')
+        return problems
+    if stm.var('err_1_flag') or stm.var('err_2_flag'):
+        problems.append('подрежим не включился (конусу V3.8 упоры не нужны)')
+    z0 = stm.var('Motor_Z_Pos')
+    if rpm:
+        sp.on(rpm); time.sleep(0.8)
+    stm.press(joy)
+    t0, paused, passes = time.time(), False, set()
+    try:
+        while time.time() - t0 < timeout and not stm.var('Complete_flag'):
+            time.sleep(0.2)
+            passes.add(stm.var('Pass_Nr'))
+            if 'e2_loss_block' in stm.sym and stm.var('e2_loss_block'):
+                problems.append('сработала защита «ПРОПУСК ШАГОВ» (линейка разошлась с шагами)'); break
+            if stm.var('isPausedAfterStep') and not paused:
+                paused = True
+                if sub == 'S1' and z0 - stm.var('Motor_Z_Pos') < 500:      # отвод 30 мм вправо (шагов/мм — по механике)
+                    problems.append('внутренний: пауза без отвода на 30 мм')
+                time.sleep(1.0); esp.btn('RESUME')
+        if not stm.var('Complete_flag'):
+            problems.append(f'не завершился за {timeout} с')
+        if (stm.var('limit_Left_flag'), stm.var('limit_Right_flag')) != (1, 1):
+            problems.append('после цикла упоры L/R не поставились сами')
+        if sub == 'S1' and not paused:
+            problems.append('внутренний: нет паузы на последнем проходе')
+    finally:
+        stm.release(joy)
+        sp.off(); time.sleep(0.5)
+        esp.btn('S2'); time.sleep(0.4); esp.btn('ALERT_OK'); time.sleep(0.3)
+        for pin, flag in LIMS:
+            if stm.var(flag):
+                esp.btn('EMUL:STOP_' + {'LIM_LEFT': 'L', 'LIM_RIGHT': 'R', 'LIM_FRONT': 'F', 'LIM_REAR': 'B'}[pin]); time.sleep(0.3)
+    print(f'    проходов {sorted(passes)}, пауза {paused}, {time.time() - t0:.0f} с')
+    return problems
+
+
 def run_case(stm, esp, dec, sp, case, a, shots_dir):
     name, mode, sub, rpm, prep = case
+    if mode in ('M4', 'M5'):
+        return run_cone_case(stm, esp, sp, case)
     sph = mode == 'M6'
     problems = []
     set_limits(stm, esp, problems)

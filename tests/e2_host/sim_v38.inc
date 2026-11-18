@@ -652,7 +652,65 @@ static void test_v38_stagger() {   // комбинация «как пальца
     SelectMenu = 1;
 }
 
+// Отпустить джойстик посреди автоцикла конуса и взять снова: что делает ядро (V3.8 — Joy_NoPressed сбрасывает Step)
+static void test_v38_cone_release() {
+    printf("[%7.1f с] [v38-release] конус > наружн.: джойстик отпущен на 2-м проходе и снова взят\n", t_ns / 1e9);
+    controls_neutral(); select_mode(1); clear_limits(); select_mode(5);
+    touch("CONE:57"); touch("FEED:20"); touch("AP:50"); Pass_Total = 3; Pass_Nr = 1;
+    long z0 = Motor_Z_Pos, x0 = Motor_X_Pos;
+    sub_pins(3); spindle(400); run_ms(300);
+    SET_IN(E2_PIN_JOY_LEFT, 0);
+    double t = 0; while (Pass_Nr < 2 && t < 200000) { run_ms(20); t += 20; }
+    run_ms(3000);
+    long zr = Motor_Z_Pos, xr = Motor_X_Pos; int st = Step;
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(1500);
+    printf("    отпущен: Step %d, Z %+ld X %+ld от старта; после нейтрали Step %d, Pass_Nr %ld, Null Z %+ld X %+ld\n",
+           st, zr - z0, xr - x0, Step, Pass_Nr, Null_Z_Pos - z0, Null_X_Pos - x0);
+    long sx = s_x.count, sz = s_z.count;
+    SET_IN(E2_PIN_JOY_LEFT, 0); run_ms(20000);
+    printf("    снова взят на 20 с: Step %d, Pass_Nr %ld, сдвиг Z %ld X %ld шагов, X %+ld от старта, завершён %d\n",
+           Step, Pass_Nr, s_z.count - sz, s_x.count - sx, Motor_X_Pos - x0, Complete_flag);
+    SET_IN(E2_PIN_JOY_LEFT, 1); run_ms(800); spindle(0); to_manual(); clear_limits();
+}
+
+// Импульсы STEP на выводе = счётчик ядра после серии движений (подачи, ускоренные, резьба, асинхрон) — как hil_mech
+static void test_v38_pulses() {
+    printf("[%7.1f с] [v38-pulses] импульсы STEP = Motor_*_Pos после серии движений\n", t_ns / 1e9);
+    controls_neutral(); select_mode(1); clear_limits(); run_ms(200);
+    long pz0 = s_z.count, px0 = s_x.count, mz0 = Motor_Z_Pos, mx0 = Motor_X_Pos;
+    spindle(600);
+    struct { int mode; const char* pre; int pin; int rapid; double ms; } mv[] = {
+        {1, "FEED:20", 0, 0, 1500}, {1, "FEED:20", 1, 0, 1500}, {1, "FEED:20", 2, 0, 1200}, {1, "FEED:20", 3, 0, 1200},
+        {1, "FEED:20", 0, 1, 800}, {1, "FEED:20", 1, 1, 800}, {3, "THREAD_STEP:13", 0, 0, 1500}, {3, "THREAD_STEP:13", 1, 0, 1500},
+        {2, "AFEED:200", 0, 0, 1500}, {2, "AFEED:200", 1, 0, 1500}, {2, "AFEED:200", 2, 1, 700}, {2, "AFEED:200", 3, 1, 700},
+        {1, "FEED:5", 0, 0, 300}, {1, "FEED:5", 1, 0, 300}, {1, "FEED:5", 2, 0, 300}, {1, "FEED:5", 3, 0, 300},
+    };
+    for (auto& m : mv) {
+        select_mode(m.mode); touch(m.pre);
+        int pins[] = {0, 0, 0, 0};
+        if (m.rapid) SET_IN(E2_PIN_JOY_RAPID, 0);
+        switch (m.pin) { case 0: SET_IN(E2_PIN_JOY_LEFT, 0); break; case 1: SET_IN(E2_PIN_JOY_RIGHT, 0); break;
+                         case 2: SET_IN(E2_PIN_JOY_UP, 0); break; default: SET_IN(E2_PIN_JOY_DOWN, 0); }
+        (void)pins;
+        run_ms(m.ms);
+        SET_IN(E2_PIN_JOY_LEFT, 1); SET_IN(E2_PIN_JOY_RIGHT, 1); SET_IN(E2_PIN_JOY_UP, 1); SET_IN(E2_PIN_JOY_DOWN, 1);
+        SET_IN(E2_PIN_JOY_RAPID, 1); run_ms(1200);
+        long dz = (s_z.count - pz0) - (Motor_Z_Pos - mz0), dx = (s_x.count - px0) - (Motor_X_Pos - mx0);
+        if (dz || dx) printf("      после M%d %s джойстик %d%s: импульсы − счётчик: Z %+ld, X %+ld\n", m.mode, m.pre, m.pin, m.rapid ? " быстро" : "", dz, dx);
+    }
+    spindle(0); run_ms(200);
+    long dz = (s_z.count - pz0) - (Motor_Z_Pos - mz0), dx = (s_x.count - px0) - (Motor_X_Pos - mx0);
+    // 7e2 при каждой остановке округляет счётчик до полного шага (Joy_NoPressed) — мотор без Enable доворачивает сам;
+    // импульсов при этом нет: расхождение — не больше McSTEP/2 на остановку (16 остановок)
+    int n = sizeof mv / sizeof mv[0];
+    CHECK(labs(dz) <= n * McSTEP_Z / 2 && labs(dx) <= n * McSTEP_X / 2, "импульсы и счётчик разошлись больше округления: Z %+ld, X %+ld", dz, dx);
+    printf("    импульсы − счётчик ядра: Z %+ld, X %+ld (округление 7e2 до полного шага, не больше %d)\n", dz, dx, n * McSTEP_Z / 2);
+}
+
 static void test_v38_all() {
+    if (getenv("SIM_PULSES")) { test_v38_pulses(); return; }
+    test_v38_pulses();
+    if (getenv("SIM_RELEASE")) { test_v38_cone_release(); return; }
     if (getenv("SIM_STAGGER")) { test_v38_stagger(); return; }
     test_v38_tables();
     test_v38_keys();

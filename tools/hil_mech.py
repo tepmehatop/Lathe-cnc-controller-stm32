@@ -207,8 +207,11 @@ class Bench:
         for ax, dg, dm, s in (('Z', mz - self.z0_mega, self.stm.var('Motor_Z_Pos') - self.z0_motor, steps_per_mm(*c[1:4])),
                               ('X', mx - self.x0_mega, self.stm.var('Motor_X_Pos') - self.x0_motor, steps_per_mm(*c[4:7]))):
             um = dm * 1000 / s
-            self.check(abs(abs(dg) - abs(um)) <= 20,
-                       f'{label}: DRO {ax} {dg:+d} мкм, по шагам STM32 {um:+.0f} мкм')
+            # 7e2 при каждой остановке округляет счётчик до полного шага (мотор без Enable доворачивает сам), а Mega
+            # считает голые импульсы — до McSTEP/2 микрошагов на остановку; в наборе до 10 остановок
+            tol = 20 + 10 * (c[2] if ax == 'Z' else c[5]) / 2 * 1000 / s
+            self.check(abs(abs(dg) - abs(um)) <= tol,
+                       f'{label}: DRO {ax} {dg:+d} мкм, по шагам STM32 {um:+.0f} мкм (допуск {tol:.0f})')
 
     def apply(self, c):
         self.esp.btn('CFG_SET:' + ','.join(str(x) for x in c[:9]))

@@ -174,7 +174,8 @@ class Run:
         esp.btn('S1'); time.sleep(1.0)
         st.press('JOY_LEFT'); time.sleep(1.5); st.release('JOY_LEFT'); time.sleep(0.5)
         u = esp.uidump()
-        refused = st.var('err_1_flag') or st.var('err_2_flag') or 'НЕВОЗМОЖЕН' in cd.norm(u.get('alert_msg', '')).upper()
+        refused = st.var('err_1_flag') or st.var('err_2_flag') or 'НЕВОЗМОЖЕН' in cd.norm(u.get('alert_msg', '')).upper() \
+            or 'НЕВОЗМОЖЕН' in cd.norm(u.get('submode_lbl', '')).upper()          # конус > «Внутренний» (V3.8)
         self.check(refused and self.pos() == p0, f'{pw.negative(row)}: отказ, оси стоят')
         esp.btn('S2'); esp.btn('ALERT_OK'); time.sleep(0.5)
 
