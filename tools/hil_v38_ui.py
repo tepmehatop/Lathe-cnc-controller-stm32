@@ -100,7 +100,7 @@ def t_prof(U):
     print('[prof]')
     U.b('M3'); U.manual(); U.to_sm(1); U.b('KZR:1'); time.sleep(0.3)
     u = U.ui()
-    chk(u.get('thr_type_title') == 'ТИП/ПРОФИЛЬ' and 'МЕТРИЧ 60' in (u.get('thr_sub') or ''),
+    chk(u.get('thr_type_title') == 'ТИП/ПРОФИЛЬ' and 'М 60°' in (u.get('thr_sub') or ''),
         f'плитка ТИП/ПРОФИЛЬ: {u.get("thr_type_val")} / {u.get("thr_sub")}')
     U.tap(THR)
     chk(U.ui().get('thr_type_menu') == '1', 'тап по плитке — окно ТИП/ПРОФИЛЬ')

@@ -2118,6 +2118,9 @@ void e2_mech_from_display(const char* prm)
       err = "НЕВЕРНАЯ КОМАНДА";
    if (!err && !e2_machine_idle()) err = "ОСТАНОВИТЕ ШПИНДЕЛЬ И ДВИЖЕНИЕ";
    if (!err) err = e2_mech_apply(m);
+   // таймеры подач — к новому пределу, как после отпускания джойстика (Joy_NoPressed): ручная асинхронная
+   // подача стартует только при OCR4A == max_OCR4A, иначе первое нажатие джойстика после смены механики пропадало
+   if (!err) { OCR4A = max_OCR4A; OCR5A = max_OCR5A; }
    if (!err) err = e2_mech_save();
    Serial.print(F("[CFG] ")); Serial.println(err ? err : "сохранено");
    Display_Send_CMD("CFG_RES", err ? err : "OK");

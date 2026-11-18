@@ -97,6 +97,10 @@ class Run:
             e0, p0, t0 = self.edges(), self.pos(), time.time()
             time.sleep(secs)
             e1, p1, t1 = self.edges(), self.pos(), time.time()
+            if p1 == p0 and os.environ.get('CYC_DEBUG'):
+                print('    [dbg] ось стоит:', {v: st.var(v) for v in ('Mode', 'Joy_Z_flag', 'Step_Z_flag', 'e2_loss_block',
+                      'err_0_flag', 'err_1_flag', 'Complete_flag', 'Button_Old', 'isPausedAfterStep', steady[0] if steady else 'Mode')},
+                      self.esp.uidump().get('alert_msg'), flush=True)
         finally:
             st.release(pin)
             held = time.time() - t_press
@@ -162,7 +166,10 @@ class Run:
         rpm = 0 if mode == 'M2' else 400
         case = (f'{mode} {row["sub"]}', mode, sub, rpm, prep)
         esp.btn('M2'); time.sleep(0.4); esp.btn('AFEED:300'); time.sleep(0.3)
-        problems = hc.run_case(st, esp, self.dec, Spin(self.q, m[0], row['spindle'] == 'CW'), case, self.a, None)
+        a = argparse.Namespace(**vars(self.a))
+        if mode == 'M6':                     # шар: ~40 проходов, на подаче 0.05 — около 7 минут
+            a.timeout = max(a.timeout, 600)
+        problems = hc.run_case(st, esp, self.dec, Spin(self.q, m[0], row['spindle'] == 'CW'), case, a, None)
         self.check(not problems, f'автоцикл {mode} {row["sub"]}: ' + ('завершён' if not problems else '; '.join(problems)))
         for pin, flag in hc.LIMS:
             cd.run_actions(st, esp, [('lim', (pin, flag, 0))])

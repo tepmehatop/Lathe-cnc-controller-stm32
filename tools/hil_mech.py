@@ -320,6 +320,21 @@ def main():
                 continue
             b.motion(c, a.quick)
 
+        # регресс 2026-11-18: смена механики меняла max_OCR4A, а таймер оставался прежним — ручная асинхронная
+        # подача стартует только при OCR4A == max_OCR4A, первое нажатие джойстика после CFG_SET пропадало
+        print('[асинхрон сразу после смены механики] первое нажатие джойстика едет')
+        st = b.stm
+        for c in (VALID[0], VALID[1], VALID[0]):
+            b.esp.btn('M2'); time.sleep(0.6); b.esp.btn('S2'); time.sleep(0.3); b.esp.btn('AFEED:200'); time.sleep(0.4)
+            st.press('JOY_LEFT'); time.sleep(0.6); st.release('JOY_LEFT'); time.sleep(0.8)   # таймер — у старого предела
+            b.apply(c)
+            p0 = st.var('Motor_Z_Pos')
+            st.press('JOY_LEFT'); time.sleep(1.0)
+            joy, dz = st.var('Joy_Z_flag'), st.var('Motor_Z_Pos') - p0
+            st.release('JOY_LEFT'); time.sleep(0.6)
+            b.check(joy == 1 and dz != 0, f'{c[9]}: Joy_Z_flag={joy}, Z {dz:+d} шагов за 1 с')
+            st.press('JOY_RIGHT'); time.sleep(1.6); st.release('JOY_RIGHT'); time.sleep(0.6)   # каретку назад
+
         print('[недопустимые] STM32 отказывает, механика не меняется')
         b.apply(VALID[0])
         for c in INVALID:

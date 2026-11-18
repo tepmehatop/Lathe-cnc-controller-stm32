@@ -194,6 +194,11 @@ def run_case(stm, esp, dec, sp, case, a, shots_dir):
     problems = []
     set_limits(stm, esp, problems)
     L, R = stm.var('Limit_Pos_Left'), stm.var('Limit_Pos_Right')
+    if mode == 'M3' and not getattr(sp, 'cw', True):
+        # резьба на реверсе шпинделя (Thread_Ext_Right / Int_Right) — от патрона: старт у ЛЕВОГО упора, джойстик влево
+        problems += cd.run_actions(stm, esp, [('press', 'JOY_LEFT'), ('wait', 3.0), ('release', 'JOY_LEFT'), ('wait', 0.8)])
+        if abs(stm.var('Motor_Z_Pos') - L) > abs(R - L) // 4:
+            problems.append(f'реверс: каретка не дошла до левого упора ({stm.var("Motor_Z_Pos")}, упор {L})')
     prepare(stm, esp, mode, prep)
     esp.btn(sub); time.sleep(1.0)
     if stm.var('err_1_flag') or stm.var('err_2_flag'):
