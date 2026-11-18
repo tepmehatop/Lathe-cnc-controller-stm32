@@ -51,8 +51,8 @@ void Sphere_Ext_Left()
       cycle_flag = true; 
       a_flag = false; 
       b_flag = false; 
-      Infeed_ValueZ = ((float)MOTOR_Z_STEP_PER_REV * Staggered_Width / 2 / SCREW_Z + 0.5) * McSTEP_Z;
-      Infeed_ValueX =  ((float)MOTOR_X_STEP_PER_REV * 0.5 * Ap / SCREW_X + 0.5) * McSTEP_X;
+      Infeed_ValueZ = (long)((float)MOTOR_Z_STEP_PER_REV * Staggered_Width / 2 / SCREW_Z + 0.5) * McSTEP_Z;   // [STM32] округление до шага, потом × микрошаг (как автор в V3.4 для aFeed)
+      Infeed_ValueX = (long)((float)MOTOR_X_STEP_PER_REV * 0.5 * Ap / SCREW_X + 0.5) * McSTEP_X;   // [STM32] было +2 микрошага на врезание
       if (Pass_Nr == 1) Limit_Pos_Front = (Null_X_Pos + Infeed_ValueX);
       else              Limit_Pos_Front = (Limit_Pos_Rear + REBOUND_X + Infeed_ValueX * 2);
       Limit_Front_LED_On();

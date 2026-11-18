@@ -98,6 +98,13 @@ typedef struct {
     bool     cone_thr;       // M4/M5 SM=2: коническая резьба включена
     int16_t  cutter_w;      // M6 SM=2: ширина резца (мм × 100)
     int16_t  cutting_w;     // M6 SM=2: шаг по оси Z (мм × 100)
+    // Мод 7e2 Лях V3.4–V3.8 (BACKLOG-043)
+    uint8_t  kzr;           // <KZR:1..4> профиль резьбы: 1 метрич., 2 BSW 55°, 3 UNF 60°, 4 трапеция
+    uint8_t  raz;           // <RAZ:1|2> режим «Шар»: 1 — шар, 2 — отрезание вразбежку
+    int16_t  raz_r;         // <RAZ_R:мм> прорезаемый диаметр отрезания (= врезаний × шаг)
+    int16_t  stag;          // <STAG:0.01 мм> смещение резца при отрезании вразбежку
+    int32_t  dist_um;       // <DIST:мкм> расстояние до дистанционного лимита
+    int32_t  cone_len;      // <CONE_LEN:0.01 мм> длина конусной части за все проходы
 
     char     thread_name[8]; // Резьба: строка из Thread_Print (напр. "1.50mm", " 8tpi ", "G  1/8")
     int16_t  rpm_limit;      // Резьба: макс. обороты для текущего шага (Об/мин)
@@ -241,6 +248,7 @@ public:
     // true во время вызова AlertCallback для алертов-флагов ядра (типы 1–4): они горят,
     // пока STM32 не пришлёт ALERT:0 — как надписи на LCD2004
     bool alertFromCore() const { return alert_from_core_; }
+    int  lastAlert() const { return last_alert_; }        // код последнего ALERT от ядра (5 — пауза V3.8), 0 — текст/нет
 
     void setGCodeResponseCallback(GCodeResponseCallback callback) {
         gcode_response_callback_ = callback;
@@ -258,6 +266,7 @@ private:
     AlertCallback alert_callback_;
     AlertDismissCallback alert_dismiss_callback_;
     bool alert_from_core_ = false;
+    int  last_alert_ = 0;
     GCodeResponseCallback gcode_response_callback_;
 
     bool data_dirty_;  // true when data_ changed but callback not yet fired

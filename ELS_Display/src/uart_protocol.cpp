@@ -218,6 +218,12 @@ void UartProtocol::parseCommand(const char* cmd)
     else if (strcmp(command, "CUTTING_W") == 0) {
         parseCuttingW(params);
     }
+    else if (strcmp(command, "KZR") == 0)      { data_.kzr = (uint8_t)atoi(params); }      // V3.4–V3.8
+    else if (strcmp(command, "RAZ") == 0)      { data_.raz = (uint8_t)atoi(params); }
+    else if (strcmp(command, "RAZ_R") == 0)    { data_.raz_r = (int16_t)atoi(params); }
+    else if (strcmp(command, "STAG") == 0)     { data_.stag = (int16_t)atoi(params); }
+    else if (strcmp(command, "DIST") == 0)     { data_.dist_um = (int32_t)atol(params); }
+    else if (strcmp(command, "CONE_LEN") == 0) { data_.cone_len = (int32_t)atol(params); }
     else if (strcmp(command, "AXIS_EDIT") == 0) {
         data_.axis_edit = (uint8_t)atoi(params);
     }
@@ -523,12 +529,14 @@ void UartProtocol::parseAlert(const char* params)
     // If params is not purely numeric, treat as literal alert string
     bool is_numeric = (params[0] != '\0') && (params[0] == '-' || (params[0] >= '0' && params[0] <= '9'));
     if (!is_numeric) {
+        last_alert_ = 0;
         alert_callback_(params);
         return;
     }
 
     int type = atoi(params);
-    alert_from_core_ = (type >= 1 && type <= 4);
+    alert_from_core_ = (type >= 1 && type <= 5);
+    last_alert_ = type;
     switch (type) {
         case 0: // Скрыть алерт (Arduino сбросил флаги ошибки)
                 if (alert_dismiss_callback_) alert_dismiss_callback_();
@@ -544,6 +552,9 @@ void UartProtocol::parseAlert(const char* params)
                 break;
         case 4: if (alert_callback_) alert_callback_("Установите джойстик\nв нейтральное положение");  // 2 строки — поле алерта на 2 строки
                 // Установите джойстик в нейтральное положение
+                break;
+        case 5: if (alert_callback_) alert_callback_("ПАУЗА\nДля продолжения нажмите ДАЛЕЕ");
+                // V3.8: автоцикл стоит в безопасной точке; продолжение — RESUME (как верхняя кнопка меню)
                 break;
         default:
             Serial.printf("Unknown alert type: %d\n", type);
@@ -580,7 +591,7 @@ void UartProtocol::parseThreadTravel(const char* params)
 void UartProtocol::parseSelectMenu(const char* params)
 {
     int sm = atoi(params);
-    if (sm >= 1 && sm <= 3) {
+    if (sm >= 1 && sm <= 4) {   // V3.6: подэкран 4 — дистанционные лимиты
         data_.select_menu = (uint8_t)sm;
         data_dirty_ = true;
     }

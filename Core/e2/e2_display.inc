@@ -627,7 +627,7 @@ void _Display_ParseRx(String& raw)   // [STM32] без изменений, кр�
     }
     // [V3.5] Шар (1) / отрезание вразбежку (2) в режиме «Шар»
     else if (prm.startsWith("RAZ:")) {
-      int k = prm.substring(4).toInt();
+      int k = prm == "RAZ:T" ? (Raz == 2 ? 1 : 2) : prm.substring(4).toInt();   // T — переключить (кнопка экрана)
       if ((k == 1 || k == 2) && Mode == Mode_Sphere && !Joy_Z_flag && !Joy_X_flag) {
         Raz = k; SelectMenu = 1; Sphere(); Print(); Beep();
       } else Beep_Error();

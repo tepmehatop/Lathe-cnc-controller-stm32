@@ -515,8 +515,8 @@ static void test_v38_cut() {
             long sx = s_x.count; SET_IN(E2_PIN_JOY_UP, 0); run_ms(200); SET_IN(E2_PIN_JOY_UP, 1); jy_moves = 0; (void)sx;
         }
     });
-    long infx = (long)(((float)MOTOR_X_STEP_PER_REV * 0.5 * 100 / SCREW_X + 0.5) * McSTEP_X);
-    long infz = (long)(((float)MOTOR_Z_STEP_PER_REV * 50 / 2 / SCREW_Z + 0.5) * McSTEP_Z);
+    long infx = steps_x_per_mm() / 2;                         // 1.00 на ⌀ = 0.50 на радиус — ровно, без лишних микрошагов
+    long infz = (long)((float)MOTOR_Z_STEP_PER_REV * 50 / 2 / SCREW_Z + 0.5) * McSTEP_Z;   // автор: смещение / 2 (+ отскок Z)
     CHECK(r.done, "отрезание не завершилось");
     CHECK(labs((r.xmax - x0) - 4 * infx) <= McSTEP_X, "глубина %ld шагов, ожидалось %ld (4 × 0.50 на радиус)", r.xmax - x0, 4 * infx);
     CHECK((long)s_x_turns.size() == 4, "врезаний %zu, ожидалось 4", s_x_turns.size());
@@ -603,7 +603,18 @@ static void test_v38_groove() {
     clear_limits();
 }
 
+static void test_v38_stagger() {   // комбинация «как пальцами»: модификатор раньше, отпускание по очереди
+    controls_neutral(); select_mode(1); SelectMenu = 3; touch("AXIS:D:20000"); run_ms(50);
+    long m0 = MX_pos;
+    SET_IN(E2_PIN_BTN_LEFT, 0); run_ms(60); SET_IN(E2_PIN_BTN_UP, 0); run_ms(100);
+    if (getenv("SIM_DBG38")) printf("      [stg] после нажатия: MX %+ld\n", MX_pos - m0);
+    SET_IN(E2_PIN_BTN_LEFT, 1); run_ms(10); SET_IN(E2_PIN_BTN_UP, 1); run_ms(200);
+    printf("    [stagger] ◀ (60 мс) + ▲: MX %+ld (ожидалось %+ld)\n", MX_pos - m0, -(long)LINEIKA);
+    SelectMenu = 1;
+}
+
 static void test_v38_all() {
+    if (getenv("SIM_STAGGER")) { test_v38_stagger(); return; }
     test_v38_tables();
     test_v38_keys();
     test_v38_dist();
