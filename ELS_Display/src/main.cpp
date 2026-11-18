@@ -1704,7 +1704,9 @@ static void create_k_content(lv_obj_t* screen)
         lv_obj_t* pnl = lv_obj_create(panel);
         lv_obj_set_size(pnl, LEFT_W, ROW_H);
         lv_obj_set_pos(pnl, PAD, GRID_Y + ROW_H + GAP);
-        lv_obj_set_style_bg_opa(pnl, LV_OPA_TRANSP, 0);
+        // непрозрачно, цветом панели: иначе в щелях между кнопками видны заголовки плиток под ними
+        lv_obj_set_style_bg_color(pnl, lv_color_hex(0x0a0a0a), 0);
+        lv_obj_set_style_bg_opa(pnl, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(pnl, 0, 0);
         lv_obj_set_style_pad_all(pnl, 0, 0);
         lv_obj_clear_flag(pnl, LV_OBJ_FLAG_SCROLLABLE);
@@ -3023,7 +3025,7 @@ static void create_settings_hub(lv_obj_t* screen)
     lv_obj_set_pos(g_hub.ver, UX(16), UY(228));
     lv_obj_set_style_text_font(g_hub.ver, &font_dejavu_14, 0);
     lv_obj_set_style_text_color(g_hub.ver, lv_color_hex(0x7a9ab0), 0);
-    lv_label_set_long_mode(g_hub.ver, LV_LABEL_LONG_DOT);
+    lv_label_set_long_mode(g_hub.ver, LV_LABEL_LONG_SCROLL_CIRCULAR);   // две длинные версии — бегущей строкой, целиком
     lv_label_set_text(g_hub.ver, "");
 
     lv_timer_create(hub_tick, 500, nullptr);

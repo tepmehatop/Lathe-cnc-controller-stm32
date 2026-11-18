@@ -84,7 +84,13 @@ class Bench:
         time.sleep(1.2)                              # дисплей дорисовывает после полного обновления
         os.makedirs(RAW, exist_ok=True)
         tmp = os.path.join(RAW, name + '_raw.jpg')
-        hc.esp_shot(self.esp, tmp)
+        for _ in range(3):                           # снимок по USB изредка не доходит — повторить
+            hc.esp_shot(self.esp, tmp)
+            if os.path.exists(tmp) and os.path.getsize(tmp) > 10000:
+                break
+            time.sleep(2.0)
+        else:
+            raise RuntimeError(f'снимок {name} не получен')
         out = os.path.join(RAW, name + '.jpg')
         subprocess.run(['sips', '-r', '90', tmp, '--out', out], capture_output=True)
         os.unlink(tmp)
@@ -107,11 +113,59 @@ SET_CLOSE = [(394, 236), 'set_close']
 def s_main_feed(b):
     b.mode(1, 1); b.shot('main_feed')
 
-def s_feed_sm2(b):
-    b.mode(1, 2); b.shot('feed_sm2')
+def dist_limits(b, um, pairs):
+    """Упоры на расстоянии (подэкран 4 M1): pairs — команды EMUL:STOP_* (ставят упор на um от резца)."""
+    b.mode(1, 4); b.btn(f'DIST:{um}')
+    for c in pairs:
+        b.btn(c)
+    b.mode(1, 1)
 
-def s_feed_sm3(b):
-    b.mode(1, 3); b.shot('feed_sm3')
+def clear_limits(b):
+    for f, c in (('limit_Left_flag', 'EMUL:STOP_L'), ('limit_Right_flag', 'EMUL:STOP_R'),
+                 ('limit_Front_flag', 'EMUL:STOP_F'), ('limit_Rear_flag', 'EMUL:STOP_B')):
+        if b.stm.var(f):
+            b.btn(c, 0.3)
+
+def s_feed_sm2(b):
+    """V3.6: подэкран 2 M1 — отскок и натяг Z: «Наружный» и упоры X (передний — у резца, задний — на 3 мм)."""
+    clear_limits(b); dist_limits(b, 3000, ['EMUL:STOP_B']); b.btn('EMUL:STOP_F')
+    b.btn('S3', 0.8); b.mode(1, 2); b.shot('feed_sm2')
+    b.mode(1, 1); b.btn('S2'); b.clear(); clear_limits(b)
+
+def s_diam_sm3(b):
+    b.btn('AXIS:D:30000'); b.mode(1, 3); b.shot('diam_sm3'); b.mode(1, 1)
+
+def s_dist_sm4(b):
+    """V3.6: дистанционные лимиты — 138.500 мм, левый упор поставлен на расстоянии, правый — у резца."""
+    clear_limits(b); b.mode(1, 4); b.btn('DIST:138500'); b.btn('EMUL:STOP_L'); b.btn('DIST:3000'); b.btn('EMUL:STOP_R')
+    b.btn('DIST:138500'); b.shot('dist_sm4'); clear_limits(b); b.btn('DIST:0'); b.mode(1, 1)
+
+def s_cut(b):
+    """V3.5: отрезание вразбежку — шаг 1, смещение 0.50, прорез ⌀17 (пруток ⌀16)."""
+    b.mode(6, 1); b.btn('RAZ:2'); b.btn('AP:100'); b.btn('STAG:2'); b.btn('CUT_D:1700'); b.btn('FEED:4')
+    b.shot('cut'); b.btn('RAZ:1')
+
+def s_pause(b):
+    """V3.8: пауза автоцикла резьбы (M3 1.50, упоры Z на 20 мм — дистанционно): ПАУЗА на 2-м проходе."""
+    clear_limits(b); dist_limits(b, 20000, ['EMUL:STOP_L']); b.btn('EMUL:STOP_R')
+    b.mode(3, 1); b.btn('THREAD_STEP:13'); b.btn('KZR:1')
+    b.stm.release('SUB_MAN'); time.sleep(0.3); b.stm.press('SUB_EXT'); time.sleep(1.0)
+    b.sp.on(300); time.sleep(0.8)
+    b.stm.press('JOY_LEFT')
+    t0, asked = time.time(), False
+    try:
+        while time.time() - t0 < 300:
+            time.sleep(0.2)
+            if not asked and b.stm.var('Pass_Nr') >= 2:
+                b.tap('dn', 80); asked = True
+            if b.stm.var('isPausedAfterStep'):
+                time.sleep(1.0); b.shot('pause'); b.tap('alert_ok'); break
+        while time.time() - t0 < 400 and not b.stm.var('Complete_flag'):
+            time.sleep(0.5)
+    finally:
+        b.stm.release('JOY_LEFT'); b.sp.on(500)
+        b.stm.release('SUB_EXT'); time.sleep(0.3); b.stm.press('SUB_MAN'); time.sleep(0.6); b.stm.release('SUB_MAN')
+        b.btn('ALERT_OK'); clear_limits(b)
 
 def s_mode_menu(b):
     b.mode(1, 1); b.tap('mode'); b.shot('mode_menu'); b.tap('cancel')
@@ -129,7 +183,17 @@ def s_cone(b):
     b.mode(4, 1); b.shot('cone')
 
 def s_cone_sm2(b):
-    b.mode(4, 2); b.shot('cone_sm2')
+    """M5, 1:10, съём 0.50 × 8 — ДЛ. КОНУСА 40.00 (пример руководства)."""
+    b.mode(5, 1); b.btn('CONE:57'); b.btn('AP:50')
+    for _ in range(20):
+        if b.stm.var('Pass_Total') <= 1: break
+        b.btn('KEY:LEFT', 0.15)
+    for _ in range(7):
+        b.btn('KEY:RIGHT', 0.15)
+    for _ in range(4):                           # «Выбор» — не b.mode(): вход в режим сбрасывает съём и проходы
+        if b.stm.var('SelectMenu') == 2: break
+        b.btn('PARAM_OK', 0.6)
+    b.shot('cone_sm2'); b.mode(5, 1)
 
 def s_sphere(b):
     b.mode(6, 1); b.shot('sphere')
@@ -141,7 +205,7 @@ def s_divider(b):
     b.mode(7, 1); b.shot('divider')
 
 def s_thread_type(b):
-    b.mode(3, 1); b.btn('THREAD_STEP:13'); b.tap('type'); b.shot('thread_type')
+    b.mode(3, 1); b.btn('THREAD_STEP:13'); b.btn('KZR:1'); b.tap('type'); b.shot('thread_type')
 
 def s_limits(b):
     """Упоры правый и передний поставлены в текущей точке (кнопки упоров), подрежим «Ручной»."""
