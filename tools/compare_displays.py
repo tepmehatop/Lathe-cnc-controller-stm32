@@ -54,6 +54,15 @@ class Stm32:
         for m in re.finditer(r'#define\s+E2_PIN_(\w+)\s+([A-E]),\s*(\d+)',
                              open(os.path.join(ROOT, 'Core', 'e2', 'e2_pins.h'), encoding='utf-8').read()):
             self.pins[m.group(1)] = (m.group(2), int(m.group(3)))
+        self.held = set()
+        # прерванный тест мог оставить вход «нажатым» (вывод — выход в 0): суппорт ехал бы сам, ядро — «занято»
+        for p in ('JOY_LEFT', 'JOY_RIGHT', 'JOY_UP', 'JOY_DOWN', 'JOY_RAPID', 'BTN_LEFT', 'BTN_RIGHT', 'BTN_UP',
+                  'BTN_DOWN', 'BTN_SELECT', 'LIM_LEFT', 'LIM_RIGHT', 'LIM_FRONT', 'LIM_REAR', 'SUB_INT', 'SUB_EXT'):
+            if p in self.pins:
+                base, n = self._gpio(p)
+                if (self.read(base, 1, 32)[0] >> (2 * n)) & 3 == 1:
+                    print(f'[Stm32] вход {p} остался «нажатым» от прошлого теста — отпускаю', flush=True)
+                    self.release(p)
 
     def cmd(self, c):
         self.sock.sendall(c.encode() + b'\x1a')
@@ -88,13 +97,20 @@ class Stm32:
         self.cmd(f'mww 0x{base + 0x18:08x} 0x{1 << (n + 16):08x}')            # BSRR: сброс
         moder = self.read(base, 1, 32)[0]
         self.cmd(f'mww 0x{base:08x} 0x{(moder & ~(3 << 2 * n)) | (1 << 2 * n):08x}')
+        self.held.add(pin)
 
     def release(self, pin):
         base, n = self._gpio(pin)
         moder = self.read(base, 1, 32)[0]
         self.cmd(f'mww 0x{base:08x} 0x{moder & ~(3 << 2 * n):08x}')
+        self.held.discard(pin)
 
     def close(self):
+        for p in list(getattr(self, 'held', ())):          # ничего не оставлять «нажатым»
+            try:
+                self.release(p)
+            except Exception:
+                pass
         try:
             self.cmd('shutdown')
         except Exception:

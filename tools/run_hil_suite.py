@@ -49,6 +49,16 @@ def main():
     for name, args in SUITES:
         if only and name not in only:
             continue
+        # стенд в исходном состоянии: входы отпущены, источник — блок DRO, координаты на экране идут
+        pf = subprocess.run([PY, '-u', os.path.join(HERE, 'bench_preflight.py')], capture_output=True, text=True,
+                            cwd=os.path.join(HERE, '..'))
+        for l in pf.stdout.splitlines():
+            if l.startswith('[предполёт]') or l.startswith('[Stm32]'):
+                print('   ', l, flush=True)
+        if pf.returncode != 0:
+            summary.append((name, 99, 0, ['предполётная проверка стенда не прошла — набор не запускался'], 0))
+            print('    стенд не готов — набор пропущен', flush=True)
+            continue
         cmd = [PY, '-u', os.path.join(HERE, args[0])] + [x.format(out=out) for x in args[1:]]
         print(f'=== {name}: {" ".join(cmd[2:])}', flush=True)
         t0 = time.time()

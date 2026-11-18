@@ -707,7 +707,34 @@ static void test_v38_pulses() {
     printf("    импульсы − счётчик ядра: Z %+ld, X %+ld (округление 7e2 до полного шага, не больше %d)\n", dz, dx, n * McSTEP_Z / 2);
 }
 
+// Флаги «ось в движении» после ручного хода гаснут (иначе ядро «занято»: не меняет режимы, не сохраняет настройки)
+static void test_v38_joyflags() {
+    printf("[%7.1f с] [v38-joyflags] Joy_Z/X_flag после ручных ходов\n", t_ns / 1e9);
+    controls_neutral(); run_ms(200);
+    struct { int mode; const char* pre; int pin; int rapid; } mv[] = {
+        {2, "AFEED:300", 0, 0}, {2, "AFEED:300", 1, 0}, {2, "AFEED:300", 2, 0}, {2, "AFEED:300", 3, 0}, {2, "AFEED:300", 0, 1},
+        {1, "FEED:20", 0, 0}, {1, "FEED:20", 2, 0}, {1, "FEED:20", 1, 1}, {3, "THREAD_STEP:13", 0, 0}, {4, "CONE:1", 0, 0}, {6, "FEED:20", 0, 0},
+    };
+    spindle(600);
+    for (auto& m : mv) {
+        select_mode(m.mode); sub_pins(2); touch(m.pre);
+        if (m.rapid) SET_IN(E2_PIN_JOY_RAPID, 0);
+        int pin[] = {0, 0, 0, 0};
+        (void)pin;
+        switch (m.pin) { case 0: SET_IN(E2_PIN_JOY_LEFT, 0); break; case 1: SET_IN(E2_PIN_JOY_RIGHT, 0); break;
+                         case 2: SET_IN(E2_PIN_JOY_UP, 0); break; default: SET_IN(E2_PIN_JOY_DOWN, 0); }
+        run_ms(3000);
+        SET_IN(E2_PIN_JOY_LEFT, 1); SET_IN(E2_PIN_JOY_RIGHT, 1); SET_IN(E2_PIN_JOY_UP, 1); SET_IN(E2_PIN_JOY_DOWN, 1); SET_IN(E2_PIN_JOY_RAPID, 1);
+        run_ms(2000);
+        CHECK(!Joy_Z_flag && !Joy_X_flag && !rapid_Z_flag && !rapid_X_flag, "M%d %s джойстик %d%s: после отпускания Joy_Z=%d Joy_X=%d rapidZ=%d rapidX=%d",
+              m.mode, m.pre, m.pin, m.rapid ? " быстро" : "", Joy_Z_flag, Joy_X_flag, rapid_Z_flag, rapid_X_flag);
+    }
+    spindle(0); run_ms(200);
+}
+
 static void test_v38_all() {
+    if (getenv("SIM_JOYF")) { test_v38_joyflags(); return; }
+    test_v38_joyflags();
     if (getenv("SIM_PULSES")) { test_v38_pulses(); return; }
     test_v38_pulses();
     if (getenv("SIM_RELEASE")) { test_v38_cone_release(); return; }
