@@ -40,12 +40,19 @@ def main():
             problems.append('пакеты от блока DRO не приходят')
         esp.send('<UIRESET>'); time.sleep(0.5)
         esp.btn('M2'); time.sleep(0.6); esp.btn('S2'); time.sleep(0.4); esp.btn('AFEED:300'); time.sleep(0.4)
+        for _ in range(4):                      # подэкран 1: на 3/4 в первой строке не позиция Z (ввод ⌀, «ДО УПОРА»)
+            if stm.var('SelectMenu') == 1:
+                break
+            esp.btn('PARAM_OK'); time.sleep(0.6)
         z0 = esp.uidump().get('row1_val')
+        m0, d0 = stm.var('Motor_Z_Pos'), stm.var('dro_pos_y')
         stm.press('JOY_LEFT'); time.sleep(1.5); stm.release('JOY_LEFT'); time.sleep(1.5)
-        z1 = esp.uidump().get('row1_val')
+        u = esp.uidump(); z1 = u.get('row1_val')
+        diag = (f'режим {stm.var("Mode")}, подэкран {stm.var("SelectMenu")}, {u.get("row1_title")}, шагов Z '
+                f'{stm.var("Motor_Z_Pos") - m0:+d}, DRO {stm.var("dro_pos_y") - d0:+d} мкм, окно: {u.get("alert_msg") if u.get("alert") == "1" else "-"}')
         stm.press('JOY_RIGHT'); time.sleep(1.5); stm.release('JOY_RIGHT'); time.sleep(1.0)
         if z0 == z1:
-            problems.append(f'Z на экране не изменилась при движении ({z0} → {z1})')
+            problems.append(f'Z на экране не изменилась при движении ({z0} → {z1}; {diag})')
         if stm.var('Joy_Z_flag') or stm.var('Joy_X_flag'):
             problems.append('после отпускания джойстика ядро считает ось в движении')
         print(f'[предполёт] источник {src()}, DRO пакетов {pkts()}, Z на экране {z0} → {z1}', flush=True)
