@@ -14,6 +14,8 @@
   tapfall  — tools/ui_fallthrough_test.py: медленное нажатие кнопки окна не «проваливается» под него
   pairwise — tools/hil_pairwise.py: режим × подрежим × источник × механика × подача × шпиндель, 18 сочетаний
   forum    — tools/hil_forum_fixes.py: режим Wi-Fi (ВЫКЛ/РОУТЕР/ТОЧКА), БЫСТРО в джойстике, «ИЗ КОНФИГА»
+  v38      — tools/hil_v38.py: мод V3.4–V3.8 в ядре — комбинации кнопок, дист. лимиты, профиль резьбы, пауза, конусы, отрезание
+  v38ui    — tools/hil_v38_ui.py: мод V3.4–V3.8 на экране — подэкраны, ТИП/ПРОФИЛЬ, ШАР/ОТРЕЗАНИЕ, кнопки упоров, ПАУЗА/ДАЛЕЕ
 Стенд: STM32 (stm32f407_dro) по ST-Link, дисплей 10.1" по USB и Wi-Fi, Mega — эмулятор DRO.
 """
 import argparse, os, subprocess, sys, time
@@ -30,6 +32,8 @@ SUITES = [
     ('pairwise', ['hil_pairwise.py']),
     ('kb', ['ui_kb_test.py', '--shots', '{out}']),
     ('forum', ['hil_forum_fixes.py']),
+    ('v38', ['hil_v38.py']),
+    ('v38ui', ['hil_v38_ui.py']),
 ]
 
 

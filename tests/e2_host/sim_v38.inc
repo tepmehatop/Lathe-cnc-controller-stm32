@@ -394,14 +394,21 @@ static void test_v38_cone() {
     long otvod = ((long)MOTOR_Z_STEP_PER_REV * 100L + SCREW_Z / 2L) / SCREW_Z * McSTEP_Z;   // 1 мм
     // pairwise: (режим/подрежим/джойстик) × угол × съём × проходы
     struct C { int mode, sub, joy; int cone; int ap; int passes; const char* n; };
-    C cs[] = {
-        {5, 3, 0, 1,  20, 2, "конус > наружн., 30°, 0.20×2"},
-        {5, 3, 0, 57, 50, 3, "конус > наружн., 1:10, 0.50×3 (съём = отскок X, зависание V3.4)"},
-        {4, 3, 1, 1,  50, 2, "конус < наружн., 30°, 0.50×2"},
-        {4, 3, 1, 57, 20, 3, "конус < наружн., 1:10, 0.20×3"},
-        {4, 1, 0, 49, 36, 2, "конус < внутр., КМ2, 0.36×2 (пауза на последнем проходе)"},
-        {4, 1, 0, 0,  20, 3, "конус < внутр., 45°, 0.20×3"},
-    };
+    // попарно (ортогональный массив L9: каждая пара значений любых двух факторов встречается):
+    // вид автоцикла {> наружн., < наружн., < внутр.} × конус {30°, 1:10, КМ2} × съём {0.20, 0.50 = отскок X (зависание
+    // V3.4), 0.36} × проходов {1, 2, 3}; плюс 45° внутр. — крутой конус
+    static const int L9[9][4] = {{0,0,0,0},{0,1,1,1},{0,2,2,2},{1,0,1,2},{1,1,2,0},{1,2,0,1},{2,0,2,1},{2,1,0,2},{2,2,1,0}};
+    struct K { int mode, sub, joy; const char* n; } kinds[] = {{5, 3, 0, "конус > наружн."}, {4, 3, 1, "конус < наружн."}, {4, 1, 0, "конус < внутр."}};
+    struct Cn { int idx; const char* n; } cones[] = {{1, "30°"}, {57, "1:10"}, {49, "КМ2"}};
+    int aps[] = {20, 50, 36}, pss[] = {1, 2, 3};
+    static char names[10][96];
+    std::vector<C> cs;
+    for (int i = 0; i < 9; i++) {
+        const int* f = L9[i];
+        snprintf(names[i], sizeof names[i], "%s, %s, %.2f×%d", kinds[f[0]].n, cones[f[1]].n, aps[f[2]] / 100.0, pss[f[3]]);
+        cs.push_back({kinds[f[0]].mode, kinds[f[0]].sub, kinds[f[0]].joy, cones[f[1]].idx, aps[f[2]], pss[f[3]], names[i]});
+    }
+    cs.push_back({4, 1, 0, 0, 20, 3, "конус < внутр., 45°, 0.20×3"});
     for (auto& c : cs) {
         printf("    %s: ", c.n); fflush(stdout);
         controls_neutral(); select_mode(1); clear_limits(); run_ms(100);
@@ -527,7 +534,39 @@ static void test_v38_cut() {
     printf("    отрезание ⌀4: врезаний %zu, глубина %.3f мм на радиус, канавки Z:", s_x_turns.size(), (double)(r.xmax - x0) / steps_x_per_mm());
     for (auto& tr : s_x_turns) printf(" %+ld", tr.z - z0); printf(" шагов, %.0f с\n", r.secs);
     auto_stop(); clear_limits();
-    // шар по-прежнему шар
+    // попарно (L9): шаг {1, 2, 3 мм} × смещение {0.10, 0.50, 2.00} × врезаний {1, 3, 4} × подача {0.05, 0.10, 0.20}
+    {
+        static const int L9[9][4] = {{0,0,0,0},{0,1,1,1},{0,2,2,2},{1,0,1,2},{1,1,2,0},{1,2,0,1},{2,0,2,1},{2,1,0,2},{2,2,1,0}};
+        int steps[] = {100, 200, 300}, stg[] = {0, 2, 8}, plunges[] = {1, 3, 4}, feeds[] = {5, 10, 20};
+        for (auto& f : L9) {
+            int ap = steps[f[0]], si = stg[f[1]], n = plunges[f[2]], fd = feeds[f[3]];
+            controls_neutral(); select_mode(1); clear_limits(); select_mode(6); SelectMenu = 1; touch("RAZ:2");
+            char b[32];
+            snprintf(b, sizeof b, "AP:%d", ap); touch(b);
+            snprintf(b, sizeof b, "CUT_D:%d", ap * n); touch(b);
+            snprintf(b, sizeof b, "STAG:%d", si); touch(b);
+            snprintf(b, sizeof b, "FEED:%d", fd); touch(b);
+            CHECK(Pass_Total == n && Raz_R == ap * n / 100, "шаг %d, врезаний %d: Pass_Total %ld, ⌀ %ld", ap, n, Pass_Total, Raz_R);
+            lim_btn(1); lim_btn(3);
+            long z0 = Motor_Z_Pos, x0 = Motor_X_Pos;
+            s_x_turns.clear(); s_x_last_dir = -1;
+            auto r = auto_run(6, 3, 0, 600, 400000);
+            long infx = (long)((float)MOTOR_X_STEP_PER_REV * 0.5 * ap / SCREW_X + 0.5) * McSTEP_X;
+            long infz = (long)((float)MOTOR_Z_STEP_PER_REV * Staggered_Width_array[si] / 2 / SCREW_Z + 0.5) * McSTEP_Z;
+            bool grooves = true;
+            for (size_t k = 0; k < s_x_turns.size(); k++)
+                grooves &= s_x_turns[k].z == (k % 2 ? z0 + infz + REBOUND_Z : z0);
+            CHECK(r.done && (long)s_x_turns.size() == n, "отрезание %.0f×%d, смещ. %.2f, подача %.2f: завершён %d, врезаний %zu",
+                  ap / 100.0, n, Staggered_Width_array[si] / 100.0, fd / 100.0, r.done, s_x_turns.size());
+            CHECK(labs((r.xmax - x0) - n * infx) <= McSTEP_X, "отрезание %.0f×%d: глубина %ld шагов, ожидалось %ld", ap / 100.0, n, r.xmax - x0, n * infx);
+            CHECK(grooves, "отрезание %.0f×%d, смещ. %.2f: врезания не чередуются между канавками", ap / 100.0, n, Staggered_Width_array[si] / 100.0);
+            printf("    pairwise: шаг %.0f, смещ. %.2f, врезаний %d, подача %.2f — %s, %.0f с\n", ap / 100.0,
+                   Staggered_Width_array[si] / 100.0, n, fd / 100.0, r.done ? "завершён" : "НЕ завершён", r.secs);
+            auto_stop(); clear_limits();
+        }
+    }
+    // шар по-прежнему шар; RAZ:T — переключить (кнопка экрана)
+    select_mode(6); touch("RAZ:1"); touch("RAZ:T"); CHECK(Raz == 2, "RAZ:T: шар → %d", Raz); touch("RAZ:T"); CHECK(Raz == 1, "RAZ:T: → %d", Raz);
     touch("RAZ:1"); CHECK(Raz == 1, "RAZ:1");
     select_mode(1);
 }
