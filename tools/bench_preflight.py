@@ -5,6 +5,7 @@
   - входы пульта не «нажаты» (Stm32() отпускает оставшиеся);
   - источник координат — блок DRO (POS_SOURCE_DRO_UART = 1); иначе POS_DEFAULT (из els_config.h сборки stm32f407_dro);
   - пакеты от блока DRO (Mega) приходят;
+  - упоры сняты (сцены съёмки и автоциклы оставляют их стоять — каретке некуда ехать);
   - ось Z проехала (M2, джойстик влево 1.5 с) — и координата Z на экране изменилась.
 Код выхода 0 — стенд готов.
 
@@ -39,6 +40,22 @@ def main():
         if pkts() == p0:
             problems.append('пакеты от блока DRO не приходят')
         esp.send('<UIRESET>'); time.sleep(0.5)
+        lims = (('limit_Left_flag', 'EMUL:STOP_L'), ('limit_Right_flag', 'EMUL:STOP_R'),
+                ('limit_Front_flag', 'EMUL:STOP_F'), ('limit_Rear_flag', 'EMUL:STOP_B'))
+        left = [c[-1] for f, c in lims if stm.var(f)]
+        if left:
+            # упоры переключаются в ручном режиме; нажатие может потеряться — до 3 попыток
+            esp.btn('M1'); time.sleep(0.8)
+            for _ in range(3):
+                for f, c in lims:
+                    if stm.var(f):
+                        esp.btn(c); time.sleep(0.6)
+                if not any(stm.var(f) for f, _ in lims):
+                    break
+            still = [c[-1] for f, c in lims if stm.var(f)]
+            print(f'[предполёт] стояли упоры {"".join(left)} — ' + ('сняты' if not still else f'не снялись {"".join(still)}'), flush=True)
+            if still:
+                problems.append('упоры не снимаются')
         esp.btn('M2'); time.sleep(0.6); esp.btn('S2'); time.sleep(0.4); esp.btn('AFEED:300'); time.sleep(0.4)
         for _ in range(4):                      # подэкран 1: на 3/4 в первой строке не позиция Z (ввод ⌀, «ДО УПОРА»)
             if stm.var('SelectMenu') == 1:

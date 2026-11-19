@@ -64,8 +64,12 @@ def main():
         e.btn('M1'); time.sleep(1)
         sp.on(3600)
         print('[1] запуск со страницы, на экране M1')
+        ps = pos()
         http('POST', B + '/api/run?name=pawn.nc'); time.sleep(5)
         u = e.uidump(); x = ex()
+        # без этого «программа не тронулась» неотличимо от «пауза не снялась» в [4]
+        chk(pos() != ps, f'после запуска оси поехали {ps} -> {pos()} (кадр {x.get("step")}, '
+                         f'STM32: пауза {s.var("e2_gc_hold")}, отбой {s.var("e2_cal_abort")})')
         chk(u.get('mode_lbl') == 'G-КОД' and s.var('Mode') == 8, f'экран сам перешёл в M8 ({u.get("mode_lbl")})')
         chk(x.get('state') in ('WAITING_ACK', 'RUNNING') and u.get('glock') == '1',
             f'программа идёт ({x.get("state")}), экран заблокирован')
@@ -79,7 +83,10 @@ def main():
         print('[4] ПРОДОЛЖИТЬ')
         pct0 = ex().get('pct', 0)
         tap(PAUSE_XY); time.sleep(2.5); p2 = pos()
-        chk(ex().get('state') != 'PAUSED' and p2 != p1, f'оси поехали {p1} -> {p2}')
+        x = ex()
+        chk(x.get('state') != 'PAUSED' and p2 != p1, f'оси поехали {p1} -> {p2}' + (
+            '' if p2 != p1 else f' [экран: {x.get("state")}, кадр {x.get("step")}; STM32: пауза {s.var("e2_gc_hold")}, '
+                                f'режим {s.var("Mode")}, отбой {s.var("e2_cal_abort")}]'))
         # проценты — по расчёту времени и после паузы могут пересчитаться назад; идёт ли программа — по осям и кадрам
         st0 = ex().get('step', 0); time.sleep(10); x = ex(); p6 = pos()
         chk(x.get('state') not in ('ERROR', 'IDLE', 'DONE') and p6 != p2,

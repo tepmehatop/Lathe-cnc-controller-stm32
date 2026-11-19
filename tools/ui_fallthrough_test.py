@@ -52,14 +52,23 @@ def main():
                 break
             e.btn('PARAM_OK'); time.sleep(0.5)
 
-    def case(name, setup, button, want_open, mode='M1', mode_changes=False):
+    def case(name, setup, button, want_open, mode='M1', mode_changes=False, need=None):
         print(f'[{name}]')
-        reset(mode)
-        for s in setup:
-            if isinstance(s, str):
-                e.btn(s); time.sleep(0.6)
-            else:
-                tap(s)
+        # need — что должно быть открыто после подготовки: касание при подготовке может потеряться (BACKLOG-045),
+        # и тогда кнопка нажимается не по тому окну — подготовка ещё раз
+        for attempt in range(2):
+            reset(mode)
+            for s in setup:
+                if isinstance(s, str):
+                    e.btn(s); time.sleep(0.6)
+                else:
+                    tap(s)
+            if need is None or opened() == need:
+                break
+            print(f'    ИНФО подготовка дала {sorted(opened())} вместо {sorted(need)} — ещё раз')
+        if need is not None and opened() != need:
+            chk(False, f'подготовка: открыто {sorted(opened())} (нужно {sorted(need)})')
+            return
         c0 = core()
         hold(button)
         o = opened(); c1 = core()
@@ -88,9 +97,10 @@ def main():
     case('съём: ОТМЕНА', [AP_TILE], CANCEL, set())
     if not dro:
         case('диаметр: ОТМЕНА', [D_TILE], CANCEL, set())
-    # окно «НЕ ПРИНЯТО» над клавиатурой: ПОНЯТНО закрывает только окно (клавиатура остаётся для исправления);
+    # окно «НЕ ПРИНЯТО» (info) над клавиатурой: ПОНЯТНО закрывает только окно (клавиатура остаётся для исправления);
     # под ПОНЯТНО — ▼ клавиатуры, под ней — плитки
-    case('НЕ ПРИНЯТО: ПОНЯТНО', [MAIN, (318, 189), (89, 143), (318, 189), ENTER], POPUP_OK, {'axis_kb'})
+    case('НЕ ПРИНЯТО: ПОНЯТНО', [MAIN, (318, 189), (89, 143), (318, 189), ENTER], POPUP_OK, {'axis_kb'},
+         need={'axis_kb', 'info'})
     # ▲▼ клавиатуры — над плитками и кнопками главного экрана
     case('подача: ▲ клавиатуры', [MAIN], (394, 117), {'axis_kb'})
     case('подача: ▼ клавиатуры', [MAIN], (394, 211), {'axis_kb'})

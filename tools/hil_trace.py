@@ -58,6 +58,7 @@ def run(B, name, idx, kzr, d0_mm, rpm=200):
     done, x0, xmax, xmin, sec = None, 0, 0, 0, 0
     log = {}                                             # проход → {lim, xmax, diam_min, ui_pass}
     zbad, uibad = [], []
+    reads = {'n': 0, 'blank': 0}                         # UIDUMP изредка приходит без строки проходов
 
     def tick(t):
         n = B.v('Pass_Nr') - 1                           # Pass_Nr++ сразу после расчёта врезания
@@ -83,6 +84,10 @@ def run(B, name, idx, kzr, d0_mm, rpm=200):
             # (экран — эхо ядра раз в ~100 мс: допускаем «на проход позади»)
             T = B.v('Pass_Total') + 1; cn = B.v('Pass_Nr') - 1
             got = u.get('row4_val') or ''
+            reads['n'] += 1
+            if not got:
+                reads['blank'] += 1
+                return
             try:
                 gr, gt = (int(x) for x in got.split('/'))
                 if gt != T or not (T - cn <= gr <= T - cn + 1):
@@ -111,6 +116,7 @@ def run(B, name, idx, kzr, d0_mm, rpm=200):
     chk(len(log) == N + 1, f'проходов {len(log)} (таблица {N} + чистовой 1)')
     chk(not zbad, f'Z всё время между упорами' + ('' if not zbad else f': выход {zbad[:5]}'))
     chk(not uibad, f'проходы на экране совпадают с ядром' + ('' if not uibad else f': {uibad[:5]}'))
+    chk(reads['blank'] * 10 <= reads['n'], f'проходы на экране читаются: пустых {reads["blank"]} из {reads["n"]}')
     fin = infeed_steps(fd, mech)
     chk(abs((xmax - x0) - fin) <= mech[5], f'итоговая глубина {xmax - x0} шагов = полная глубина профиля {fd:.3f} мм ({fin} шагов)')
     u = B.e.uidump()
