@@ -1,4 +1,4 @@
-# Сборка релиза: по тегу v* (например, v0.1.0) — релиз на GitHub с файлами прошивок;
+# Сборка релиза: по тегу v* (например, v0.1.0) — релиз на GitHub с файлами прошивок (v0.5.0-beta.1 — пре-релиз);
 # вручную (Actions → Релиз → Run workflow) — только сборка, файлы в артефакте запуска.
 # Что собирается и как прошивать — tools/make_release.sh и docs/RELEASE.md.
 name: Релиз
@@ -46,5 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
+          # тег с дефисом (v0.5.0-beta.1, v1.0.0-rc.1) — пре-релиз: на GitHub с пометкой и не «Latest»
+          PRE=""; case "$GITHUB_REF_NAME" in *-*) PRE="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" dist/* $PRE \
             --title "$GITHUB_REF_NAME" --notes-file docs/RELEASE.md
