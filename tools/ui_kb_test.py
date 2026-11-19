@@ -10,9 +10,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import compare_displays as cd
 import hil_cycles as hc
 
-K = {'7': (125, 97), '8': (201, 97), '9': (278, 97), '4': (125, 143), '5': (201, 143), '6': (278, 143),
-     '1': (125, 189), '2': (201, 189), '3': (278, 189), '0': (354, 189), '.': (117, 235)}
-ENTER, POPUP_OK, MAIN, AP_TILE = (340, 236), (390, 241), (150, 78), (71, 230)
+K = {'7': (89, 97), '8': (165, 97), '9': (242, 97), '4': (89, 143), '5': (165, 143), '6': (242, 143),
+     '1': (89, 189), '2': (165, 189), '3': (242, 189), '0': (318, 189), '.': (81, 235)}
+ENTER, POPUP_OK, MAIN, AP_TILE = (304, 236), (390, 241), (150, 78), (71, 230)
+CANCEL = (174, 236)
 
 
 def main():
@@ -62,21 +63,23 @@ def main():
     typ('020'); chk(state('feed', 20) == 20, '«0», «2», «0» без точки — 0.20 принято')
     tap(MAIN); typ('0.40'); time.sleep(0.6)
     chk(ui('info') == '1', '0.40 — окно «НЕ ПРИНЯТО»'); shot('kb_reject')
-    tap(POPUP_OK); chk(state('feed') == 20 and ui('info') == '0', 'значение не изменилось, окно закрыто')
-    tap(MAIN); typ('0'); time.sleep(0.6); chk(ui('info') == '1', '0.00 — не принято'); tap(POPUP_OK)
+    tap(POPUP_OK); chk(state('feed') == 20 and ui('info') == '0' and ui('axis_kb') == '1',
+                       'значение не изменилось, окно закрыто, клавиатура осталась открытой')
+    tap(CANCEL)
+    tap(MAIN); typ('0'); time.sleep(0.6); chk(ui('info') == '1', '0.00 — не принято'); tap(POPUP_OK); tap(CANCEL)
     tap(MAIN); typ('0.25'); chk(state('feed', 25) == 25, 'граница 0.25 — принято')
     tap(MAIN); typ('0.01'); chk(state('feed', 1) == 1, 'граница 0.01 — принято')
-    tap(MAIN); tap((210, 236)); chk(ui('axis_kb') == '0' and state('feed') == 1, 'ОТМЕНА — без изменений')
+    tap(MAIN); tap(CANCEL); chk(ui('axis_kb') == '0' and state('feed') == 1, 'ОТМЕНА — без изменений')
     print('[M1] съём')
     tap(AP_TILE); chk(ui('axis_kb') == '1', 'тап по съёму — клавиатура')
     typ('1.5'); chk(state('ap', 150) == 150, 'съём 1.50')
-    tap(AP_TILE); typ('99.5'); time.sleep(0.6); chk(ui('info') == '1', '99.50 — не принято'); tap(POPUP_OK)
+    tap(AP_TILE); typ('99.5'); time.sleep(0.6); chk(ui('info') == '1', '99.50 — не принято'); tap(POPUP_OK); tap(CANCEL)
     tap(AP_TILE); typ('0'); chk(state('ap', 0) == 0, 'съём 0 — принято')
     print('[M2] асинхронная подача')
     e.btn('M2'); time.sleep(1)
     tap(MAIN); typ('250'); chk(state('afeed', 250) == 250, '250 мм/мин')
-    tap(MAIN); typ('450'); time.sleep(0.6); chk(ui('info') == '1', '450 — не принято'); tap(POPUP_OK)
-    tap(MAIN); typ('5'); time.sleep(0.6); chk(ui('info') == '1', '5 — не принято (меньше 10)'); tap(POPUP_OK)
+    tap(MAIN); typ('450'); time.sleep(0.6); chk(ui('info') == '1', '450 — не принято'); tap(POPUP_OK); tap(CANCEL)
+    tap(MAIN); typ('5'); time.sleep(0.6); chk(ui('info') == '1', '5 — не принято (меньше 10)'); tap(POPUP_OK); tap(CANCEL)
     tap(MAIN); typ('400'); chk(state('afeed', 400) == 400, 'граница 400')
     tap(MAIN); typ('10'); chk(state('afeed', 10) == 10, 'граница 10')
     e.btn('AFEED:200'); e.btn('M1'); time.sleep(0.8); e.btn('FEED:13')

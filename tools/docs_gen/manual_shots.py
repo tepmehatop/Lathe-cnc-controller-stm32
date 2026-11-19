@@ -216,6 +216,10 @@ def s_limits(b):
     for pin in ('LIM_RIGHT', 'LIM_FRONT'):                       # снять
         b.stm.press(pin); time.sleep(0.2); b.stm.release(pin); time.sleep(0.4)
 
+def s_alert_dro_axes(b):
+    """С блоком DRO оси с экрана не задаются: тап по ПОЗИЦИЯ Z — сообщение"""
+    b.mode(1, 1); b.tap('pos_z'); time.sleep(0.6); b.shot('alert_dro_axes'); b.tap('alert_ok')
+
 def s_joystick(b):
     b.mode(1, 1); b.tap('joy'); b.shot('joystick')
 

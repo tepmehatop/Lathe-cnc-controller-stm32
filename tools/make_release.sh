@@ -8,7 +8,8 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 PIO=${PIO:-$(command -v pio || echo "$HOME/.platformio/penv/bin/pio")}
 STM32_ENVS=${STM32_ENVS:-stm32f407_dro}
-DISPLAY_ENVS=${DISPLAY_ENVS:-"jc4827w543 jc8012p4a1c jc1060p470 jc1060p470_v2 jc1060p470_v3"}
+# 4.3" (jc4827w543) не собираем: не поддерживается после v0.4.1 (DISPLAYS.md); собрать вручную — DISPLAY_ENVS=jc4827w543
+DISPLAY_ENVS=${DISPLAY_ENVS:-"jc8012p4a1c jc1060p470 jc1060p470_v2 jc1060p470_v3"}
 OUT=dist
 # esptool 4.x/5.x — для склейки образов дисплея: Python из PlatformIO (локально) или pip install esptool (CI)
 PIO_PY=$(dirname "$PIO")/python

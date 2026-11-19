@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 Подменю и тапы по плиткам (BACKLOG-040): в каждом режиме M1–M7 и на каждом подэкране —
-  1) двойной тап по ⌀ (два касания через 150 мс) переключает подэкран и ничего не открывает;
+  1) кнопка «ЭКРАН N» справа (на месте OK) переключает подэкран одним нажатием и ничего не открывает,
+     подпись — номер нового подэкрана; в M7 (делилка) кнопка — «OK» (следующая метка), подэкран не меняется;
   2) одиночный тап по каждой плитке — что открылось (клавиатура, барабан, правка, меню, сообщение).
-Печатает таблицу; FAIL — двойной тап открыл что-то или не переключил подэкран.
+  3) пока открыт барабан (тап по главному значению) — кнопка снова «OK» и подтверждает выбор.
+Печатает таблицу; FAIL — кнопка открыла что-то, не переключила подэкран или подпись не та.
 
   ~/.platformio/penv/bin/python tools/ui_submenu_test.py [--modes M1,M3]
 """
@@ -54,14 +56,34 @@ def main():
                 row.append(f'{name}:{"+".join(o) if o else "-"}')
             reset()
             print(f'{mode} подэкран {s0}: ' + '  '.join(row))
-            e.send('<TAP:347,153,80>'); time.sleep(0.15); e.send('<TAP:347,153,80>'); time.sleep(1.2)
+            l0 = (e.uidump().get('ok_lbl') or '').replace('\\n', ' ')
+            want0 = 'OK' if mode in ('M7', 'M8') else f'ЭКРАН {s0}'
+            e.send('<TAP:446,154,80>'); time.sleep(1.2)
             o = opened(); s1 = sm()
-            # M7 (делилка) и M8: подэкранов нет, «ОК» там — следующая метка; двойной тап по ⌀ ничего не делает
-            ok = (s1 == s0 if mode in ('M7', 'M8') else s1 != s0) and not o
-            print(f'   двойной тап по ⌀: подэкран {s0} -> {s1}, открыто: {o or "ничего"} {"OK" if ok else "FAIL"}')
+            l1 = (e.uidump().get('ok_lbl') or '').replace('\\n', ' ')
+            want1 = 'OK' if mode in ('M7', 'M8') else f'ЭКРАН {s1}'
+            # M7 (делилка) и M8: подэкранов нет, кнопка — «OK» (в делилке — следующая метка)
+            ok = (s1 == s0 if mode in ('M7', 'M8') else s1 != s0) and not o and l0 == want0 and l1 == want1
+            print(f'   «{l0}»: подэкран {s0} -> {s1}, подпись «{l1}», открыто: {o or "ничего"} {"OK" if ok else "FAIL"}')
             if not ok:
-                fails.append(f'{mode} подэкран {s0}: двойной тап по ⌀ -> {s1}, открыто {o}')
+                fails.append(f'{mode} подэкран {s0}: кнопка «{l0}» (ожидалось «{want0}») -> подэкран {s1}, «{l1}», открыто {o}')
             if s1 == seen[0]: break
+    # барабан открыт — кнопка «OK»
+    reset(); e.btn('M3'); time.sleep(1.0)
+    for _ in range(4):
+        if sm() == 1: break
+        e.btn('PARAM_OK'); time.sleep(0.6)
+    e.send('<TAP:150,78,80>'); time.sleep(1.2)           # тап по шагу резьбы — правка (барабан)
+    u = e.uidump()
+    if u.get('roller') == '1' or u.get('edit') == '1':
+        lb = u.get('ok_lbl'); s0 = sm()
+        e.send('<TAP:446,154,80>'); time.sleep(1.0)
+        u2 = e.uidump(); s1 = sm()
+        ok = lb == 'OK' and u2.get('roller') == '0' and u2.get('edit') == '0' and s1 == s0
+        print(f'правка открыта: кнопка «{lb}», после нажатия барабан закрыт={u2.get("roller") == "0"}, подэкран {s0} -> {s1} {"OK" if ok else "FAIL"}')
+        if not ok: fails.append(f'при правке кнопка «{lb}», после нажатия {u2.get("roller")}/{u2.get("edit")}, подэкран {s0}->{s1}')
+    else:
+        print('правка: тап по шагу не открыл правку — проверка «OK» пропущена')
     reset()
     print('\nИТОГ:', 'OK' if not fails else f'{len(fails)} FAIL')
     for f in fails: print('  -', f)

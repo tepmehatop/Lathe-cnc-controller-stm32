@@ -290,22 +290,33 @@ void IRAM_ATTR my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_colo
 
 // Имитация касания для автотестов (<TAP:x,y> или <TAP:x,y,мс> по USB): нажатие держится 120 мс
 // или заданное время (долгое нажатие — от 400 мс)
-static struct { bool active; lv_coord_t x, y; uint32_t until_ms; } g_sim_tap = {};
+static struct { bool active, seen; lv_coord_t x, y; uint32_t until_ms; } g_sim_tap = {};
+// Самый долгий промежуток между опросами тача (мс) с прошлого <UIDUMP>: если экран занят перерисовкой
+// дольше, чем длится касание, короткий тап может не дойти до LVGL
+static uint32_t s_touch_gap_max = 0, s_touch_last_ms = 0;
 static int g_touch_raw_x = -1, g_touch_raw_y = -1;   // последнее «сырое» касание драйвера (проверка тача)
 static void sim_tap(int x, int y, int ms = 120)
 {
     g_sim_tap.x = (lv_coord_t)x;
     g_sim_tap.y = (lv_coord_t)y;
     g_sim_tap.until_ms = millis() + ms;
+    g_sim_tap.seen = false;
     g_sim_tap.active = true;
 }
 
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
+    {
+        uint32_t now = millis();
+        if (s_touch_last_ms && now - s_touch_last_ms > s_touch_gap_max) s_touch_gap_max = now - s_touch_last_ms;
+        s_touch_last_ms = now;
+    }
     if (g_sim_tap.active) {
         data->point.x = g_sim_tap.x;
         data->point.y = g_sim_tap.y;
-        if ((int32_t)(millis() - g_sim_tap.until_ms) < 0) {
+        // нажатие доходит до LVGL хотя бы в одном опросе, даже если экран был занят дольше касания
+        if (!g_sim_tap.seen || (int32_t)(millis() - g_sim_tap.until_ms) < 0) {
+            g_sim_tap.seen = true;
             data->state = LV_INDEV_STATE_PR;
         } else {
             data->state = LV_INDEV_STATE_REL;
@@ -1087,7 +1098,40 @@ static void handle_ok_btn_click()
     } else if (g_edit_param.active) {
         exit_edit_mode();
     } else if (s_last_mode == MODE_DIVIDER) {
-        uart_protocol.sendButtonPress("PARAM_OK");
+        uart_protocol.sendButtonPress("PARAM_OK");                 // делилка: следующая метка
+    } else if (s_last_mode != MODE_RESERVE) {
+        uart_protocol.sendButtonPress("PARAM_OK");                 // «ЭКРАН»: следующий подэкран («Выбор» пульта)
+    }
+}
+
+// Кнопка справа между ▲▼: «OK» — пока что-то правится (барабан, значение) и в делилке; иначе — «ЭКРАН N»
+// (следующий подэкран одним нажатием; раньше — двойной тап по ⌀, с блоком DRO мешало сообщение про оси)
+static lv_obj_t* s_ok_btn = nullptr;
+static lv_obj_t* s_ok_lbl = nullptr;
+static bool ok_is_screen()
+{
+    return !g_roller.active && !g_sub_edit.active && !g_edit_param.active &&
+           s_last_mode != MODE_DIVIDER && s_last_mode != MODE_RESERVE && s_last_mode != (LatheMode)0;
+}
+static void ok_btn_refresh(lv_timer_t*)
+{
+    if (!s_ok_btn) return;
+    static int shown = -1;                                           // -1 — ещё не рисовали, 0 — OK, n — ЭКРАН n
+    int want = ok_is_screen() ? uart_protocol.getData().select_menu : 0;
+    if (want < 0) want = 0;
+    if (want == shown) return;
+    shown = want;
+    if (want) {
+        char t[24]; snprintf(t, sizeof(t), "\xD0\xAD\xD0\x9A\xD0\xA0\xD0\x90\xD0\x9D\n%d", want);   // ЭКРАН\nN
+        lv_label_set_text(s_ok_lbl, t);
+        lv_obj_set_style_bg_color(s_ok_btn, lv_color_hex(0x0a2a3a), 0);
+        lv_obj_set_style_shadow_width(s_ok_btn, 0, 0);
+        lv_obj_set_style_text_color(s_ok_lbl, lv_color_hex(0x00d4ff), 0);
+    } else {
+        lv_label_set_text(s_ok_lbl, "OK");
+        lv_obj_set_style_bg_color(s_ok_btn, lv_color_hex(0x00d4ff), 0);
+        lv_obj_set_style_shadow_width(s_ok_btn, US(10), 0);
+        lv_obj_set_style_text_color(s_ok_lbl, lv_color_hex(0x000000), 0);
     }
 }
 
@@ -1274,6 +1318,11 @@ struct Numpad {
     NumpadDone done;
     intptr_t tag;
     char buf[12];         // "-1234.567"
+    bool keep;            // done() отказал (kb_reject) — клавиатура остаётся, ввод можно исправить
+    int32_t lo, hi;       // пределы для ▲▼ (как у проверки ВВОДа; по умолчанию — сколько влезает цифр)
+    const int16_t* list;  // ▲▼ по списку допустимых значений (смещение отрезания); nullptr — шаг 1 младшего разряда
+    uint8_t nlist;
+    lv_obj_t* hint;       // «МАКС 0.25» — ▲▼ упёрлись в предел
 };
 static Numpad g_numpad = {};
 
@@ -1282,7 +1331,7 @@ static Numpad g_numpad = {};
 static void numpad_close()
 {
     if (g_numpad.back && lv_indev_get_act()) lv_indev_wait_release(lv_indev_get_act());
-    if (g_numpad.back) { lv_obj_del(g_numpad.back); g_numpad.back = nullptr; }
+    if (g_numpad.back) { lv_obj_del(g_numpad.back); g_numpad.back = nullptr; g_numpad.hint = nullptr; }
 }
 
 static void numpad_refresh()
@@ -1308,9 +1357,66 @@ static int32_t numpad_value()
     return neg ? -v : v;
 }
 
+static void numpad_hint(const char* t)
+{
+    if (!g_numpad.hint) return;
+    lv_label_set_text(g_numpad.hint, t ? t : "");
+}
+
+// целое в единицах 10^-dec → текст в буфер набора («0.14», «-12.500», «250»)
+static void numpad_set_value(int32_t v)
+{
+    int32_t scale = 1;
+    for (int i = 0; i < g_numpad.dec; i++) scale *= 10;
+    int32_t a = v < 0 ? -v : v;
+    if (g_numpad.dec)
+        snprintf(g_numpad.buf, sizeof(g_numpad.buf), "%s%ld.%0*ld", v < 0 ? "-" : "", (long)(a / scale),
+                 (int)g_numpad.dec, (long)(a % scale));
+    else
+        snprintf(g_numpad.buf, sizeof(g_numpad.buf), "%s%ld", v < 0 ? "-" : "", (long)a);
+}
+
+// ▲▼ сбоку клавиатуры: ±1 младшего разряда (или соседнее значение из списка). За пределы не выходит —
+// значение остаётся, вверху панели — «МАКС …» / «МИН …» (окно НЕ ПРИНЯТО — только для набранного числа).
+static void numpad_step(int dir)
+{
+    int32_t v = strpbrk(g_numpad.buf, "0123456789") ? numpad_value() : 0;
+    int32_t nv = v;
+    if (g_numpad.list) {
+        int best = 0;                                     // ближайшее из списка, затем соседнее
+        for (int i = 1; i < g_numpad.nlist; i++)
+            if (abs(g_numpad.list[i] - v) < abs(g_numpad.list[best] - v)) best = i;
+        int i = g_numpad.list[best] == v ? best + dir : (g_numpad.list[best] > v ? (dir > 0 ? best : best - 1)
+                                                                                 : (dir > 0 ? best + 1 : best));
+        nv = (i < 0 || i >= g_numpad.nlist) ? v : g_numpad.list[i];
+    } else {
+        nv = v + dir;
+        if (nv > g_numpad.hi) nv = v > g_numpad.hi ? g_numpad.hi : v;
+        if (nv < g_numpad.lo) nv = v < g_numpad.lo ? g_numpad.lo : v;
+    }
+    if (nv == v && strpbrk(g_numpad.buf, "0123456789")) {
+        char lim[24], t[32];
+        int32_t edge = g_numpad.list ? g_numpad.list[dir > 0 ? g_numpad.nlist - 1 : 0] : (dir > 0 ? g_numpad.hi : g_numpad.lo);
+        char save[12]; memcpy(save, g_numpad.buf, sizeof(save));
+        numpad_set_value(edge); snprintf(lim, sizeof(lim), "%s", g_numpad.buf); memcpy(g_numpad.buf, save, sizeof(save));
+        snprintf(t, sizeof(t), "%s %s", dir > 0 ? "\xD0\x9C\xD0\x90\xD0\x9A\xD0\xA1" : "\xD0\x9C\xD0\x98\xD0\x9D", lim);   // МАКС / МИН
+        numpad_hint(t);
+        return;
+    }
+    numpad_hint(nullptr);
+    numpad_set_value(nv);
+    g_numpad.fresh = false;
+    numpad_refresh();
+}
+
+// пределы ▲▼ — вызывать сразу после numpad_show (те же, что проверяет ВВОД)
+static void numpad_range(int32_t lo, int32_t hi) { g_numpad.lo = lo; g_numpad.hi = hi; }
+static void numpad_values(const int16_t* list, uint8_t n) { g_numpad.list = list; g_numpad.nlist = n; }
+
 static void numpad_key(const char* k)
 {
     char* b = g_numpad.buf;
+    numpad_hint(nullptr);
     bool edit = !strcmp(k, "<") || !strcmp(k, ".") || (k[0] >= '0' && k[0] <= '9' && !k[1]);
     if (edit && g_numpad.fresh) b[0] = 0;          // первая цифра заменяет исходное значение
     if (edit || !strcmp(k, "+/-")) g_numpad.fresh = false;
@@ -1335,8 +1441,12 @@ static void numpad_key(const char* k)
         bool has_digit = strpbrk(b, "0123456789") != nullptr;
         NumpadDone done = g_numpad.done; intptr_t tag = g_numpad.tag;
         int32_t v = numpad_value();
-        numpad_close();
+        // проверка — до закрытия: при отказе (kb_reject → окно НЕ ПРИНЯТО) клавиатура остаётся под окном,
+        // после ПОНЯТНО можно исправить число или нажать ОТМЕНА
+        g_numpad.keep = false;
         if (has_digit && done) done(v, tag);
+        if (g_numpad.keep) { g_numpad.keep = false; numpad_refresh(); return; }
+        numpad_close();
         return;
     }
     else { numpad_close(); return; }               // ОТМЕНА
@@ -1352,6 +1462,13 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
     g_numpad.done = done; g_numpad.tag = tag;
     g_numpad.fresh = init != nullptr;
     snprintf(g_numpad.buf, sizeof(g_numpad.buf), "%s", init ? init : "");
+    g_numpad.keep = false;
+    g_numpad.list = nullptr; g_numpad.nlist = 0;
+    {   // пределы ▲▼ по умолчанию — сколько помещается цифр (уточняет numpad_range)
+        int32_t hi = 1;
+        for (int i = 0; i < int_digits + dec; i++) hi *= 10;
+        g_numpad.hi = hi - 1; g_numpad.lo = sign ? -(hi - 1) : 0;
+    }
 
     lv_obj_t* back = lv_obj_create(lv_layer_top());
     g_numpad.back = back;
@@ -1364,7 +1481,7 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
     lv_obj_clear_flag(back, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* panel = lv_obj_create(back);
-    lv_obj_set_size(panel, UX(320), UY(256));
+    lv_obj_set_size(panel, UX(392), UY(256));                  // цифры слева, колонка ▲▼ справа
     lv_obj_center(panel);
     lv_obj_set_style_bg_color(panel, lv_color_hex(0x0a1622), 0);
     lv_obj_set_style_border_color(panel, lv_color_hex(0x00d4ff), 0);
@@ -1385,6 +1502,33 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
     lv_obj_align(g_numpad.val, LV_ALIGN_TOP_RIGHT, 0, UY(26));
     numpad_refresh();
 
+    g_numpad.hint = lv_label_create(panel);                 // «МАКС 0.25» — ▲▼ упёрлись в предел
+    lv_obj_set_style_text_font(g_numpad.hint, &font_dejavu_14, 0);
+    lv_obj_set_style_text_color(g_numpad.hint, lv_color_hex(0xffaa00), 0);
+    lv_label_set_text(g_numpad.hint, "");
+    lv_obj_align(g_numpad.hint, LV_ALIGN_TOP_LEFT, 0, UY(36));   // под заголовком, слева от значения
+
+    // ▲▼ — колонка внутри окна справа от цифр: значение ±1 младшего разряда, держать — повтор
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t* a = lv_btn_create(panel);
+        lv_obj_set_size(a, UX(64), UY(90));
+        lv_obj_align(a, LV_ALIGN_BOTTOM_RIGHT, 0, i ? 0 : -UY(94));
+        lv_obj_set_style_bg_color(a, lv_color_hex(0x0d3a4e), 0);
+        lv_obj_set_style_bg_color(a, lv_color_hex(0x00d4ff), LV_STATE_PRESSED);
+        lv_obj_set_style_border_color(a, lv_color_hex(0x00d4ff), 0);
+        lv_obj_set_style_border_width(a, US(2), 0);
+        lv_obj_set_style_radius(a, US(6), 0);
+        lv_obj_set_style_shadow_width(a, 0, 0);
+        lv_obj_t* l = lv_label_create(a); lv_obj_center(l);
+        lv_obj_set_style_text_color(l, lv_color_hex(0x00d4ff), 0);   // шрифт — по умолчанию (в нём стрелки)
+        lv_label_set_text(l, i ? LV_SYMBOL_DOWN : LV_SYMBOL_UP);
+        lv_obj_add_event_cb(a, [](lv_event_t* e) {
+            lv_event_code_t c = lv_event_get_code(e);
+            if (c == LV_EVENT_PRESSED || c == LV_EVENT_LONG_PRESSED_REPEAT)
+                numpad_step(lv_event_get_user_data(e) ? -1 : 1);
+        }, LV_EVENT_ALL, (void*)(intptr_t)i);
+    }
+
     static const char* map[] = {
         "7", "8", "9", "<", "\n",
         "4", "5", "6", "+/-", "\n",
@@ -1398,7 +1542,7 @@ static void numpad_show(const char* title, const char* unit, uint8_t dec, uint8_
     if (!sign) lv_btnmatrix_set_btn_ctrl(m, 7, LV_BTNMATRIX_CTRL_DISABLED);    // +/-
     if (!dec)  lv_btnmatrix_set_btn_ctrl(m, 12, LV_BTNMATRIX_CTRL_DISABLED);   // .
     lv_obj_set_size(m, UX(306), UY(184));
-    lv_obj_align(m, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(m, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_obj_set_style_text_font(m, &font_tahoma_bold_22, 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(m, 0, 0);
@@ -1644,27 +1788,15 @@ static void create_k_content(lv_obj_t* screen)
             else { exit_sub_edit(); enter_sub_edit(3); }
         }, LV_EVENT_CLICKED, nullptr);
     }
-    // ДИАМЕТР (Ø на LCD2004) — верх col2, в одном ряду с ПОЗИЦИЯ Y / X; двойной тап → PARAM_OK,
-    // долгое нажатие — ввод диаметра (замерили деталь — ввели ⌀)
+    // ДИАМЕТР (Ø на LCD2004) — верх col2, в одном ряду с ПОЗИЦИЯ Y / X; тап — ввод диаметра (замерили деталь —
+    // ввели ⌀). Подэкраны — кнопкой «ЭКРАН» справа (раньше двойной тап здесь)
     {
         auto r = make_param_cell(panel, col_x[2], GRID_Y, COL_W2, ROW_H, TITLE_DIAM);
         g_wk.diam_unit = r.title; g_wk.diam_val = r.val; g_wk.diam_box = r.box;
         lv_label_set_text(r.val, "+0.00");
         lv_obj_add_flag(r.box, LV_OBJ_FLAG_CLICKABLE);
-        // тап — ввод диаметра; двойной тап — следующий подэкран (PARAM_OK), поэтому ввод — после окна 350 мс
         lv_obj_add_event_cb(r.box, [](lv_event_t*) {
-            static lv_timer_t* s_dt = nullptr;
-            if (s_dt) {                                 // второй тап — подменю
-                lv_timer_del(s_dt); s_dt = nullptr;
-                // только где есть подэкраны: в M7 «ОК» — следующая метка делилки, в M8 — не нужен
-                if (s_last_mode == MODE_DIVIDER || s_last_mode == MODE_RESERVE) return;
-                exit_sub_edit(); uart_protocol.sendButtonPress("PARAM_OK");
-                return;
-            }
-            s_dt = lv_timer_create([](lv_timer_t* t) {
-                *(lv_timer_t**)t->user_data = nullptr; lv_timer_del(t);
-                if (axis_edit_allowed()) { exit_sub_edit(); axis_kb_show('D'); }
-            }, DOUBLE_TAP_MS, &s_dt);
+            if (axis_edit_allowed()) { exit_sub_edit(); axis_kb_show('D'); }
         }, LV_EVENT_SHORT_CLICKED, nullptr);
     }
     // SM-индикатор (название текущего SM, update_sm_row6) — в featured-панели между значением и RPM
@@ -1759,7 +1891,10 @@ static void create_k_content(lv_obj_t* screen)
     { lv_obj_t* l = lv_label_create(ok_btn); lv_obj_center(l);
       lv_obj_set_style_text_color(l, lv_color_hex(0x000000), 0);
       lv_obj_set_style_text_font(l, &font_dejavu_14, 0);
-      lv_label_set_text(l, "OK"); }
+      lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+      lv_label_set_text(l, "OK"); s_ok_lbl = l; }
+    s_ok_btn = ok_btn;
+    lv_timer_create(ok_btn_refresh, 150, nullptr);
     lv_obj_add_event_cb(ok_btn, [](lv_event_t*) { handle_ok_btn_click(); }, LV_EVENT_CLICKED, nullptr);
 
     lv_obj_t* dn_btn = lv_btn_create(panel);
@@ -1885,8 +2020,9 @@ static const int32_t KB_AP_MAX = 9900;                         // 0.01 мм
 static void kb_reject(const char* what, const char* range, const char* entered)
 {
     static char body[400];
-    snprintf(body, sizeof(body), "%s - %s.\nВведено: %s.\n\nЗначение не изменилось. Тапните по полю ещё раз и "
-             "введите число в этих пределах.", what, range, entered);
+    snprintf(body, sizeof(body), "%s - %s.\nВведено: %s.\n\nЗначение не изменилось. Нажмите ПОНЯТНО, исправьте "
+             "число на клавиатуре (или кнопками со стрелками) - либо ОТМЕНА.", what, range, entered);
+    g_numpad.keep = true;                                   // клавиатура остаётся открытой (numpad_key, ВВОД)
     info_popup("\xD0\x9D\xD0\x95 \xD0\x9F\xD0\xA0\xD0\x98\xD0\x9D\xD0\xAF\xD0\xA2\xD0\x9E", 0xff5555, body);   // НЕ ПРИНЯТО
 }
 
@@ -1925,6 +2061,7 @@ static bool feed_kb_show()
         uart_protocol.sendButtonPress(cmd);
         Serial.printf("[KB] %s\n", cmd);
     }, af);
+    numpad_range(af ? KB_AFEED_MIN : KB_FEED_MIN, af ? KB_AFEED_MAX : KB_FEED_MAX);
     return true;
 }
 
@@ -1946,6 +2083,7 @@ static void ap_kb_show()
         uart_protocol.sendButtonPress(cmd);
         Serial.printf("[KB] %s\n", cmd);
     }, 0);
+    numpad_range(0, KB_AP_MAX);
 }
 
 // Шагов мотора на 1 мм хода оси: шагов на оборот × микрошаг / шаг винта (винт — в сотых мм)
@@ -2346,6 +2484,7 @@ static void cal_show()
             char init[8]; snprintf(init, sizeof(init), "%ld", (long)g_cal.len_mm[i]);
             numpad_show("\xD0\xA5\xD0\x9E\xD0\x94, \xD0\xBC\xD0\xBC", "\xD0\xBC\xD0\xBC", 0, 3, false, init,   // ХОД, мм
                         [](int32_t v, intptr_t i) { g_cal.len_mm[i] = v < 5 ? 5 : v; cal_len_refresh(); }, i);
+            numpad_range(5, 999);
         }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
         // ПУСК
         lv_obj_t* go = cfg_button(back, "\xD0\x9F\xD0\xA3\xD0\xA1\xD0\x9A", 0x0a3a2a, 0x00ff88);   // ПУСК
@@ -3107,6 +3246,7 @@ static void create_settings_menu(lv_obj_t* screen)
                     cfg_set_status("\xD0\x9D\xD0\x95 \xD0\xA1\xD0\x9E\xD0\xA5\xD0\xA0\xD0\x90\xD0\x9D\xD0\x95\xD0\x9D\xD0\x9E", 0xffcc00);   // НЕ СОХРАНЕНО
                     cfg_refresh();
                 }, idx);
+                if (idx != 7 && idx != 8) g_numpad.lo = 1;        // ▲▼: ноль — только у люфта
             }, LV_EVENT_CLICKED, (void*)(intptr_t)idx);
         }
     }
@@ -5687,12 +5827,14 @@ static void cut_kb_show(int what)
             if (v < 1 || v > 20) { char e[16]; snprintf(e, sizeof(e), "%ld", (long)v); kb_reject("ШАГ НА " DIAM_SIGN, "1...20 мм", e); return; }
             char c[24]; snprintf(c, sizeof(c), "AP:%ld", (long)v * 100); uart_protocol.sendButtonPress(c);
         }, 0);
+        numpad_range(1, 20);
     } else if (what == 3) {
         snprintf(init, sizeof(init), "%d", d.raz_r);
         numpad_show("ПРОРЕЗАТЬ " DIAM_SIGN, "\xD0\xBC\xD0\xBC", 2, 3, false, init, [](int32_t v, intptr_t) {
             if (v < 1) { kb_reject("ПРОРЕЗАТЬ " DIAM_SIGN, "больше 0", "0"); return; }
             char c[24]; snprintf(c, sizeof(c), "CUT_D:%ld", (long)v); uart_protocol.sendButtonPress(c);
         }, 0);
+        numpad_range(1, 99999);
     } else {
         snprintf(init, sizeof(init), "%d.%02d", d.stag / 100, d.stag % 100);
         numpad_show("СМЕЩЕНИЕ", "\xD0\xBC\xD0\xBC", 2, 1, false, init, [](int32_t v, intptr_t) {
@@ -5700,6 +5842,7 @@ static void cut_kb_show(int what)
             for (int i = 1; i < 9; i++) if (abs(STAG_MM[i] - v) < abs(STAG_MM[best] - v)) best = i;
             char c[16]; snprintf(c, sizeof(c), "STAG:%d", best); uart_protocol.sendButtonPress(c);
         }, 0);
+        numpad_values(STAG_MM, 9);                               // ▲▼ — по значениям ядра
     }
 }
 
@@ -6499,6 +6642,8 @@ static void ui_dump()
         {"sm_row6", g_ui.sm_row6}, {"s2_lbl", g_ui.s2_lbl}, {"alert_msg", g_ui.alert_msg},
         {"up_lbl", s_up_lbl}, {"dn_lbl", s_dn_lbl}, {"thr_sub", s_thr_sub_lbl}, {"raz_lbl", s_raz_lbl},   // V3.4–V3.8
         {"alert_ok", s_alert_ok_lbl},
+        {"ok_lbl", s_ok_lbl},   // «OK» / «ЭКРАН\nN»
+        {"np_val", g_numpad.back ? g_numpad.val : nullptr}, {"np_hint", g_numpad.back ? g_numpad.hint : nullptr},   // клавиатура
     };
     Serial.print("[UI]");
     for (const auto& l : labels) {
@@ -6521,6 +6666,7 @@ static void ui_dump()
                   !hidden(g_ui.joystick_overlay), !hidden(g_ui.settings_menu), (int)g_roller.active,
                   (int)g_edit_param.active, (int)g_sub_edit.active, !hidden(g_ui.thr_type_box),
                   g_numpad.back != nullptr, (int)uart_protocol.getData().axis_edit);
+    Serial.printf(" touch_gap=%lu", (unsigned long)s_touch_gap_max); s_touch_gap_max = 0;
     Serial.printf(" cal=%d info=%d glock=%d", g_cal.back != nullptr, s_info != nullptr,
                   s_gl && !lv_obj_has_flag(s_gl, LV_OBJ_FLAG_HIDDEN));
     if (g_ui.lim_L)
@@ -6907,6 +7053,7 @@ void loop()
                             if (s_info) { lv_obj_del(s_info); s_info = nullptr; }   // окна настроек
                             numpad_close();
                             scales_close();
+                            cal_close();
                             wifi_close();
                             if (g_ui.settings_menu) lv_obj_add_flag(g_ui.settings_menu, LV_OBJ_FLAG_HIDDEN);
                             if (g_hub.ov) lv_obj_add_flag(g_hub.ov, LV_OBJ_FLAG_HIDDEN);

@@ -56,10 +56,11 @@ static bool     s_sweep = true;    // по умолчанию позиции «�
 //   STEP Z (PE9)  → D2 (INT4)    DIR Z (PE10) → D4 (PG5)
 //   STEP X (PE13) → D3 (INT5)    DIR X (PE14) → D5 (PE3)     через 1 кОм, GND общий
 // Шаг — спад STEP, DIR = 0 — позиция растёт (DRIVER_SIGNALS_DIRECT = 0 в els_config.h).
-// Команды: f1/f0 — следовать/нет, lz<мкм>/lx<мкм> — люфт, kz<нм>/kx<нм> — нм на шаг, o — обнулить,
+// Команды: z/x<мкм> — положение (при слежении — начальное, дальше от моторов), f1/f0 — следовать/нет, lz<мкм>/lx<мкм> — люфт, kz<нм>/kx<нм> — нм на шаг, o — обнулить,
 // dz<N>/dx<N> — следующие N шагов оси потерять (срыв мотора: проверка контроля пропуска шагов).
 // ============================================================
 static bool              s_follow = false;
+static int32_t s_off_um[2];                         // слежение: начальное положение линейки (z/x<мкм>)
 static volatile int32_t  s_nut[2], s_car[2];      // шаги: гайка (сколько шагов пришло) и каретка
 static volatile int32_t  s_bl_steps[2] = {0, 0};  // люфт, шаги
 static int32_t           s_nm_per_step[2] = {2500, 1250};   // Z: винт 2 мм / 800, X: 1 мм / 800
@@ -220,13 +221,19 @@ static void handle_command(const char* c) {
         case 'm':
             apply_mode(c[1] ? c[1] : '0');
             break;
-        case 'z': s_pos_um[0] = atol(c + 1); break;
-        case 'x': s_pos_um[1] = atol(c + 1); break;
+        // z/x<мкм> — положение линейки; при слежении — смещение: дальше линейка идёт от него за моторами
+        case 'z': case 'x': {
+            uint8_t ax = c[0] == 'x';
+            s_pos_um[ax] = atol(c + 1);
+            noInterrupts(); int32_t car = s_car[ax]; interrupts();
+            s_off_um[ax] = s_pos_um[ax] - (int32_t)(((int64_t)car * s_nm_per_step[ax]) / 1000);
+            break;
+        }
         case 'w': s_sweep = (c[1] == '1'); break;
         case 'f': s_follow = (c[1] == '1'); if (s_follow) s_sweep = false; break;
         case 'l': s_bl_um[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
         case 'k': s_nm_per_step[c[1] == 'x'] = atol(c + 2); follow_apply_bl(); break;
-        case 'o': noInterrupts(); s_nut[0] = s_nut[1] = s_car[0] = s_car[1] = 0; interrupts(); break;
+        case 'o': noInterrupts(); s_nut[0] = s_nut[1] = s_car[0] = s_car[1] = 0; interrupts(); s_off_um[0] = s_off_um[1] = 0; break;
         case 'd': noInterrupts(); s_drop[c[1] == 'x'] = atol(c + 2); interrupts(); break;   // dz/dx<N> — срыв N шагов
     }
     print_state();
@@ -264,7 +271,7 @@ void loop() {
     if (s_follow) {                         // позиция — каретка с люфтом по шагам моторов
         for (uint8_t ax = 0; ax < 2; ax++) {
             noInterrupts(); int32_t c = s_car[ax]; interrupts();
-            s_pos_um[ax] = (int32_t)(((int64_t)c * s_nm_per_step[ax]) / 1000);
+            s_pos_um[ax] = s_off_um[ax] + (int32_t)(((int64_t)c * s_nm_per_step[ax]) / 1000);
         }
     }
     // Качание позиций через ноль, чтобы на дисплее были и плюс, и минус:

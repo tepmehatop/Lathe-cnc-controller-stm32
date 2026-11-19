@@ -8,6 +8,10 @@
   dist    — подэкран 4: тап «ДО УПОРА» — клавиатура; расстояние с экрана и с пульта; кнопки упоров на экране ставят/снимают
             упор на расстоянии, кнопки подсвечиваются; негатив — в «Наружном» упоры не ставятся;
   prof    — плитка ТИП/ПРОФИЛЬ: окно с двумя рядами, профиль BSW → ядро Kzr=2, плитка; с пульта (уск+Выбор) — плитка следом;
+  profall — все профили × все типы, в обоих порядках (сначала профиль, потом тип — и наоборот): ядро Kzr и шаг,
+            плитка ТИП/ПРОФИЛЬ, ШАГ ММ/ДЮЙМ/G-ТРУБ/K-ТРУБ, главное значение; при повторном открытии окна выделен
+            выбранный профиль (не сброшен на метрический);
+  table   — все 67 строк таблицы резьб: шаг на экране, ОБ/МИН и проходы — как в таблице ядра и как в ядре;
   cut     — M6: переключатель ШАР/ОТРЕЗАНИЕ (экран и пульт), плитки ШАГ ⌀ / СМЕЩЕНИЕ / ПРОРЕЗ ⌀, клавиатура, ⌀ = врезаний × шаг;
   cone    — подэкран 2: ДЛ. КОНУСА = формуле V3.8; конус > «Внутренний» — «Режим невозможен!»;
   pause   — в автоцикле ▲/▼ — ДАЛЕЕ/ПАУЗА; ПАУЗА в резьбе → окно «ПАУЗА» с кнопкой ДАЛЕЕ → цикл до конца; в «Ручном» — стрелки.
@@ -120,6 +124,99 @@ def t_prof(U):
     U.e.send('<UIRESET>'); time.sleep(0.5); U.b('KZR:1')
 
 
+CATS = [('МЕТРИЧ', 'ШАГ ММ', 0), ('ДЮЙМ', 'ДЮЙМ', 20), ('G-ТРУБ', 'G-ТРУБ', 47), ('К-ТРУБ', 'K-ТРУБ', 57)]
+KZR_SHORT = ['', 'М 60°', 'BSW 55°', 'UNF 60°', 'ТРАП 30°']
+SCREEN_OK = (446, 154)
+
+
+def thread_table():
+    """Таблица резьб ядра (Core/e2/e2_core.cpp): [(подпись, шаг, проходов, предел об/мин)]"""
+    import re
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Core', 'e2', 'e2_core.cpp'),
+               encoding='utf-8').read()
+    body = src[src.index('Thread_Info[] ='):]
+    body = body[:body.index('};')]
+    return [(m[0], float(m[1]), int(m[2]), int(m[3]))
+            for m in re.findall(r'\{\s*\d+,\s*\d+,\s*\d+,\s*\d+,\s*"([^"]*)",\s*([\d.]+),\s*(\d+),\s*(\d+)\s*\}', body)]
+
+
+def digits(t):
+    return ''.join(c for c in t if c == '+' or '-' <= c <= ':')
+
+
+def t_profall(U):
+    print('[profall]')
+    tab = thread_table()
+    U.b('M3'); U.manual(); U.to_sm(1)
+
+    def check(k, ci, how):
+        name, unit, idx = CATS[ci]
+        u = U.ui()
+        want_val = digits(tab[idx][0]) or '--'
+        ok = (U.v('Kzr') == k and U.v('Thread_Step') == idx and u.get('thr_type_val') == name and
+              KZR_SHORT[k] in (u.get('thr_sub') or '') and u.get('primary_unit') == unit and u.get('primary_val') == want_val)
+        chk(ok, f'{how}: профиль {KZR_SHORT[k]}, тип {name} — ядро Kzr={U.v("Kzr")} шаг #{U.v("Thread_Step")} '
+                f'(ожидался #{idx}); плитка {u.get("thr_type_val")!r}/{u.get("thr_sub")!r}, '
+                f'{u.get("primary_unit")!r} {u.get("primary_val")!r} (ожидалось {unit!r} {want_val!r})')
+        U.tap(THR)                                       # повторное открытие — выделен выбранный профиль
+        u = U.ui()
+        w = [int(u.get(f'prof_b{i}', 0)) for i in range(4)]
+        chk(u.get('thr_type_menu') == '1' and w[k - 1] == max(w) and w.count(max(w)) == 1,
+            f'{how}: окно открыто снова — выделен {KZR_SHORT[k]} (рамки {w})')
+        U.e.send('<UIRESET>'); time.sleep(0.4)
+
+    def menu():
+        U.tap(THR)
+        u = U.ui()
+        if u.get('thr_type_menu') != '1':
+            print(f'      ! тап по плитке не открыл окно (edit={u.get("edit")} roller={u.get("roller")} '
+                  f'sub_edit={u.get("sub_edit")} alert={u.get("alert")})', flush=True)
+
+    def pick_type(ci):
+        menu(); U.tap(MENU_CAT[ci], 0.8)
+        lbl = U.ui().get('ok_lbl')
+        U.tap(SCREEN_OK, 1.0)                            # правка открыта — кнопка «OK» подтверждает
+        return lbl
+
+    def pick_prof(k):
+        menu(); U.tap(MENU_PROF[k - 1])
+        if U.v('Kzr') != k:
+            print(f'      ! профиль {k}: ядро Kzr={U.v("Kzr")}, окно={U.ui().get("thr_type_menu")}', flush=True)
+
+    for k in range(1, 5):
+        for ci in range(4):
+            pick_prof(k)
+            lbl = pick_type(ci)
+            if lbl != 'OK':
+                chk(False, f'при выборе типа кнопка справа {lbl!r}, ожидалось OK')
+            check(k, ci, 'профиль → тип')
+    for ci in range(4):
+        for k in range(1, 5):
+            pick_type(ci)
+            pick_prof(k)
+            check(k, ci, 'тип → профиль')
+    U.b('KZR:1'); U.b('THREAD_STEP:13')
+
+
+def t_table(U):
+    print('[table]')
+    tab = thread_table()
+    chk(len(tab) == 67, f'в таблице ядра {len(tab)} строк (ожидалось 67)')
+    U.b('M3'); U.manual(); U.to_sm(1)
+    bad = []
+    for i, (name, step, passes, lim) in enumerate(tab):
+        U.b(f'THREAD_STEP:{i}', 0.45)
+        u = U.ui()
+        cat = 3 if i >= 57 else 2 if i >= 47 else 1 if i >= 20 else 0
+        got = (u.get('primary_val'), u.get('row3_val'), u.get('row4_val'), u.get('thr_type_val'))
+        # проходов — из таблицы + чистовой (PASS_FINISH = 1, решение владельца); ядро считает Pass_Total в цикле
+        want = (digits(name) or '--', str(lim), f'{passes + 1}/{passes + 1}', CATS[cat][0])
+        if got != want or U.v('Thread_Step') != i:
+            bad.append(f'#{i} {name.strip()}: экран {got}, ожидалось {want}; ядро шаг #{U.v("Thread_Step")}')
+    chk(not bad, f'67 строк: шаг, ОБ/МИН, проходы (+чистовой), тип — как в таблице, шаг ядра тот же' + ('' if not bad else ': ' + '; '.join(bad[:6])))
+    U.b('THREAD_STEP:13')
+
+
 def t_cut(U):
     print('[cut]')
     U.b('M6'); U.manual(); U.to_sm(1); U.b('RAZ:1', 0.5)
@@ -189,7 +286,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--only')
     a = ap.parse_args()
-    allt = ['sm', 'dist', 'prof', 'cut', 'cone', 'pause']
+    allt = ['sm', 'dist', 'prof', 'profall', 'table', 'cut', 'cone', 'pause']
     only = a.only.split(',') if a.only else allt
     U = UI()
     U.e.send('<UIRESET>'); time.sleep(0.5)

@@ -16,7 +16,7 @@ import compare_displays as cd
 OPEN = ('axis_kb', 'roller', 'edit', 'sub_edit', 'alert', 'info', 'mode_menu', 'thr_type_menu', 'settings',
         'joystick', 'cal')
 GEAR, SET_MECH, SET_CAL, HUB_CLOSE = (465, 19), (126, 66), (354, 66), (409, 18)
-MECH_CELL, ENTER, CANCEL = (264, 72), (340, 236), (210, 236)
+MECH_CELL, ENTER, CANCEL = (264, 72), (304, 236), (174, 236)
 MECH_CLOSE, POPUP_OK = (394, 236), (390, 241)
 Z_TILE, D_TILE, MAIN, AP_TILE = (71, 153), (347, 153), (150, 78), (71, 230)
 MODE_LBL, JOY = (54, 20), (438, 19)
@@ -88,8 +88,12 @@ def main():
     case('съём: ОТМЕНА', [AP_TILE], CANCEL, set())
     if not dro:
         case('диаметр: ОТМЕНА', [D_TILE], CANCEL, set())
-    # окно «НЕ ПРИНЯТО» — ПОНЯТНО над плиткой справа внизу
-    case('НЕ ПРИНЯТО: ПОНЯТНО', [MAIN, (354, 189), (125, 143), (354, 189), ENTER], POPUP_OK, set())
+    # окно «НЕ ПРИНЯТО» над клавиатурой: ПОНЯТНО закрывает только окно (клавиатура остаётся для исправления);
+    # под ПОНЯТНО — ▼ клавиатуры, под ней — плитки
+    case('НЕ ПРИНЯТО: ПОНЯТНО', [MAIN, (318, 189), (89, 143), (318, 189), ENTER], POPUP_OK, {'axis_kb'})
+    # ▲▼ клавиатуры — над плитками и кнопками главного экрана
+    case('подача: ▲ клавиатуры', [MAIN], (394, 117), {'axis_kb'})
+    case('подача: ▼ клавиатуры', [MAIN], (394, 211), {'axis_kb'})
     # меню режимов: кнопка режима над плитками
     case('меню режимов: M3', [MODE_LBL], (121, 110), set(), mode_changes=True)
     case('меню режимов: M2', [MODE_LBL], (356, 63), set(), mode_changes=True)
