@@ -16,7 +16,7 @@ import compare_displays as cd
 import hil_cycles as hc
 from manual_shots import Bench
 
-CONE_1_10 = 55          # индекс «1:10» в Cone_Info (e2_core.cpp)
+CONE_1_10 = 57          # индекс «1:10» в Cone_Info (e2_core.cpp; таблица V3.8 + 1:30)
 
 
 def run(b, name, mode, prep, sm2_keys, rpm, shot_at, until_done=True):
@@ -74,7 +74,39 @@ def run(b, name, mode, prep, sm2_keys, rpm, shot_at, until_done=True):
 
 
 def cone(b):
-    return run(b, 'cone_cycle', 'M5', [f'CONE:{CONE_1_10}', 'FEED:10', 'AP:50', 'PASSES:8'], [], 400, 3)
+    """Конус V3.8 (M5 «Конус >», «Наружный»): без упоров — резец в точке старта, джойстик влево, снимок на рабочем
+    проходе 3 (Step 6 — резание к старту)."""
+    stm, esp = b.stm, b.esp
+    problems = []
+    esp.btn('M1'); time.sleep(0.5)
+    for f, c in (('limit_Left_flag', 'EMUL:STOP_L'), ('limit_Right_flag', 'EMUL:STOP_R'),
+                 ('limit_Front_flag', 'EMUL:STOP_F'), ('limit_Rear_flag', 'EMUL:STOP_B')):
+        if stm.var(f):
+            esp.btn(c); time.sleep(0.3)
+    hc.prepare(stm, esp, 'M5', [f'CONE:{CONE_1_10}', 'FEED:10', 'AP:50', 'PASSES:8'])
+    stm.release('SUB_MAN'); time.sleep(0.3); stm.press('SUB_EXT'); time.sleep(1.0)
+    b.sp.on(400); time.sleep(0.8)
+    stm.press('JOY_LEFT')
+    t0, shot = time.time(), False
+    try:
+        while time.time() - t0 < 600 and not stm.var('Complete_flag'):
+            time.sleep(0.2)
+            if not shot and stm.var('Pass_Nr') == 3 and stm.var('Step') == 6:
+                time.sleep(1.0); b.shot('cone_cycle'); shot = True
+        if not stm.var('Complete_flag'):
+            problems.append('конус не завершился')
+        elif (stm.var('limit_Left_flag'), stm.var('limit_Right_flag')) != (1, 1):
+            problems.append('после цикла упоры не поставились')
+    finally:
+        stm.release('JOY_LEFT'); b.sp.off()
+        stm.release('SUB_EXT'); time.sleep(0.3); stm.press('SUB_MAN'); time.sleep(0.6); stm.release('SUB_MAN')
+        esp.btn('ALERT_OK'); time.sleep(0.4)
+        for f, c in (('limit_Left_flag', 'EMUL:STOP_L'), ('limit_Right_flag', 'EMUL:STOP_R')):
+            if stm.var(f):
+                esp.btn(c); time.sleep(0.3)
+    if not shot:
+        problems.append('снимок не сделан')
+    return problems
 
 
 def sphere(b):

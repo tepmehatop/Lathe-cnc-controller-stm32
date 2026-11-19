@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 704" font-family="-apple-system,Segoe UI,Arial,sans-serif" font-size="13">
+<rect width="600" height="704" fill="#0b1019" rx="8"/>
+<defs>
+  <pattern id="cut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="6" height="6" fill="#5d6b80"/><line x1="0" y1="0" x2="0" y2="6" stroke="#ff7a59" stroke-width="2.5"/>
+  </pattern>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff5050"/></marker>
+  <marker id="aj" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#43c463"/></marker>
+  <marker id="ad" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a97ab"/></marker>
+</defs>
+
+<!-- ═══════════ 1. M5 «Конус >», «Наружный» ═══════════ -->
+<text x="14" y="26" fill="#00d4ff" font-size="15" font-weight="bold">1. Наружный, сужается к задней бабке — M5 «Конус &gt;», «Наружный»</text>
+<rect x="14" y="44" width="40" height="150" rx="4" fill="#2a3550"/><text x="16" y="212" fill="#8a97ab">патрон</text>
+<rect x="54" y="74" width="340" height="90" fill="#5d6b80"/>
+<line x1="8" y1="119" x2="590" y2="119" stroke="#3a4a66" stroke-dasharray="10 4 2 4"/><text x="530" y="134" fill="#5b6b82">ось</text>
+<polygon points="214,74 394,74 394,98" fill="url(#cut)"/>
+<polygon points="214,164 394,164 394,140" fill="url(#cut)"/>
+<!-- резец на старте -->
+<polygon points="394,73 384,52 404,52" fill="#a0522d"/><rect x="388" y="38" width="12" height="14" fill="#6b3a1f"/>
+<text x="412" y="50" fill="#e0b080">старт: касание у торца</text>
+<!-- люфт -->
+<line x1="436" y1="68" x2="436" y2="86" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="436" y1="68" x2="416" y2="68" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<text x="444" y="78" fill="#ff7070">люфт: к оси, к патрону</text>
+<!-- джойстик -->
+<line x1="470" y1="112" x2="420" y2="112" stroke="#43c463" stroke-width="3" marker-end="url(#aj)"/>
+<text x="476" y="116" fill="#43c463">джойстик влево</text>
+<!-- конец -->
+<circle cx="214" cy="74" r="5" fill="#ffd54a"/><text x="140" y="64" fill="#ffd54a">конец: резец здесь</text>
+<!-- длина -->
+<line x1="214" y1="184" x2="394" y2="184" stroke="#8a97ab" marker-start="url(#ad)" marker-end="url(#ad)"/>
+<text x="232" y="202" fill="#c6cfdb">ДЛ. КОНУСА — считает прошивка</text>
+
+<!-- ═══════════ 2. M4 «Конус <», «Наружный» ═══════════ -->
+<text x="14" y="252" fill="#00d4ff" font-size="15" font-weight="bold">2. Наружный, сужается к патрону — M4 «Конус &lt;», «Наружный»</text>
+<rect x="14" y="270" width="40" height="150" rx="4" fill="#2a3550"/><text x="16" y="438" fill="#8a97ab">патрон</text>
+<rect x="54" y="314" width="60" height="50" fill="#5d6b80"/>
+<rect x="114" y="300" width="300" height="90" fill="#5d6b80"/>
+<line x1="8" y1="345" x2="590" y2="345" stroke="#3a4a66" stroke-dasharray="10 4 2 4"/>
+<polygon points="114,300 114,324 294,300" fill="url(#cut)"/>
+<polygon points="114,390 114,366 294,390" fill="url(#cut)"/>
+<polygon points="114,299 104,278 124,278" fill="#a0522d"/><rect x="108" y="264" width="12" height="14" fill="#6b3a1f"/>
+<text x="132" y="282" fill="#e0b080">старт: у уступа, касание цилиндра</text>
+<line x1="150" y1="430" x2="150" y2="412" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="150" y1="430" x2="170" y2="430" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<text x="178" y="434" fill="#ff7070">люфт: к оси, от патрона</text>
+<line x1="430" y1="330" x2="480" y2="330" stroke="#43c463" stroke-width="3" marker-end="url(#aj)"/>
+<text x="486" y="334" fill="#43c463">джойстик</text><text x="486" y="350" fill="#43c463">вправо</text>
+<circle cx="294" cy="300" r="5" fill="#ffd54a"/><text x="300" y="296" fill="#ffd54a">конец</text>
+<line x1="114" y1="408" x2="294" y2="408" stroke="#8a97ab" marker-start="url(#ad)" marker-end="url(#ad)"/>
+
+<!-- ═══════════ 3. M4 «Конус <», «Внутренний» ═══════════ -->
+<text x="14" y="478" fill="#00d4ff" font-size="15" font-weight="bold">3. Внутренний, шире к торцу — M4 «Конус &lt;», «Внутренний»</text>
+<rect x="14" y="496" width="40" height="150" rx="4" fill="#2a3550"/><text x="16" y="664" fill="#8a97ab">патрон</text>
+<rect x="54" y="516" width="340" height="38" fill="#5d6b80"/>
+<rect x="54" y="586" width="340" height="38" fill="#5d6b80"/>
+<line x1="8" y1="570" x2="590" y2="570" stroke="#3a4a66" stroke-dasharray="10 4 2 4"/>
+<polygon points="234,554 394,554 394,532" fill="url(#cut)"/>
+<polygon points="234,586 394,586 394,608" fill="url(#cut)"/>
+<!-- расточной резец в отверстии -->
+<polygon points="394,555 384,572 404,572" fill="#a0522d"/><rect x="398" y="566" width="120" height="10" fill="#6b3a1f"/>
+<text x="420" y="600" fill="#e0b080">старт: касание стенки</text>
+<text x="420" y="616" fill="#e0b080">отверстия на торце</text>
+<line x1="456" y1="548" x2="456" y2="530" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<line x1="456" y1="548" x2="436" y2="548" stroke="#ff5050" stroke-width="2" marker-end="url(#ar)"/>
+<text x="464" y="536" fill="#ff7070">люфт: к себе (к стенке),</text>
+<text x="464" y="552" fill="#ff7070">к патрону</text>
+<line x1="520" y1="506" x2="470" y2="506" stroke="#43c463" stroke-width="3" marker-end="url(#aj)"/>
+<text x="526" y="510" fill="#43c463">джойстик</text><text x="526" y="524" fill="#43c463">влево</text>
+<circle cx="234" cy="554" r="5" fill="#ffd54a"/><text x="160" y="508" fill="#ffd54a">конец (последний проход —</text>
+<text x="160" y="524" fill="#ffd54a">сначала пауза, отвод на 30 мм)</text>
+<line x1="234" y1="640" x2="394" y2="640" stroke="#8a97ab" marker-start="url(#ad)" marker-end="url(#ad)"/>
+<text x="250" y="658" fill="#c6cfdb">упоров не ставить — встанут сами</text>
+<rect x="14" y="684" width="12" height="12" fill="url(#cut)"/><text x="32" y="695" fill="#c6cfdb">— снимается за все проходы; жёлтая точка — где резец после цикла</text>
+</svg>
